@@ -41,6 +41,7 @@ Roles:
 | D22 | 2026-11-18 | tibiapal hunt target averages already include the wheel's area augment (Expanded Shape); without it a spell hits 0.5 fewer. Gem picks maximise overall damage; mods within 10 % of the chosen one's gain are listed as near-equal substitutes (`GemRecommendation.similar`); greater gem shown once with substitutes. | User guidance (EK Front Sweep vs Fierce Berserk tie). |
 | D23 | 2026-11-18 | A vessel holds only a gem the player added; unlocked vessels without an owned gem stay empty (never a recommended gem). The search values Gem Vessel slices only by the slice's own effects (+1 flat) and owned gems the new vessel can hold; gem recommendations stay advice (all qualities) and do not affect the allocation. | User: priority 50 sorcerer chose "no revelation" because 3 vessel slices were worth ~20 pp EHP from assumed grade-IV gems. |
 | D24 | 2026-11-18 | Stances (Vocation Adjustments 2026, TibiaWiki after the 7 July 2026 patch) are modelled and picked automatically per rotation plan by their build-independent value (damage vs the shared reference T0 + % EHP) at the user's priority. One stance per vocation; sorcerers one elemental + one aura. Elemental stances convert the next other-element spell: converted share = min(1, element casts / other casts). Serene uptime 80 %, 30 % of incoming damage from non-adjacent enemies (Divine Defiance dodge); Divine Defiance's healing magic level is valued through healing (e.g. Salvation). Monk presets carry their virtue. Elemental pierce capped at 2× sensitivity. | User request; values confirmed by the user (Q1–Q4). |
+| D25 | 2026-11-18 | Base spell cooldowns follow TibiaWiki where the TibiaTools datamine differs (`COOLDOWN_OVERRIDES`, applied on load): Shield Bash 4, Death Echo 6, Great Death Beam 6, Forked Glacier 6, Forked Thorns 6, Strong Ice Wave 4, Devastating Knockout 8, Mystic Repulse 8, Thousand Fist Blows 8, Intense Wound Cleansing 120 s. The rotation display includes the build's augment mods (cooldowns). | User: the DE – EW – DE – GDB rotation needs Death Echo's −2 s augment (DE was 4 s in the datamine). |
 
 ---
 
@@ -375,6 +376,10 @@ User: sorcerer 850 points, offense, Master of Decay got Gift of Life instead of 
 ### 2026-11-18 — Search: augment pair look-ahead
 
 User: is +1 magic level worth more than the second Death Echo augment? No: +1 ML ≈ 0.6 % damage, Death Echo stage II (+12 % base damage) ≈ 3.8 %. Stage I (−2 s cooldown) is worth 0 in the DE – EW – DE – GDB preset (every turn is already used and Death Echo deals less per cast than Energy Wave), so the beam search never filled the first copy and missed the pair (forcing Death Echo gave 25.1 vs 22.6 % damage). `rankOf` now credits stage II × LOOKAHEAD_WEIGHT while one copy is full and the other is affordable (ranking only). 850 points, priority 0: Beam Mastery 2 + LoD 1 + both Death Echo augments (25.2 %). RM look-ahead test relaxed: the plain knight build now already reaches stage 3, so the gem must give a higher stage or the same stage with fewer slice points.
+
+### 2026-11-18 — Cooldowns from TibiaWiki (D25)
+
+All 70 non-rune damage/healing spells checked against TibiaWiki; 10 differed (mostly 2026 spells). With Death Echo at 6 s its first augment (−2 s) is worth ~7.6 % damage (was 0) and stage II ~4 %. 850 points, priority 0: Beam Mastery 2 + LoD 1 + both Death Echo augments; DE 14.3 casts/min shown. The askarak/chakoya spot test no longer expects Master of Flames: with Great Death Beam at 6 s the Decay death-beam rotation wins both spots (Flames still wins at T0 without the wheel). Open: the 7 July 2026 patch also lowered base damage (Death Echo 85 → 75, Great Death Beam 170 → 155); check whether the TibiaTools formulas include it.
 
 ## In progress / Next
 

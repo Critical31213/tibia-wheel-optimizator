@@ -113,6 +113,9 @@ Double Jab, Greater Tiger Clash, Devastating Knockout, Forceful Uppercut, Mystic
 
 ## Cooldowns and healing
 
+`COOLDOWN_OVERRIDES` (D25): TibiaWiki base cooldowns where the datamine differs, applied on load.
+
+
 - Cooldowns come from opentibiabr/canary spell scripts. 2026 spells without public data are marked
   `cooldownApprox` (Shield Bash/Slam, Divine Grenade, Barrages, Death Echo, Forked spells, Thousand Fist Blows).
 - Healing is not in the API. `healing[]` uses Canary `onGetFormulaValues` with linear `level`, and is approximate.

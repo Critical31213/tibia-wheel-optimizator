@@ -539,10 +539,8 @@ describe('integration: hunting spot (weighted monsters)', () => {
     const fire = run(9, 1);
     const energy = run(1, 9);
     expect(topElement(fire)).not.toBe('energy');
-    // D24: the elemental stance converts the rotation (energy spot: death ≈ energy, death rotation stronger).
-    expect(fire.stances).toContain('Master of Flames');
-    expect(energy.stances).not.toContain('Master of Flames');
-    expect(energy.rotation?.presetId).not.toBe(fire.rotation?.presetId);
+    // D24/D25: Master of Decay converts the death-beam rotation (death 105–108 % on both monsters), so both spots
+    // share the rotation; the weights still change the build.
     expect(fire.allocation).not.toEqual(energy.allocation);
     expect(run(18, 2).allocation).toEqual(fire.allocation);
     const spotMsg = fire.rationaleMsgs!.find((m) => m.key === 'rationale.spot');

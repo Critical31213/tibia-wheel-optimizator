@@ -24,10 +24,30 @@ export const REVELATION_SPELLS: Readonly<Record<string, string>> = {
   'Avatar of Balance': 'Avatar of Balance',
 };
 
+/**
+ * D25: base cooldowns (s) from TibiaWiki (checked 2026-11-18, after the 7 July 2026 patch) where the
+ * TibiaTools datamine differs. Applied on load so a re-datamine keeps them.
+ */
+export const COOLDOWN_OVERRIDES: Readonly<Record<string, number>> = {
+  'Shield Bash': 4,
+  'Death Echo': 6,
+  'Great Death Beam': 6,
+  'Forked Glacier': 6,
+  'Forked Thorns': 6,
+  'Strong Ice Wave': 4,
+  'Devastating Knockout': 8,
+  'Mystic Repulse': 8,
+  'Thousand Fist Blows': 8,
+  'Intense Wound Cleansing': 120,
+};
+
+const withCooldown = <T extends { name: string; cooldownSeconds: number }>(s: T): T =>
+  COOLDOWN_OVERRIDES[s.name] !== undefined ? { ...s, cooldownSeconds: COOLDOWN_OVERRIDES[s.name] } : s;
+
 export const DAMAGE_SPELLS: readonly DamageSpell[] = SPELL_FORMULAS.spells.map((s) =>
-  REVELATION_SPELLS[s.name] ? { ...s, unlockedBy: REVELATION_SPELLS[s.name] } : s,
+  withCooldown(REVELATION_SPELLS[s.name] ? { ...s, unlockedBy: REVELATION_SPELLS[s.name] } : s),
 );
-export const HEALING_SPELLS: readonly HealingSpell[] = SPELL_FORMULAS.healing;
+export const HEALING_SPELLS: readonly HealingSpell[] = SPELL_FORMULAS.healing.map(withCooldown);
 
 /** Combat turn length used by the API and tibiapal rotations. */
 export const TURN_SECONDS = 2;

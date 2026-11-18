@@ -54,6 +54,7 @@ import {
 } from './spells';
 import {
   add,
+  augmentMods,
   augmentParts,
   avatarParts,
   type BuildFacts,
@@ -619,9 +620,10 @@ function spellUsages(v: ValuationContext, stages: number[], wheel: EngineWheel):
 /** Casts per minute (30 combat turns). */
 const PER_MINUTE = 60 / 2;
 
-function rotationUsage(p: Prepared, stages: number[]): RotationUsage {
+function rotationUsage(p: Prepared, stages: number[], alloc: ArrayLike<number>): RotationUsage {
   const { v, wheel } = p;
-  const rot = rotation(v.model, { stages });
+  const augments = wheel.slices.filter((s) => s.kind === 'augment' && isFull(wheel, alloc, s.idx)).map((s) => s.tile);
+  const rot = rotation(v.model, { stages, mods: augmentMods(v, augments) });
   const spells: RotationUsage['spells'] = [];
   for (const [name, x] of rot.rates) {
     if (x.rate <= 0) continue;
@@ -1071,7 +1073,7 @@ function assemble(p: Prepared, best: State): BuildResult {
     upgradeRecommendations: upgrades(env, vessels),
     spells: spellUsages(v, stages, wheel),
     plannerCode: plannerCodeFor(input.vocation, allocation, vessels),
-    rotation: rotationUsage(p, stages),
+    rotation: rotationUsage(p, stages, best.alloc),
     stances: v.model.stances ?? [],
   };
 }

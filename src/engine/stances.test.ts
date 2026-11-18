@@ -3,10 +3,11 @@ import { getStance, stanceCombos } from '../data/damage/stances';
 import { pierceDamageMod } from '../data/damage';
 import { resolveCharacterStats } from '../data/character';
 import { optimize } from '.';
-import { valuationFor } from './optimizer';
+import { presetById, valuationFor } from './optimizer';
+import { spellCooldown } from './spells';
 import { stancedCharacter, stanceDefense, stanceElementMl } from './stances';
 import { getEngineWheel } from './wheel/build';
-import { revelationParts } from './values';
+import { augmentParts, revelationParts } from './values';
 
 const st = (n: string) => getStance(n)!;
 
@@ -80,5 +81,17 @@ describe('D24 Lord of Destruction follows the elemental stance', () => {
     // Augment pair look-ahead: stage I (-2 s cooldown) is worth 0 here, stage II (+12 % base damage) needs both copies.
     expect(r.allocation.QTR2).toBe(100);
     expect(r.allocation.QBL2).toBe(100);
+  });
+});
+
+describe('D25 TibiaWiki cooldowns', () => {
+  it('Death Echo 6 s: its -2 s augment is what lets the DE – EW – DE – GDB rotation cast it every 4 s', () => {
+    expect(spellCooldown('Death Echo')).toBe(6);
+    expect(spellCooldown('Great Death Beam')).toBe(6);
+    const v = valuationFor({ vocation: 'sorcerer', points: 850, monster: null }, presetById('sorcerer', 'ms-echo-gdb'), undefined, [st('Master of Decay')]);
+    const tile = getEngineWheel('sorcerer').slices.find((s) => s.tile.conviction.name === 'Augmented Death Echo')!.tile;
+    expect(augmentParts(v, tile)[0].off).toBeGreaterThan(3);
+    const r = optimize({ vocation: 'sorcerer', points: 850, monster: null, priority: 0 });
+    expect(r.rotation!.spells.find((s) => s.name === 'Death Echo')!.ratio).toBeGreaterThan(14);
   });
 });
