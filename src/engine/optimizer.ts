@@ -25,6 +25,8 @@ import { encodePlannerCode, gridForSliceId, plannerVesselIssues, type PlannerVes
 import { resolveCharacterStats } from '../data/character';
 import { BALLISTIC_MASTERY, healingAverage, pierceDamageMod, POSITIONAL_TACTICS } from '../data/damage';
 import { getRotationPresets } from '../data/damage/rotations';
+import { getStance, stanceCombos, type StanceDef } from '../data/damage/stances';
+import { stanceBuilder, stanceDefense, stancedCharacter } from './stances';
 import {
   activeSlots,
   type GemEnv,
@@ -367,6 +369,15 @@ export function vesselTable(env: GemEnv, gems: OwnedGem[]): Parts[] {
   return vessels.map((_, k) => add(add(prefix[k + 1], prefix[k], -1), flat));
 }
 
+/** Build-independent value of a plan: rotation + stance offense vs the reference, offhand mitigation and stance defense. */
+export function baseParts(v: ValuationContext): Parts {
+  return {
+    off: v.model.baseOff,
+    def: 100 * ((100 - v.mitigationRef) / Math.max(50, 100 - v.mitigation) - 1) * v.threat + (v.stanceDef ?? 0),
+    util: 0,
+  };
+}
+
 function partTables(wheel: EngineWheel, v: ValuationContext, vesselP: Parts[]): PartTables {
   const augs = wheel.slices.map((s): [Parts, Parts] => (s.kind === 'augment' ? augmentParts(v, s.tile) : [ZERO, ZERO]));
   return {
@@ -376,11 +387,7 @@ function partTables(wheel: EngineWheel, v: ValuationContext, vesselP: Parts[]): 
     aug2P: augs.map((a) => a[1]),
     revP: wheel.revelations.map((r) => [0, 1, 2, 3].map((st) => revelationParts(v, r, st))),
     vesselP,
-    baseP: {
-      off: v.model.baseOff,
-      def: 100 * ((100 - v.mitigationRef) / Math.max(50, 100 - v.mitigation) - 1) * v.threat,
-      util: 0,
-    },
+    baseP: baseParts(v),
   };
 }
 
@@ -654,6 +661,7 @@ function rationale(p: Prepared, best: State, stages: number[], revPoints: number
   const rotName = plan.preset?.name ?? plan.id;
   out.push(text(p.auto ? 'rationale.rotationAuto' : 'rationale.rotationManual', { rotation: rotName }));
   if (!p.auto && plan.requires && !planValid(p, stages)) out.push(text('rationale.rotationRequires', { revelation: plan.requires }));
+  out.push(model.stances?.length ? text('rationale.stances', { stances: model.stances.join(' + ') }) : text('rationale.noStance'));
   const f = p.forced;
   if (f.taken.length) out.push(text('rationale.forced', { spells: f.taken.join(', ') }));
   if (f.impossible.length) out.push(text('rationale.forcedImpossible', { spells: f.impossible.join(', ') }));
@@ -766,11 +774,16 @@ function modelInputs(input: ValuationInput) {
  * D21: Positional Tactics (+3 distance 70 % of the time, else +3 holy & healing magic level) and Ballistic Mastery
  * (hunt/bow: +4 % physical & holy pierce; boss/crossbow: +10 % critical extra damage) as exact rotation deltas.
  */
-function paladinUniques(mi: ReturnType<typeof modelInputs>, model: SpellModel, preset: RotationPreset | null, threat: number): Partial<Record<string, Parts>> {
+function paladinUniques(
+  mi: ReturnType<typeof modelInputs>,
+  model: SpellModel,
+  preset: RotationPreset | null,
+  threat: number,
+  at: (c: Required<CharacterStats>) => SpellModel,
+): Partial<Record<string, Parts>> {
   const { context, monsters, character } = mi;
   const t0 = planTotal(mi.model, preset);
   const norm = (t: number) => (100 * (t - t0)) / model.total;
-  const at = (c: CharacterStats) => buildSpellModel('paladin', context, monsters, c);
   const pt = POSITIONAL_TACTICS;
   const skill = planTotal(at({ ...character, mainSkill: character.mainSkill + pt.skillBonus }), preset);
   const ml = at({ ...character, magicLevel: character.magicLevel + pt.magicLevelBonus });
@@ -819,17 +832,24 @@ export function valuationFor(
   input: ValuationInput,
   preset: RotationPreset | null = presetById(input.vocation, input.rotationId),
   reference?: number,
+  stances: readonly StanceDef[] = [],
 ): ValuationContext {
-  const mi = modelInputs(input);
-  const { context, level, character, monsters } = mi;
+  const mi0 = modelInputs(input);
+  const { context, level, monsters } = mi0;
+  const build = stanceBuilder(input.vocation, context, monsters, stances, preset);
+  const character = stancedCharacter(mi0.character, stances);
+  const mi = stances.length ? { ...mi0, character, model: build(character) } : mi0;
   const model = withPlan(mi.model, preset, reference);
   const t0 = planTotal(mi.model, preset);
   const mage = input.vocation === 'sorcerer' || input.vocation === 'druid';
   const boosted = mage ? { ...character, magicLevel: character.magicLevel + 1 } : { ...character, mainSkill: character.mainSkill + 1 };
-  const skillOff = (100 * (planTotal(buildSpellModel(input.vocation, context, monsters, boosted), preset) - t0)) / model.total;
+  const skillOff = (100 * (planTotal(build(boosted), preset) - t0)) / model.total;
   const monster = spotMonster(monsters);
   const threat = threatOf(monster);
-  const facts = characterFacts(input.vocation, level, character.shielding, model.plan.shield ? 'shield' : undefined);
+  const offhand = model.plan.shield ? 'shield' : undefined;
+  const facts = characterFacts(input.vocation, level, character.shielding, offhand);
+  // EHP reference without stances, so Protector's shielding counts.
+  facts.mitigationRef = characterFacts(input.vocation, level, mi0.character.shielding).mitigationRef;
   return {
     vocation: input.vocation,
     context,
@@ -838,10 +858,11 @@ export function valuationFor(
     level,
     threat,
     ...facts,
+    stanceDef: stanceDefense(model, mi0.character, stances, K.HEAL_EHP) * threat,
     incoming: incomingShares(monsters),
     skillOff: Math.max(0, skillOff),
     forced: new Set(input.forcedSpells ?? []),
-    unique: input.vocation === 'paladin' ? paladinUniques(mi, model, preset, threat) : {},
+    unique: input.vocation === 'paladin' ? paladinUniques(mi, model, preset, threat, build) : {},
   };
 }
 
@@ -924,6 +945,10 @@ interface Prepared {
 
 interface PlanSpec {
   preset: RotationPreset | null;
+  /** D24: stances of this plan. */
+  stances: StanceDef[];
+  /** Valuation already built while picking the stances. */
+  v?: ValuationContext;
   reference: number;
   auto: boolean;
   forced: ForcedInfo;
@@ -931,7 +956,7 @@ interface PlanSpec {
 
 function prepare(input: OptimizerInput, priority = input.priority, base?: Prepared, spec?: PlanSpec): Prepared {
   const wheel = getEngineWheel(input.vocation);
-  const v = base?.v ?? valuationFor(input, spec?.preset ?? null, spec?.reference);
+  const v = base?.v ?? spec?.v ?? valuationFor(input, spec?.preset ?? null, spec?.reference, spec?.stances);
   const budget = Math.min(wheel.definition.totalCapacity, pointsOf(input));
   const gems = input.gems ?? [];
   const blend = blendWith(weightsFor(priority));
@@ -1035,6 +1060,7 @@ function assemble(p: Prepared, best: State): BuildResult {
     spells: spellUsages(v, stages, wheel),
     plannerCode: plannerCodeFor(input.vocation, allocation, vessels),
     rotation: rotationUsage(p, stages),
+    stances: v.model.stances ?? [],
   };
 }
 
@@ -1213,7 +1239,27 @@ export function planSpecs(input: OptimizerInput): PlanSpec[] {
   const reference = Math.max(1, ...autoPlans.filter((x) => !x?.requires?.revelation).map((x) => planTotal(base, x)));
   const wheel = getEngineWheel(input.vocation);
   const forced = forcedSeed(wheel, input.forcedSpells ?? [], Math.min(wheel.definition.totalCapacity, pointsOf(input)));
-  return presets.map((preset) => ({ preset, reference, auto: !chosen, forced }));
+  const blend = blendWith(weightsFor(input.priority));
+  return presets.map((preset) => {
+    const { stances, v } = pickStances(input, preset, reference, blend);
+    return { preset, stances, v, reference, auto: !chosen, forced };
+  });
+}
+
+/**
+ * D24: stances per plan, picked by their build-independent value (damage vs the reference, EHP) at the
+ * user's priority; a preset may name its stance (monk virtues).
+ */
+export function pickStances(input: OptimizerInput, preset: RotationPreset | null, reference: number, blend: (p: Parts) => number) {
+  const fixed = preset?.stance ? getStance(preset.stance) : undefined;
+  const combos = fixed ? [[fixed]] : stanceCombos(input.vocation);
+  let best = { stances: [] as StanceDef[], v: null as ValuationContext | null, score: -Infinity };
+  for (const stances of combos) {
+    const v = valuationFor(input, preset, reference, stances);
+    const score = blend(baseParts(v));
+    if (score > best.score + 1e-9) best = { stances, v, score };
+  }
+  return { stances: best.stances, v: best.v ?? undefined };
 }
 
 export function runOptimizer(input: OptimizerInput): OptimizerResult {

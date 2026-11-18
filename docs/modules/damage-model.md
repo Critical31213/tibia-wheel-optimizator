@@ -88,6 +88,10 @@ The committed fixture `__fixtures__/api-samples.json` (10 API responses) is re-c
 - Evaluate it with `HitOptions.skillBonus` / `magicLevelBonus` (also `healingAverage({ magicLevelBonus })`).
   Example: +3 magic level adds ≈ 18 to Divine Caldera.
 
+## Stances (D24)
+
+See `src/data/damage/stances.ts` and docs/modules/engine.md. `pierceDamageMod` caps the result at 2× sensitivity (TibiaWiki Elemental Pierce).
+
 ## Revelation spells (D20)
 
 - `REVELATION_SPELLS` / `revelationSpell(name)` give the unlocking revelation (wheel-data names):

@@ -73,7 +73,7 @@ const PASSIVE_MULT: Record<string, { mult: number[]; applies: (s: SpellEval) => 
   'Lord of Destruction': { mult: [1.0148, 1.0222, 1.0296], applies: (s) => s.element === 'fire' },
 };
 /** Monk spells that spend Harmony (Ascetic). Approximate. */
-const HARMONY_SPENDERS = new Set([
+export const HARMONY_SPENDERS = new Set([
   'Greater Flurry of Blows',
   'Sweeping Takedown',
   'Thousand Fist Blows',
@@ -141,6 +141,10 @@ export interface SpellEval {
   areaGap: number;
   /** Part of the attack rotation (damage spell, not a rune; D16: not single-target in hunt mode). */
   usable: boolean;
+  /** D24 stances: extra crit chance / extra damage (pp) and damage multiplier of this spell. */
+  critChance?: number;
+  critExtra?: number;
+  mult?: number;
   /** Hits per stage 0..3: main, extra (null if none). */
   hits: { main: HitPart; extra: HitPart | null }[];
 }
@@ -185,6 +189,10 @@ export interface SpellModel {
   flatOffPerPoint: number;
   /** Δ% healing output per +1 flat healing bonus. */
   flatHealPerPoint: number;
+  /** D24: multiplier of all damage dealt (Protector). */
+  damageMult?: number;
+  /** D24: active stances. */
+  stances?: string[];
 }
 
 export function elementMultiplier(monster: Monster | null, element: Element | null): number {
@@ -217,11 +225,11 @@ export function outerBeamTargets(meta: Pick<SpellMeta, 'area' | 'avgHitsHuntOute
   return meta.avgHitsHuntOuter ?? 0;
 }
 
-function hitPart(name: string, char: Required<CharacterStats>, vocation: Vocation, mode: FightContext['mode'], stage: number, part: 'main' | 'extra'): HitPart | null {
+function hitPart(name: string, char: Required<CharacterStats>, vocation: Vocation, mode: FightContext['mode'], stage: number, part: 'main' | 'extra', magicLevelBonus = 0): HitPart | null {
   const spell = getDamageSpell(name);
   const variant = spell && spellVariant(spell, stage, part);
   if (!variant) return null;
-  const o = { vocation, stage, part, paladinWeapon: paladinWeaponFor(mode) };
+  const o = { vocation, stage, part, paladinWeapon: paladinWeaponFor(mode), magicLevelBonus };
   const base = spellAverageHit(name, char, o);
   return {
     base,
@@ -232,9 +240,12 @@ function hitPart(name: string, char: Required<CharacterStats>, vocation: Vocatio
 
 const modelCache = new Map<string, SpellModel>();
 
-function cacheKey(vocation: Vocation, ctx: FightContext, monsters: { monster: Monster; weight: number }[], c: Required<CharacterStats>) {
+/** D24: extra magic level for spells of some elements (stances). */
+export type ElementMagicLevel = Partial<Record<Element, number>>;
+
+function cacheKey(vocation: Vocation, ctx: FightContext, monsters: { monster: Monster; weight: number }[], c: Required<CharacterStats>, eml: ElementMagicLevel) {
   const m = monsters.map((x) => `${x.monster.id}:${x.weight.toFixed(6)}`).join(',');
-  return `${vocation}|${ctx.mode}|${m}|${c.level}|${c.mainSkill}|${c.magicLevel}|${c.shielding}`;
+  return `${vocation}|${ctx.mode}|${m}|${c.level}|${c.mainSkill}|${c.magicLevel}|${c.shielding}|${JSON.stringify(eml)}`;
 }
 
 export function buildSpellModel(
@@ -242,10 +253,11 @@ export function buildSpellModel(
   context: FightContext,
   monsters: { monster: Monster; weight: number }[] | Monster | null,
   character?: CharacterStats,
+  elementMl: ElementMagicLevel = {},
 ): SpellModel {
   const spot = Array.isArray(monsters) ? monsters : monsters ? [{ monster: monsters, weight: 1 }] : [];
   const char = resolveCharacterStats(vocation, character ?? { level: 600 });
-  const key = cacheKey(vocation, context, spot, char);
+  const key = cacheKey(vocation, context, spot, char, elementMl);
   const cached = modelCache.get(key);
   if (cached && cached.monsters.every((m, i) => m.monster === spot[i].monster)) return cached;
 
@@ -282,9 +294,10 @@ export function buildSpellModel(
     const maxTargets = revDef?.maxTargets?.[2] ?? meta?.maxTargets ?? MAX_TARGETS_FALLBACK[area];
     const shape = { kind, area, maxTargets, avgHitsHunt: meta?.avgHitsHunt ?? dmg?.avgTargetsHunt ?? undefined };
     const revelation = revOf.get(name) ?? -1;
+    const ml = (element && elementMl[element]) || 0;
     const hits = [0, 1, 2, 3].map((st) => ({
-      main: (kind === 'damage' && hitPart(name, char, vocation, context.mode, st, 'main')) || { base: 0, boost: 0, bf: 0 },
-      extra: kind === 'damage' && st > 0 ? hitPart(name, char, vocation, context.mode, st, 'extra') : null,
+      main: (kind === 'damage' && hitPart(name, char, vocation, context.mode, st, 'main', ml)) || { base: 0, boost: 0, bf: 0 },
+      extra: kind === 'damage' && st > 0 ? hitPart(name, char, vocation, context.mode, st, 'extra', ml) : null,
     }));
     const isRune = dmg?.spellType === 'rune';
     spells.set(name, {
@@ -420,7 +433,7 @@ export function castDamage(model: SpellModel, s: SpellEval, r: RotationInput, m:
     else if (def?.extra === 'half') dmg = ((val(h.main) + val(h.extra)) / 2) * t;
     else dmg += val(h.extra) * t;
   }
-  let mult = s.elem * critEV(m.critChance, m.critExtra + (r.critExtra ?? 0));
+  let mult = s.elem * (s.mult ?? 1) * (model.damageMult ?? 1) * critEV(m.critChance + (s.critChance ?? 0), m.critExtra + (s.critExtra ?? 0) + (r.critExtra ?? 0));
   for (const [name, d] of model.passives) {
     const st = r.stages[d] ?? 0;
     const p = PASSIVE_MULT[name];

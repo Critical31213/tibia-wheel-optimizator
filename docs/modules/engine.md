@@ -137,6 +137,14 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 
 **Gem Vessel slices** (D23) are valued as the slice's own +1 flat bonus plus the Hungarian placement gain of *owned* gems that the newly unlocked vessel lets the placement use. Recommended (hypothetical) gems are never assumed, so without owned gems a vessel slice is worth only its flat bonus.
 
+### Stances (`stances.ts`, D24)
+
+- Data: `src/data/damage/stances.ts` (`STANCES`, `stanceCombos`, `SERENE_UPTIME` 0.8, `NON_ADJACENT_SHARE` 0.3).
+- Character: skill +% (Blood Rage 25, Sharpshooter 32, Virtue of Justice 8 × serene), shielding +30 % (Protector, via mitigation; EHP reference keeps the unstanced shielding).
+- Spell model: element magic level (Divine Defiance 6 % distance → holy/healing, Elemental Synthesis 10 % ML → ice/earth), elemental stance bonus on natural spells (+4 % base fire, +4 % crit chance energy, +30 % crit extra death) and conversion (other spells take the element's sensitivity for min(1, element casts / other casts)), Exposed Weakness 8 % pierce, Harmony spenders ×(1 + 0.0478 × base pp), Protector damage ×0.85.
+- Defense (`stanceDefense`, × threat, in `baseParts`): damage taken (Blood Rage +15 %, Protector −15 %, Sapped Strength −10 %), dodge 12 % × 30 %, healing (+10 % self / Sustain +35 % all × serene, healing ML) × heal share × K.HEAL_EHP.
+- Pick (`pickStances`): per plan, the stance set with the highest blended `baseParts`; a preset's `stance` is fixed.
+
 ## 3. Optimizer (`optimizer.ts`)
 
 0. **Plans and forced spells.** One prepared valuation per plan (see Rotation). Forced spells (`input.forcedSpells`, D21) are seeded with a Dijkstra over slice capacities to their cheapest stage I augment, and every search starts from that seed. Messages: `rationale.forced`, `rationale.forcedImpossible`, `rationale.forcedNoAugment`.

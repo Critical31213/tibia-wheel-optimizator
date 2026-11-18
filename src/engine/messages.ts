@@ -18,6 +18,8 @@ export const ENGINE_MESSAGES = {
   'rationale.rotationAuto': 'Damage is based on the rotation {rotation} (picked as the best for this build and spot).',
   'rationale.rotationManual': 'Damage is based on your rotation {rotation}.',
   'rationale.rotationRequires': 'Your rotation needs the {revelation} revelation, which this build does not reach.',
+  'rationale.stances': 'Stance: {stances} (picked by its damage / survivability value at your priority).',
+  'rationale.noStance': 'No stance: none adds value at your priority.',
   'rationale.forced': 'Augments taken because you forced them: {spells}.',
   'rationale.forcedImpossible': 'Not enough points to reach the augment of {spells}.',
   'rationale.forcedNoAugment': '{spells}: no wheel augment; only gem mods can boost it.',

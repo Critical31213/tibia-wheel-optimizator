@@ -532,8 +532,6 @@ describe('integration: hunting spot (weighted monsters)', () => {
   const run = (fire: number, energy: number) =>
     optimize({ vocation: 'sorcerer', points: 1500, monster: null, monsters: spot(fire, energy), priority: 30, context: CONTEXTS[1] });
   const topElement = (r: OptimizerResult) => spellElement(r.spells.find((s) => s.useful && (s.share ?? 0) > 0)!.name);
-  const energyShare = (r: OptimizerResult) =>
-    r.spells.filter((s) => s.useful && spellElement(s.name) === 'energy').reduce((a, s) => a + (s.share ?? 0), 0);
 
   it('weights change the preferred element and the build', () => {
     expect(monster('askarak-demon').elementModifiers.fire).toBeGreaterThan(100);
@@ -541,7 +539,9 @@ describe('integration: hunting spot (weighted monsters)', () => {
     const fire = run(9, 1);
     const energy = run(1, 9);
     expect(topElement(fire)).not.toBe('energy');
-    expect(energyShare(energy)).toBeGreaterThan(energyShare(fire) + 10);
+    // D24: the elemental stance converts the rotation (energy spot: death ≈ energy, death rotation stronger).
+    expect(fire.stances).toContain('Master of Flames');
+    expect(energy.stances).not.toContain('Master of Flames');
     expect(energy.rotation?.presetId).not.toBe(fire.rotation?.presetId);
     expect(fire.allocation).not.toEqual(energy.allocation);
     expect(run(18, 2).allocation).toEqual(fire.allocation);

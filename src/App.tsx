@@ -115,6 +115,7 @@ export default function App() {
               value={spellPrefs}
               onChange={updateSpellPrefs}
               usage={deferred.vocation === inputs.vocation ? shown?.rotation : undefined}
+              stances={deferred.vocation === inputs.vocation ? shown?.stances : undefined}
             />
           </Panel>
           <Panel title={t('app.summaryTitle')} headingId="results-heading">

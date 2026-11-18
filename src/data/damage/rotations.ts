@@ -26,8 +26,8 @@ export const ROTATION_PRESETS: readonly RotationPreset[] = [
   { id: 'ed-glacier-frigo', vocation: 'druid', name: 'Forked Glacier – Strong Ice Wave', spells: [{ name: 'Forked Glacier', ratio: 10 }, { name: 'Strong Ice Wave', ratio: 10 }, { name: 'Eternal Winter', ratio: 1, or: ['Wrath of Nature'] }] },
   { id: 'ed-thorns-tera', vocation: 'druid', name: 'Forked Thorns – Terra Wave', spells: [{ name: 'Forked Thorns', ratio: 10 }, { name: 'Terra Wave', ratio: 10 }, { name: 'Wrath of Nature', ratio: 1, or: ['Eternal Winter'] }] },
 
-  { id: 'em-voh', vocation: 'monk', name: 'Chain – GFoB – Chain – TFB – Takedown (Harmony)', spells: [{ name: 'Chained Penance', ratio: 2 }, { name: 'Greater Flurry of Blows', ratio: 1 }, { name: 'Thousand Fist Blows', ratio: 1 }, { name: 'Sweeping Takedown', ratio: 1 }] },
-  { id: 'em-voj', vocation: 'monk', name: 'Chain – GFoB – Chain – TFB – Chain – Takedown (Justice)', spells: [{ name: 'Chained Penance', ratio: 3 }, { name: 'Greater Flurry of Blows', ratio: 1 }, { name: 'Thousand Fist Blows', ratio: 1 }, { name: 'Sweeping Takedown', ratio: 1 }] },
+  { id: 'em-voh', vocation: 'monk', name: 'Chain – GFoB – Chain – TFB – Takedown (Harmony)', stance: 'Virtue of Harmony', spells: [{ name: 'Chained Penance', ratio: 2 }, { name: 'Greater Flurry of Blows', ratio: 1 }, { name: 'Thousand Fist Blows', ratio: 1 }, { name: 'Sweeping Takedown', ratio: 1 }] },
+  { id: 'em-voj', vocation: 'monk', name: 'Chain – GFoB – Chain – TFB – Chain – Takedown (Justice)', stance: 'Virtue of Justice', spells: [{ name: 'Chained Penance', ratio: 3 }, { name: 'Greater Flurry of Blows', ratio: 1 }, { name: 'Thousand Fist Blows', ratio: 1 }, { name: 'Sweeping Takedown', ratio: 1 }] },
   { id: 'em-tfb', vocation: 'monk', name: 'TFB – GFoB – Chain – TFB – Takedown', spells: [{ name: 'Thousand Fist Blows', ratio: 2 }, { name: 'Greater Flurry of Blows', ratio: 1 }, { name: 'Chained Penance', ratio: 1 }, { name: 'Sweeping Takedown', ratio: 1 }] },
 ];
 

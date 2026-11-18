@@ -104,7 +104,8 @@ export function pierceDamageMod(mod: number, piercePct: number): number {
   const p = piercePct / 100;
   if (mod >= 1) return mod + p / 2;
   const toNeutral = Math.min(p, 1 - mod);
-  return mod + toNeutral + (p - toNeutral) / 2;
+  // TibiaWiki Elemental Pierce: at most doubles the sensitivity.
+  return Math.min(2 * mod, mod + toNeutral + (p - toNeutral) / 2);
 }
 
 export interface HitOptions {

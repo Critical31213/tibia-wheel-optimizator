@@ -138,6 +138,8 @@ export const en = {
   'rotation.needsShield': 'needs a shield',
   'rotation.used': 'Damage based on',
   'rotation.autoPicked': 'picked automatically',
+  'rotation.stance': 'Stance',
+  'rotation.noStance': 'none',
   'rotation.fromRevelation': 'added by a revelation',
   'rotation.forced': 'Force augment for spell',
   'rotation.forcedAdd': 'Add spell…',

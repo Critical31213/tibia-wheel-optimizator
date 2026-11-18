@@ -167,6 +167,8 @@ export interface RotationPreset {
   note?: string;
   /** Only valid when the build reaches this revelation / the player wears a shield. */
   requires?: { revelation?: string; shield?: boolean };
+  /** D24: stance this rotation is played with (else picked by the engine). */
+  stance?: string;
   spells: RotationSpell[];
 }
 
@@ -380,6 +382,8 @@ export interface OptimizerResult {
   alternatives?: AlternativeBuild[];
   /** Rotation the damage estimate is based on. */
   rotation?: RotationUsage;
+  /** D24: stances the build assumes (picked automatically). */
+  stances?: string[];
 }
 
 export interface AlternativeBuild {

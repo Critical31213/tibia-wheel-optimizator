@@ -40,6 +40,7 @@ Roles:
 | D21 | 2026-11-18 | Forced spells: the user can force wheel augments of chosen spells (utility, e.g. Divine Dazzle, Mystic Repulse, Heal Friend). Healing gems excluded for ED/MS; for RP/EK/Monk valued on the defense side. Ballistic Mastery (bow: +4 % physical/holy pierce; crossbow: +10 % crit extra damage) and Positional Tactics (+3 distance 70 % of the time, else +3 holy/healing mlvl) valued exactly. | User guidance + planner texts. |
 | D22 | 2026-11-18 | tibiapal hunt target averages already include the wheel's area augment (Expanded Shape); without it a spell hits 0.5 fewer. Gem picks maximise overall damage; mods within 10 % of the chosen one's gain are listed as near-equal substitutes (`GemRecommendation.similar`); greater gem shown once with substitutes. | User guidance (EK Front Sweep vs Fierce Berserk tie). |
 | D23 | 2026-11-18 | A vessel holds only a gem the player added; unlocked vessels without an owned gem stay empty (never a recommended gem). The search values Gem Vessel slices only by the slice's own effects (+1 flat) and owned gems the new vessel can hold; gem recommendations stay advice (all qualities) and do not affect the allocation. | User: priority 50 sorcerer chose "no revelation" because 3 vessel slices were worth ~20 pp EHP from assumed grade-IV gems. |
+| D24 | 2026-11-18 | Stances (Vocation Adjustments 2026, TibiaWiki after the 7 July 2026 patch) are modelled and picked automatically per rotation plan by their build-independent value (damage vs the shared reference T0 + % EHP) at the user's priority. One stance per vocation; sorcerers one elemental + one aura. Elemental stances convert the next other-element spell: converted share = min(1, element casts / other casts). Serene uptime 80 %, 30 % of incoming damage from non-adjacent enemies (Divine Defiance dodge); Divine Defiance's healing magic level is valued through healing (e.g. Salvation). Monk presets carry their virtue. Elemental pierce capped at 2× sensitivity. | User request; values confirmed by the user (Q1–Q4). |
 
 ---
 
@@ -363,6 +364,10 @@ User Cyclopedia (EK): 119 shielding → 1.34 % (knight shielding factor 1.148 �
 
 Numbered badges on the wheel, the tooltip step and the `wheel.step` key were removed; the hint no longer mentions numbers. The fill-order list in the results panel stays.
 
+### 2026-11-18 — Stances (D24)
+
+Data `src/data/damage/stances.ts`; engine `src/engine/stances.ts` (character, spell model, defense); `pickStances` in `planSpecs`; result `stances`, rationale `rationale.stances` / `rationale.noStance`; shown in the rotation panel. Tests: `src/engine/stances.test.ts`; two tests updated (elemental conversion makes Energy Wave useful vs energy-immune targets; the energy spot picks Master of Decay since death ≈ energy there). Observed picks at level 600: EK Blood Rage (priority 0–50) / Protector (100); RP Sharpshooter / Divine Defiance (100); MS Decay or Flames + Exposed Weakness (0) / Sapped Strength (50+); ED Elemental Synthesis / Shared Conservation (100); EM Harmony (0) / Sustain (50+).
+
 ## In progress / Next
 
 - [x] S1 Data — scraper + monster dataset + search API.
@@ -385,5 +390,6 @@ Open issues:
 - Some legacy monsters lack damage types / max damage.
 - **Pending user decision:** at priority 50, the RP 500–800 hunt build picks Gift of Life instead of the meta Divine Grenade + Divine Empowerment. The cause is that 1 % EHP is weighted like 1 % damage, and the offense/defense exchange rate is not decided yet. Divine Grenade wins at priority ≤ 20–35.
 - Paladin mitigation: shield defense 50 confirmed (Gnome Shield); the quiver factor (0.877) still comes from a single data pair.
+- Monk at priority 50 picks Virtue of Sustain (healing +63 % → ~23 % EHP via K.HEAL_EHP); same open offense/defense exchange-rate question as RP Gift of Life. Virtue of Harmony uses the Ascetic probe (+1 pp base bonus → ×1.0478 spender damage).
 - Rotation preset notes are English-only data strings (not translated in PL).
 - Consider a Web Worker for `optimize()` if the beam width or alternative count grows.

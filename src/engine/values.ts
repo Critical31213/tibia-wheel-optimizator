@@ -93,6 +93,8 @@ export interface ValuationContext {
   incoming: Partial<Record<Element, number>>;
   /** Δ% damage of +1 main skill / magic level (skill boost convictions). */
   skillOff: number;
+  /** D24: % EHP (× threat) of the active stances beyond shielding (damage taken, dodge, healing). */
+  stanceDef?: number;
 }
 
 export function add(a: Parts, b: Parts, k = 1): Parts {

@@ -12,10 +12,12 @@ interface RotationPanelProps {
   onChange: (patch: Partial<SpellPrefs>) => void;
   /** Rotation used by the viewed build. */
   usage?: RotationUsage;
+  /** Stances the viewed build assumes (D24). */
+  stances?: string[];
 }
 
 /** Rotation choice (auto / preset), the rotation the viewed build is based on, and forced spell augments. */
-export function RotationPanel({ presets, spells, value, onChange, usage }: RotationPanelProps) {
+export function RotationPanel({ presets, spells, value, onChange, usage, stances }: RotationPanelProps) {
   const t = useT();
   const id = useId();
   const selected = presets.find((p) => p.id === value.rotationId);
@@ -55,6 +57,12 @@ export function RotationPanel({ presets, spells, value, onChange, usage }: Rotat
             {t('rotation.used')}: <span className="text-parchment-100">{used?.name ?? (usage.presetId === GREEDY_ROTATION_ID ? t('rotation.boss') : usage.presetId)}</span>
             {usage.auto && <span className="text-parchment-400"> ({t('rotation.autoPicked')})</span>}
           </p>
+          {stances && (
+            <p className="mt-0.5 text-xs text-parchment-300">
+              {t('rotation.stance')}: <span className="text-parchment-100">{stances.length ? stances.join(' + ') : t('rotation.noStance')}</span>
+              <span className="text-parchment-400"> ({t('rotation.autoPicked')})</span>
+            </p>
+          )}
           <ul className="mt-1 space-y-0.5">
             {usage.spells.map((s) => (
               <li key={s.name} className="flex justify-between gap-2 text-xs">

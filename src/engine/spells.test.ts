@@ -108,11 +108,10 @@ describe('spell shares', () => {
     const dmgMod = w.supremeMods.find((m) => m.spell === 'Energy Wave' && m.category === 'augDamage')!;
     expect(supremeModParts(v, w.revelations, facts, dmgMod, 4).off).toBe(0);
 
+    // D24: with an elemental stance Energy Wave is converted, so it stays useful.
     const r = optimize({ vocation: 'sorcerer', points: 800, monster: energyImmune, priority: 0 });
-    const ew = r.spells.find((s) => s.name === 'Energy Wave')!;
-    expect(ew.useful).toBe(false);
-    expect(ew.reasonMsg).toEqual({ key: 'spell.immune', params: { monster: 'energy-immune', element: 'energy' } });
-    expect(r.spells.find((s) => s.name === 'Great Fire Wave')!.useful).toBe(true);
+    expect(r.stances?.some((s) => s.startsWith('Master of') && s !== 'Master of Thunder')).toBe(true);
+    expect(r.spells.find((s) => s.name === 'Energy Wave')!.useful).toBe(true);
   });
 
   it('lists every spell the wheel can augment with a reason', () => {
