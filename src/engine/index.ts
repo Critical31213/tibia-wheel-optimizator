@@ -30,5 +30,6 @@ export function pointsForLevel(level: number, scrollPoints = 0): number {
   return base > 0 ? base + scrolls : 0;
 }
 
-export { isAvailable } from './optimizer';
-export { getEngineWheel } from './wheel/build';
+export { ENGINE_MESSAGES, renderMessage, type EngineMessageKey } from './messages';
+export { DEFAULT_CONTEXT } from './spells';
+export { getEngineWheel, isAvailable } from './wheel/build';

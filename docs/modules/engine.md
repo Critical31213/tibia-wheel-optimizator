@@ -1,225 +1,165 @@
-# Engine module (`src/engine`) — Wheel model & optimizer
+# Engine module (`src/engine`): wheel model, valuation, optimizer, gems
 
-Owner: **S2 Engine**. Public API (`src/engine/index.ts`):
+Owner: **S2 Engine** (iteration 2). Every number comes from the official test-server planner data in
+`src/data/wheel` (see [`wheel-data.md`](wheel-data.md)); the engine contains no hand-written wheel tables.
+
+## Public API (`src/engine/index.ts`)
 
 | Export | Purpose |
 |---|---|
-| `getWheel(vocation): WheelDefinition` | 36 slices + 4 revelations for a vocation (cached, treat as read-only). |
-| `optimize(input): OptimizerResult` | Best allocation for points / monster / priority. Deterministic, ~2–6 ms. |
-| `pointsForLevel(level, scrollPoints = 0)` | `max(0, level − 50)` (+ 0–50 scroll points, only from level 51). |
-| `MIN_LEVEL_FOR_POINTS`, `MAX_SCROLL_POINTS` | 50 / 50. |
-| `getEngineWheel`, `isAvailable` | Internal model + unlock rule (used by tests). |
-
-Files:
+| `optimize(input): OptimizerResult` | The best allocation, path, revelations, convictions, stats, vessels, gem and upgrade recommendations, and spells. Deterministic; at most about 10 ms at 4000 points. |
+| `getWheel(vocation): WheelDefinition` | Contract view: 36 slices, 4 revelations, 8 `vessels`, and `mods` (basic and supreme). |
+| `pointsForLevel`, `MIN_LEVEL_FOR_POINTS`, `MAX_SCROLL_POINTS` | Unchanged. |
+| `ENGINE_MESSAGES`, `renderMessage`, `EngineMessageKey` | i18n templates for `rationaleMsgs`, `reasonMsg` and `labelMsg`. |
+| `DEFAULT_CONTEXT` | `{ mode: 'hunt', huntStyle: 'solo' }`, used when `input.context` is missing. |
+| `getEngineWheel`, `isAvailable` | Internal model and unlock rule (for tests and the UI). |
 
 ```
 src/engine/
-  index.ts            public API
-  optimizer.ts        beam search, result assembly, stats, rationale
-  scoring.ts          priority blend, monster tailoring, score tables
-  wheel/geometry.ts   36-slot layout, angles, adjacency builder
-  wheel/perks.ts      perk value model + perk factories
-  wheel/build.ts      geometry + vocation data -> EngineWheel / WheelDefinition
-  wheel/vocations/    knight.ts paladin.ts sorcerer.ts druid.ts monk.ts (+ shared.ts, types.ts)
-  geometry.test.ts    invariants × 5 vocations
-  optimizer.test.ts   path validity, budget, priority, monster, perf
+  index.ts        public API
+  wheel/build.ts  getWheelData -> EngineWheel (slices, unlock graph, twins, revelations, mods) + WheelDefinition
+  spells.ts       context-aware spell model (targets, element, damage shares, cooldowns)
+  values.ts       Parts {off, def, util} for dedication, convictions, augments, revelations, avatar, mods
+  gems.ts         gem valuation, Hungarian placement, recommendations, upgrades
+  optimizer.ts    tables, beam search, result assembly, stats, rationale
+  messages.ts     ENGINE_MESSAGES key -> English template
+  *.test.ts       model, spells, gems, optimizer
 ```
 
-## 1. Sources
+## 1. Data model
 
-| Fact | Source | Status |
-|---|---|---|
-| 36 slices, 9 per domain, capacities 50/75/75/100/100/100/150/150/200 (1000 per domain) | canary `wheel_definitions.hpp` (`WheelSlots_t`), `PlayerWheel::getMaxPointsPerSlot` | verified (server emulator mirroring the client) |
-| Unlock rule & adjacency | canary `PlayerWheel::canPlayerSelectPointOnSlot` / `canSelectSlotFullOrPartial` | verified |
-| Dedication per point (HP/mana/capacity/mitigation) and conviction of every slot, per vocation | canary `io_wheel.cpp` (`slotGreen200` … `slotPurple200`) | verified (monk: canary only) |
-| Revelation thresholds 250 / 500 / 1000 | tibia.fandom.com *Version 13 Updates*, tibiaqa.com, canary | verified |
-| Revelation flat bonus +4 / +9 / +20 damage & healing | canary `io_wheel.hpp` | verified |
-| Revelation perk names per vocation/domain | canary `applyRedStageBonus` / `applyPurpleStageBonus` / `applyBlueStageBonus` | verified |
-| Points = level − 50 (1/level from 51); scrolls 3+5+9+13+20 = 50 | tibiaqa.com, canary `wheel_scrolls.lua` (one community source lists revised = 8) | verified |
-| Numeric *value* of each perk (off/def units) | engine estimate | **approximate** |
-| Monk spell elements & passives | engine estimate | **approximate** |
+- **Slices.** The engine index is the planner `gridId` (row-major 6×6). The slice id is the planner `tileName` (`QTL0`…`QBR8`).
+  - Ring, capacity and domain come from the planner: rings hold 4×50, 8×75, 12×100, 8×150 and 4×200 points, which is 4000 in total and 1000 per domain.
+  - `indexInRing` sorts each ring by angle, clockwise from 12 o'clock. The domains run in this order: `topRight`, `bottomRight`, `bottomLeft`, `topLeft`.
+- **Unlock rule.** This is the planner's directed graph, `WHEEL_DATA.unlockGraph`.
+  - Slices 14, 15, 20 and 21 start unlocked.
+  - Any other slice is available only when at least one slice with an edge into it is **completely full**.
+  - `slice.adjacent` in the contract is the undirected version of this graph, used for drawing.
+  - The graph is asymmetric (corner slices, for example), so the engine always uses `unlockedBy`.
+- **Dedication.** Planner perks per point: HP, mana, capacity, and mitigation at 0.075 % per point.
+- **Convictions.** Each conviction applies only when its slice is full.
+  - Augment slices come in pairs (`twin`). The first full copy gives stage I and the second gives stage II, in either order.
+  - The other kinds are RM (+125 points to the revelation of its own domain), Gem Vessel, life leech, mana leech, skill, and vocation-unique perks.
+- **Revelations.**
+  - Stage thresholds are 250, 500 and 1000 revelation points. Revelation points are domain grid points plus 125 for each full RM slice in that domain.
+  - Revelation-points gems (supreme mods for Revelation Mastery, 150/165/180/225 by grade) count toward thresholds only, and only when placed in an unlocked greater vessel.
+  - Flat damage and healing bonus = Σ over domains of [0, 4, 9, 20][stage], plus 1 per full Gem Vessel slice.
+- **Vessels.** There are 8 vessels, numbered with a **0-based** `vesselId` in planner order (lesser, regular, greater, lesser, greater, regular, greater, greater). Vessel *n* (0-based) unlocks when *n + 1* Gem Vessel slices are full, in any domain.
+- **Gems and slots.** A lesser gem has `basic1`. A regular gem has `basic1` and `basic2`. A greater gem has both basics and `supreme`.
+  - Any gem fits any vessel. Active slots = `SLOTS_BY_QUALITY[min(gem quality, vessel quality)]`.
+- **Momentum.** Supreme cooldown mods add 0, 0.33, 0.66 or 1 % momentum by grade.
 
-URLs: <https://github.com/opentibiabr/canary> (`src/creatures/players/components/wheel/`, `src/io/io_wheel.cpp`),
-<https://tibia.fandom.com/wiki/Version_13_Updates>, <https://www.tibiaqa.com/33683/how-do-promotion-scrolls-work>.
+## 2. Valuation (`spells.ts`, `values.ts`)
 
-> Correction vs. the initial assumption (rings 4×50, 8×75, 12×100, 12×150 = 3600): the real wheel has
-> **5 rings** — 4×50, 8×75, 12×100, 8×150, 4×200 = **4000** points. A full domain is exactly 1000, i.e.
-> revelation stage 3 requires a completely filled domain (gems' *Revelation Mastery* can add domain points
-> in-game; not modelled).
+Every source yields `Parts = { off, def, util }`:
 
-## 2. Geometry
+| Part | Unit |
+|---|---|
+| `off` | ≈ % of total damage output |
+| `def` | ≈ % survivability, scaled by `threat = clamp(maxDamage / 1000, 0.6, 1.6)` |
+| `util` | capacity and mana cost |
 
-Domain colours (canary): green = topLeft, red = topRight, purple = bottomRight, blue = bottomLeft.
-`indexInRing` counts clockwise from 12 o'clock; topRight = 12→3, bottomRight = 3→6, bottomLeft = 6→9, topLeft = 9→12.
+**Blend:** `score = wOff·off + wDef·def + 0.1·util`, where `p = priority / 100`, `wOff = max(0.05, 1 − p)` and `wDef = max(0.05, p)`.
 
-```
-                         12 o'clock
-              topLeft (green)  |  topRight (red)
-                               |
-   ring 5  [200]               |               [200]           4 × 200
-   ring 4    [150][150]        |        [150][150]             8 × 150
-   ring 3      [100][100][100] | [100][100][100]              12 × 100
-   ring 2          [75][75]  <-|->  [75][75]                   8 × 75
-   ring 1              [50]    |    [50]                       4 × 50
-  9 ---------------------------+--------------------------- 3
-   ring 1              [50]    |    [50]
-   ring 2          [75][75]  <-|->  [75][75]
-   ring 3      [100][100][100] | [100][100][100]
-   ring 4    [150][150]        |        [150][150]
-   ring 5  [200]               |               [200]
-              bottomLeft (blue)|  bottomRight (purple)
-                               6
-   <-> = rings 2 and 3 touch across domain borders (cross-domain unlock)
-```
+**Expected targets** (`expectedTargets`):
 
-| Ring | Slices | Per domain | Capacity | Angular width |
-|---|---|---|---|---|
-| 1 | 4 | 1 | 50 | 90° |
-| 2 | 8 | 2 | 75 | 45° |
-| 3 | 12 | 3 | 100 | 30° |
-| 4 | 8 | 2 | 150 | 45° |
-| 5 | 4 | 1 | 200 | 90° |
+| Spell or context | Targets |
+|---|---|
+| single-target spell | 1 (always) |
+| area spell, boss mode | `min(maxTargets, 1.2)` |
+| area spell, solo hunt | `min(maxTargets, avgHitsHunt)` (tibiapal) |
+| area spell, team-lure / team-box | `min(maxTargets, max(solo, 5 / 9))` |
 
-Slice ids are canary-style and identical for all vocations: `green-50`, `green-bottom-75`, `green-top-75`,
-`green-bottom-100`, `green-middle-100`, `green-top-100`, `green-bottom-150`, `green-top-150`, `green-200`, …
-("top/bottom" refer to canary's 6×6 grid; for green/red "top" is the 12 o'clock side).
+- Beams use 0.5 × pool for the central part. The outer part (`avgHitsHuntOuter`, 0.4 × pool in team styles) is weighted separately and is 0 against bosses.
+- Healing spells count 1 target, or the party size for area heals in team hunts.
 
-### Adjacency rule (builder in `geometry.ts`)
+**Element.** `elem = monster.elementModifiers[element] / 100`. Immune (0) makes the spell useless, and so are its augments and its gem mods. With no monster, `elem = 1`.
 
-1. **Radial**: slices of rings *r* and *r+1* are adjacent when their angular spans overlap (> 0°).
-2. **Lateral**: neighbouring slices of the same ring (index ±1) are adjacent inside a domain for rings 2–4;
-   across a domain border only in rings 2 and 3. Ring 1 slices are not adjacent to each other.
-3. The result is symmetric and equals the symmetric closure of canary's prerequisite lists (tested).
+**Damage share.**
+- `c(spell) = weight × targets × elem`.
+- `share = 100 · c / C`.
+- `C` = the vocation's baseline attacks (auto-attacks or runes; mage area runes count 3/4/6 targets) + all non-revelation damage spells.
+- Revelation spells (Executioner's Throw, Divine Grenade, Ice/Terra Burst, Spiritual Outburst) are added at weight 0.35 × stage multiplier. Twin Bursts share one cooldown.
 
-**Unlock rule**: a slice can receive points if it is in ring 1, or **any adjacent slice is full**
-(canary checks every listed neighbour, including same-ring and cross-domain ones). Revelation domain points =
-sum of points in the domain's 9 slices (partial slices count).
+| Effect | Value |
+|---|---|
+| +X % base damage | `off = X · share / 100` |
+| crit extra damage | ×0.1 |
+| crit chance | ×0.5 |
+| life leech | → `def` |
+| mana leech | → `off` and `def` |
+| cooldown −r s (base cooldown B) | `share · (B / max(B/2, B − r) − 1)`. Cooldowns are **capped at 50 % of base**. |
+| area / shape / jumps | add targets via the target model |
+| healing augments | `def` via a heal share. Team heals count ×0.5 solo and ×2 in team. |
 
-## 3. Per-vocation data
+**Avatar.** Worth 0 in hunt mode. In boss mode:
+- `off = 100 · (15 s / 120 s) · ((1 + 0.5 + extra) / (1 + 0.1·0.5) − 1) · min(1, 30 min / cooldown)`
+- `extra` is 5/10/15 % by stage. `def` is the uptime-scaled damage reduction.
+- This applies to the revelation itself and to its supreme mods, momentum included.
 
-### Dedication (per point, verified — canary)
+**Basic mods.** Resistances are worth `pct × incomingShare(monster, element)`; with no monster, generic shares are used. HP, mana and capacity scale relative to `level ≈ points + 50`. Mitigation is worth `pct × 0.18`.
 
-| Kind | Knight | Paladin | Sorcerer | Druid | Monk |
-|---|---|---|---|---|---|
-| HP | 3 | 2 | 1 | 1 | 2 |
-| Mana | 1 | 3 | 6 | 6 | 2 |
-| Capacity | 5 | 4 | 2 | 2 | 5 |
-| Mitigation | 0.03 % | 0.03 % | 0.03 % | 0.03 % | 0.03 % |
-| 200-slices | HP + mana | HP + mana | HP + mana | HP + mana | HP + mana |
+**Supreme mods.** Damage, crit, cooldown and healing use the spell model. Revelation Mastery is worth Δ(revelation value) for the extra points. Momentum is worth `off = 0.5·m` and `def = 0.2·m`.
 
-### Slot layout (dedication → conviction), identical for every vocation
+## 3. Optimizer (`optimizer.ts`)
 
-| Slot | Green (TL) | Red (TR) | Purple (BR) | Blue (BL) |
-|---|---|---|---|---|
-| 50 | cap → Vessel | mitig → **Spell A** | HP → Vessel | mana → **Spell B** |
-| 75 (G,R,P: top · B: bottom) | mana → Life leech 0.75% | cap → Vessel | mitig → Skill +1 | HP → Vessel |
-| 75 (G,R,P: bottom · B: top) | mana → Skill +1 | cap → Life leech | mitig → Mana leech 0.25% | HP → Mana leech |
-| 100 side A | HP → Vessel (top) | mana → Skill +1 (top) | cap → **Spell C** (top) | mitig → Skill +1 (bottom) |
-| 100 middle | HP → **Spell C** | mana → **Spell E** | cap → **Spell D** | mitig → **Spell E** |
-| 100 side B | HP → **Spell D** (bottom) | mana → Vessel (bottom) | cap → Vessel (bottom) | mitig → Vessel (top) |
-| 150 top | mitig → Mana leech | HP → Vessel | mana → Vessel | cap → Life leech |
-| 150 bottom | mitig → Vessel | HP → Mana leech | mana → Life leech | cap → Vessel |
-| 200 | HP+mana → **Passive G** | HP+mana → **Spell B** | HP+mana → **Passive P** | HP+mana → **Spell A** |
+1. **Tables.** Precompute Parts and blended scalars for:
+   - dedication per point
+   - each conviction
+   - augment I/II
+   - revelation[domain][stage]
+   - vessel[k]: the marginal value of unlocking vessel k = Hungarian placement of the owned gems over vessels `0..k`, against the grade-I recommended gem, plus 1 flat bonus.
 
-Each spell group appears in two slices: the first full slice grants augment **I**, the second **II**.
+   Before the search, revelation spells and RM mods assume `min(1000, 0.6 · budget)` revelation points.
+2. **Beam search.**
+   - Width 24, over states that fill one available slice completely. States are deduplicated by allocation key.
+   - Rank = score + 0.6 × (next revelation-stage gain × progress toward it) + greedy-completion estimate.
+   - When the budget cannot fill the next slice, the remainder goes to the best available slice as a partial last slice.
+   - Ties break on the key, so the result is deterministic.
+3. **Final pass.** Recompute the facts from the chosen grid (stages, RM slices, wheel effects), then:
+   - place the owned gems
+   - add the points of placed RM gems
+   - recompute the stages, vessels, stats, recommendations and spells.
+4. **Scores.** Offense and defense are normalised to the full wheel at stage 3 (0–100).
 
-### Spells, passives and revelations (names verified; value units approximate)
+Complexity:
+- Search: `O(steps · W · 36)` with an allocation-free gain function.
+- Hungarian assignment: `O(n²m)`, with n, m ≤ 8.
+- Measured: 0.4 ms at 100 points, 2.4 ms at 1000 points, 10 ms at 4000 points.
 
-| | Knight | Paladin | Sorcerer | Druid | Monk ≈ |
-|---|---|---|---|---|---|
-| Spell A | Fierce Berserk (phys, off 4.5) | Divine Caldera (holy, 4.5) | Great Fire Wave (fire, 4) | Heal Friend (heal, def 2.5) | Flurry of Blows (phys, 4.5) |
-| Spell B | Front Sweep (phys, 3.5) | Sharpshooter (off 3) | Hell's Core / Rage of the Skies (fire+energy, 5) | Strong Ice Wave (ice, 4.5) | Sweeping Takedown (phys, 4) |
-| Spell C | Groundshaker (phys, 4) | Strong Ethereal Spear (phys, 4) | Magic Shield (def 4) | Mass Healing (def 3.5) | Mass Spirit Mend (def 3.5) |
-| Spell D | Intense Wound Cleansing (def 3.5) | Swift Foot (support) | Energy Wave (energy, 4) | Terra Wave (earth, 4) | Chained Penance (phys, 3.5) |
-| Spell E | Chivalrous Challenge (support) | Divine Dazzle (support) | Sap Strength (def 2) | Nature's Embrace (def 3) | Mystic Repulse (support) |
-| Passive G (green-200) | Battle Instinct | Positional Tactics | Runic Mastery | Healing Link | Guiding Presence ≈ |
-| Passive P (purple-200) | Battle Healing | Ballistic Mastery | Focus Mastery | Runic Mastery | Sanctuary ≈ |
-| Rev. topLeft (green) | Gift of Life | Gift of Life | Gift of Life | Gift of Life | Gift of Life |
-| Rev. topRight (red) | Executioner's Throw | Divine Grenade | Beam Mastery | Blessing of the Grove | Spiritual Outburst ≈ |
-| Rev. bottomRight (purple) | Avatar of Steel | Avatar of Light | Avatar of Storm | Avatar of Nature | Avatar of Balance |
-| Rev. bottomLeft (blue) | Combat Mastery | Divine Empowerment | Drain Body | Twin Burst | Ascetic ≈ |
+## 4. Gems (`gems.ts`)
 
-Other convictions: Skill +1 (melee / distance / magic level / fist; off 2, mages 3), Life leech +0.75 % (def 2.5),
-Mana leech +0.25 % (off 1, def 1, util 0.5), Vessel Resonance (off 1, def 1, util 2; tagged with all elemental
-resistances because gems provide them — **approximate**).
+- **Placement rule.** Maximise Σ blend(gem value in vessel) over a one-to-one assignment (Hungarian algorithm), using only each vessel's active slots.
+  - Because active slots follow `min(gem, vessel)` quality, strong supreme gems end up in greater vessels and basic-only gems fill the lower vessels.
+  - Unplaced vessels that are unlocked get `source: 'recommended'`: the best gem of that vessel's quality at grade IV, with id `recommended-<quality>`.
+  - Locked vessels have `unlocked: false`, `gem: null` and `source: 'empty'`.
+- **`gemRecommendations`.**
+  - Per quality, at grade IV: the best `basic1`, the best distinct `basic2`, and the top-2 supreme variants for greater gems.
+  - Each has `reason` and `reasonMsg` from the dominant mod (spell share, avatar in boss, RM stage gained, resistance vs monster, and so on), sorted by gain.
+- **`upgradeRecommendations`.**
+  - Only owned gems, only active slots, and only +1 grade.
+  - `gain = blend(grade + 1) − blend(grade)`, with momentum included for cooldown mods, sorted descending.
 
-## 4. Scoring
+## 5. i18n
 
-Every perk carries a vector `v = (off, def, util, offElements?, defElements?)`, in units where 1 ≈ +1 % effective
-damage or survivability (**approximate** estimates).
+- `rationaleMsgs`, `SpellUsage.reasonMsg`, `GemRecommendation.reasonMsg` and `StatLine.labelMsg` carry `{ key, params }`.
+- Keys are `rationale.*`, `spell.*`, `gem.*` and `stat.*`, and are listed in `ENGINE_MESSAGES` (English templates with `{param}` placeholders).
+- The plain `rationale`, `reason` and `label` strings stay in English.
+- `renderMessage` fills placeholders and leaves unknown ones as they are.
 
-**Dedication per point** (vocation-independent in value units, because per-point HP/mana scale with the vocation's
-base HP/mana): HP `def 0.03`; mana `off 0.015, def 0.01`; capacity `util 0.01`; mitigation `def 0.03`;
-HP+mana `off 0.015, def 0.04`.
+## 6. Assumptions
 
-**Revelation stage k** (k = 1..3): `v_k = base × [0.35, 0.6, 1][k] + flat_k × 0.25` on both off and def, with
-`flat = 4 / 9 / 20`.
+- Spell weights (single 0.6, area 0.5, per-spell overrides), the baseline attacks, and the boss window (120 s fight, 30 min between attempts) are heuristics.
+- `maxTargets` and monk elements are approximate (S1).
+- The level is estimated as points + 50 and is used to scale HP, mana and flat bonuses.
+- The Mitigation Multiplier basic mod (up to 30 % at grade IV) is taken literally as % mitigation. It therefore dominates `basic1` for defensive builds, and its in-game units should be verified.
+- Momentum is valued as a flat cooldown proxy.
 
-**Priority blend** (`p = priority / 100`):
+## 7. Tests
 
-```
-wOff = max(0.05, 1 − p)     wDef = max(0.05, p)     wUtil = 0.1
-```
-
-**Monster tailoring**:
-
-```
-offMult(v) = mean_{e ∈ v.offElements} (elementModifier(e) / 100)^2     (1 if untagged or no monster)
-defMult(v) = 0.6 + 0.8 × |monster.damageTypes ∩ v.defElements| / |monster.damageTypes|   (1 if untagged)
-threat     = clamp(maxDamage / 1000, 0.6, 1.6)                          (1 if unknown)
-
-value(v) = wOff · off · offMult + wDef · def · defMult · threat + wUtil · util
-```
-
-Squaring the modifier makes a 150 % weakness worth 2.25× and an immunity worth 0 — strong enough to swap
-which spell augment is taken.
-
-**Score of an allocation** `a` (points per slice):
-
-```
-S(a) = Σ_i a_i · ded_i  +  Σ_{i full} conv_i  +  Σ_d rev_d[stage(domainPoints_d)]
-stage(x) = #{t ∈ [250, 500, 1000] : x ≥ t}
-```
-
-**Reported scores**: `offenseScore = round(100 · Off(a) / Off(fullWheel))`, same for defense, where Off/Def are the
-monster-tailored but un-blended totals.
-
-## 5. Search algorithm
-
-1. `budget = min(points, 4000)`; precompute scalar tables `ded[i]`, `conv[i]`, `rev[d][stage]`.
-2. **Beam search** (width 24) over *full-slice fills*: each step expands every beam state by filling one
-   available slice whose capacity fits the remaining budget; states are deduplicated by the bitmask of full slices.
-3. **Ranking** (only for pruning):
-   `rank = S + Σ_d 0.6 · Δrev_d · progress_d + remaining · density`, where `progress_d` is the fraction of the way
-   from the previous to the next revelation threshold (only if still reachable with the remaining budget), and
-   `density` = mean value-per-point over all slices — this makes states with different spent points comparable and
-   is the revelation look-ahead.
-4. **Completion**: every state kept in the beam is completed greedily (best gain/point among available slices,
-   including revelation deltas); when the leftover is smaller than the chosen slice's room it is partially filled
-   and becomes the last path entry. The best completed state wins.
-5. Ties break by bitmask key → fully deterministic.
-
-Complexity: ≤ 36 steps × 24 states × 36 candidates ≈ 31 k expansions (O(36) each) + 24 greedy completions per
-step (O(36²) each). Measured 2–6 ms per call (budget test asserts < 50 ms).
-
-The `path` is the fill order of the winning state; every entry was unlocked when it was started, all but the last
-are full.
-
-## 6. Assumptions & limitations
-
-- Premium + promotion assumed; `pointsForLevel` ignores scrolls unless passed.
-- Gems, fragments, gem mods and *Revelation Mastery* bonus points are not modelled (Vessel Resonance has a flat value).
-- Spell-augment effects are modelled as value units, not exact spell numbers.
-- Mitigation is treated as untagged (applies to all damage types).
-- Monk data is from canary and partly estimated; marked "approximate" in perk descriptions.
-- Optimizer is heuristic (beam), not proven optimal; it never violates connectivity or the point budget.
-
-## 7. Work log
-
-- 2026-11-18 — Researched mechanics: wiki pages are paywalled (HTTP 402); used tibiaqa.com/fandom search summaries
-  and the canary server sources (slot enum, capacities, prerequisites, per-slot bonuses, revelations). Found the
-  5-ring / 4000-point layout (not 4 rings).
-- Built geometry builder (angles → adjacency), per-vocation data files, perk value model, scoring with monster
-  tailoring, beam-search optimizer with revelation look-ahead and partial last slice.
-- Tests: 48 engine tests (geometry ×5 vocations, random path validity, budget, priority shift, monster weakness,
-  perf). `tsc -b` clean.
+| File | Covers |
+|---|---|
+| `model.test.ts` | Geometry, the directed unlock graph matches `WHEEL_DATA`, twins, vessels and mods, thresholds, messages. |
+| `spells.test.ts` | Targets per context, team-box > solo for area spells, boss favours single-target, immune → useless, Avatar is 0 in hunt and > 0 in boss, cooldown floor, momentum, effect parsing, augment I/II. |
+| `gems.test.ts` | Hungarian vs brute force, active slots, placement respects vessel quality, recommended/locked vessels, recommendations, upgrade ranking. |
+| `optimizer.test.ts` | Directed-path validity on 60 random inputs, RM points and stages, vessel unlock order, augment stacking, determinism, edge budgets, priority, perf < 50 ms, loose check against the planner reference builds. |

@@ -117,6 +117,14 @@ Roles:
 - Dev-only mod fixture `src/lib/devFixtures.ts` (stripped from prod) — remove once `wheel.mods` is filled.
 - Gates: `tsc -b` 0 errors, 126 tests (incl. i18n key parity, gem slot rules, gem/context persistence), lint 0, build OK.
 
+### 2026-11-18 — S2 Engine (iteration 2)
+- Rewrote `src/engine/`:
+  - The wheel model now comes from `getWheelData()` (directed unlock graph, twin augments I/II, RM +125, 8 vessels, basic and supreme mods). The hand-written `wheel/vocations/*`, `perks.ts`, `geometry.ts` and `scoring.ts` are removed.
+  - New `spells.ts` (context-aware targets, element, damage shares), `values.ts` (Parts per source), `gems.ts` (Hungarian placement, recommendations, upgrades) and `messages.ts` (i18n keys).
+- Optimizer: beam search over the directed graph with revelation look-ahead. Vessel value = best placeable gem. Fills `vessels`, `gemRecommendations`, `upgradeRecommendations`, `spells`, `rationaleMsgs` and `labelMsg`.
+- Assumptions: heuristic spell weights and baselines; the Mitigation Multiplier mod is taken literally; level ≈ points + 50.
+- Tests: 4 engine test files. `tsc -b` clean, all tests pass, lint clean. Perf ≤ 10 ms at 4000 points. Docs: `docs/modules/engine.md`.
+
 ## In progress / Next
 
 - [x] S1 Data — scraper + monster dataset + search API.

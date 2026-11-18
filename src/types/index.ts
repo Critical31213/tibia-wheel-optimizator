@@ -169,6 +169,8 @@ export interface ModDefinition {
   gradeValues: string[];
   /** Basic mods only: which basic slot(s) may hold it. */
   slots?: (1 | 2)[];
+  /** Supreme mods: spell or revelation it augments, if any. */
+  target?: string;
 }
 
 export interface GemModRef {
@@ -206,6 +208,7 @@ export interface GemRecommendation {
   /** Relative score gain (same units as offense/defense scores). */
   gain: number;
   reason: string;
+  reasonMsg?: EngineMessage;
 }
 
 export interface UpgradeRecommendation {
@@ -216,14 +219,29 @@ export interface UpgradeRecommendation {
   fromGrade: ModGrade;
   toGrade: ModGrade;
   gain: number;
+  /** Gain of upgrading straight to grade IV. */
+  gainToMax?: number;
+}
+
+/**
+ * Translatable engine message: `key` is looked up in the UI i18n
+ * dictionary (`engine.<key>`), `params` fill `{name}` placeholders.
+ * The plain-English string fields stay as a fallback.
+ */
+export interface EngineMessage {
+  key: string;
+  params?: Record<string, string | number>;
 }
 
 /** How the engine valued a spell (augment) in the current context. */
 export interface SpellUsage {
   name: string;
   expectedTargets: number;
+  /** Estimated share (%) of total damage/healing output in this context. */
+  share?: number;
   useful: boolean;
   reason: string;
+  reasonMsg?: EngineMessage;
 }
 
 // ---------------------------------------------------------------------------
@@ -246,6 +264,7 @@ export interface OptimizerInput {
 
 export interface StatLine {
   label: string;
+  labelMsg?: EngineMessage;
   value: string;
   category: PerkCategory;
 }
@@ -275,6 +294,8 @@ export interface OptimizerResult {
   defenseScore: number;
   /** Short explanations of why the engine chose this build. */
   rationale: string[];
+  /** Same as `rationale`, translatable. */
+  rationaleMsgs?: EngineMessage[];
   /** Vessel contents: owned gems placed optimally, else recommendations. */
   vessels: VesselAssignment[];
   /** Best gems to look for / invest in, best first. */

@@ -1,0 +1,140 @@
+import { describe, expect, it } from 'vitest';
+import { type GemQuality, type OwnedGem, VOCATIONS } from '../types';
+import { optimize } from './index';
+import { activeSlots, assign, bestGems, type GemEnv, gemParts, placeGems, toOwnedGem, upgrades } from './gems';
+import { blendWith, valuationFor, weightsFor } from './optimizer';
+import { getEngineWheel } from './wheel/build';
+
+function env(vocation: (typeof VOCATIONS)[number] = 'knight', points = 2000): GemEnv {
+  return {
+    v: valuationFor({ vocation, points, monster: null }),
+    wheel: getEngineWheel(vocation),
+    facts: { stages: [3, 3, 3, 3], revPoints: [1000, 1000, 1000, 1000], wheelEffects: new Map() },
+    blend: blendWith(weightsFor(50)),
+  };
+}
+
+function permutations(n: number, k: number): number[][] {
+  if (k === 0) return [[]];
+  const out: number[][] = [];
+  for (const rest of permutations(n, k - 1)) for (let j = -1; j < n; j++) if (j < 0 || !rest.includes(j)) out.push([...rest, j]);
+  return out;
+}
+
+describe('assignment', () => {
+  it('matches brute force on random matrices', () => {
+    let seed = 7;
+    const r = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    for (let t = 0; t < 40; t++) {
+      const rows = 1 + Math.floor(r() * 4);
+      const cols = 1 + Math.floor(r() * 4);
+      const w = Array.from({ length: rows }, () => Array.from({ length: cols }, () => (r() < 0.2 ? 0 : r() * 10)));
+      const total = (p: number[]) => p.reduce((s, c, i) => s + (c >= 0 ? w[i][c] : 0), 0);
+      const best = Math.max(...permutations(cols, rows).map(total));
+      const got = assign(w);
+      expect(new Set(got.filter((c) => c >= 0)).size).toBe(got.filter((c) => c >= 0).length);
+      expect(total(got)).toBeCloseTo(best, 9);
+    }
+  });
+});
+
+describe('gem placement', () => {
+  it('only the mods both gem and vessel support are active', () => {
+    expect(activeSlots('greater', 'lesser')).toEqual(['basic1']);
+    expect(activeSlots('greater', 'regular')).toEqual(['basic1', 'basic2']);
+    expect(activeSlots('lesser', 'greater')).toEqual(['basic1']);
+    expect(activeSlots('regular', 'greater')).toEqual(['basic1', 'basic2']);
+    expect(activeSlots('greater', 'greater')).toEqual(['basic1', 'basic2', 'supreme']);
+  });
+
+  it('puts the strong greater gem in a greater vessel', () => {
+    const e = env();
+    const vq = e.wheel.definition.vessels.map((v) => v.quality);
+    const [g] = bestGems(e, 'greater', 4);
+    const greater = toOwnedGem('g', g, 4);
+    const lesser = toOwnedGem('l', bestGems(e, 'lesser', 1)[0], 1);
+    const unlocked = vq.indexOf('greater') + 1;
+    const placed = placeGems(e, [lesser, greater], unlocked);
+    expect(vq[placed.indexOf(greater)]).toBe('greater');
+    expect(placed.filter(Boolean)).toHaveLength(2);
+  });
+
+  it('placement is never worse than any other assignment (brute force)', () => {
+    for (const vocation of VOCATIONS) {
+      const e = env(vocation);
+      const qs: GemQuality[] = ['greater', 'regular', 'lesser', 'greater'];
+      const gems: OwnedGem[] = qs.map((q, i) => {
+        const opts = bestGems(e, q, 1 + i, 3);
+        return toOwnedGem(`g${i}`, opts[i % opts.length], (1 + i) as 1);
+      });
+      const n = 5;
+      const vs = e.wheel.definition.vessels.slice(0, n);
+      const value = (p: (OwnedGem | null)[]) => p.reduce((s, g, i) => s + (g ? e.blend(gemParts(e, g, vs[i].quality)) : 0), 0);
+      const placed = placeGems(e, gems, n);
+      const best = Math.max(...permutations(gems.length, n).map((p) => value(p.map((c) => (c >= 0 ? gems[c] : null)))));
+      expect(value(placed)).toBeCloseTo(best, 9);
+    }
+  });
+
+  it('owned gems are placed, free vessels get a recommendation, locked ones stay empty', () => {
+    const e = env('sorcerer');
+    const owned = toOwnedGem('mine', bestGems(e, 'regular', 2)[0], 2);
+    const res = optimize({ vocation: 'sorcerer', points: 1500, monster: null, priority: 50, gems: [owned] });
+    const open = res.vessels.filter((v) => v.unlocked);
+    expect(open.length).toBeGreaterThan(1);
+    expect(open.filter((v) => v.source === 'owned').map((v) => v.gem!.id)).toEqual(['mine']);
+    for (const v of open.filter((x) => x.source !== 'owned')) {
+      expect(v.source).toBe('recommended');
+      expect(v.gem!.id).toBe(`recommended-${v.quality}`);
+      expect(v.gem!.quality).toBe(v.quality);
+    }
+  });
+
+  it('recommends gems per quality at grade IV with reasons', () => {
+    for (const vocation of VOCATIONS) {
+      const res = optimize({ vocation, points: 2000, monster: null, priority: 50 });
+      const qs = new Set(res.gemRecommendations.map((g) => g.quality));
+      expect(qs).toEqual(new Set(['lesser', 'regular', 'greater']));
+      for (const g of res.gemRecommendations) {
+        expect(g.mods.every((m) => m.grade === 4)).toBe(true);
+        expect(g.reason.length).toBeGreaterThan(0);
+        expect(g.reasonMsg?.key).toMatch(/^gem\./);
+      }
+      const gains = res.gemRecommendations.map((g) => g.gain);
+      expect(gains).toEqual([...gains].sort((a, b) => b - a));
+    }
+  });
+});
+
+describe('upgrade recommendations', () => {
+  it('are ranked, +1 grade, and only for active mods', () => {
+    for (const vocation of VOCATIONS) {
+      const e = env(vocation);
+      const g = toOwnedGem('big', bestGems(e, 'greater', 1)[0], 1);
+      const lesserVessel = e.wheel.definition.vessels.findIndex((v) => v.quality === 'lesser');
+      const gv = e.wheel.definition.vessels.findIndex((v) => v.quality === 'greater');
+      const vessel = (i: number, gem: OwnedGem) => ({ vesselId: i, quality: e.wheel.definition.vessels[i].quality, unlocked: true, gem, source: 'owned' as const });
+
+      const inLesser = upgrades(e, [vessel(lesserVessel, g)]);
+      expect(inLesser.map((u) => u.slot)).toEqual(['basic1']);
+
+      const second = { ...toOwnedGem('two', bestGems(e, 'greater', 2, 2)[1], 2) };
+      const ups = upgrades(e, [vessel(gv, g), vessel(gv === 2 ? 4 : 2, second)]);
+      expect(ups.length).toBeGreaterThan(1);
+      for (const u of ups) {
+        expect(u.toGrade).toBe(u.fromGrade + 1);
+        expect(u.gain).toBeGreaterThan(0);
+      }
+      const gains = ups.map((u) => u.gain);
+      expect(gains).toEqual([...gains].sort((a, b) => b - a));
+    }
+  });
+
+  it('a supreme upgrade at max grade yields nothing; recommended gems are never upgraded', () => {
+    const e = env('druid');
+    const g4 = toOwnedGem('max', bestGems(e, 'greater', 4)[0], 4);
+    expect(upgrades(e, [{ vesselId: 2, quality: 'greater', unlocked: true, gem: g4, source: 'owned' }])).toEqual([]);
+    const g1 = toOwnedGem('rec', bestGems(e, 'greater', 1)[0], 1);
+    expect(upgrades(e, [{ vesselId: 2, quality: 'greater', unlocked: true, gem: g1, source: 'recommended' }])).toEqual([]);
+  });
+});

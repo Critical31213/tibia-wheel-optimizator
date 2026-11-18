@@ -55,7 +55,7 @@ promotion points for a Tibia character, given:
 └── src/
     ├── types/index.ts      # shared contract (all modules)
     ├── data/               # monsters.json (2006) + search API (lazy-loaded chunk)
-    ├── engine/             # wheel model (wheel/), scoring.ts, optimizer.ts, index.ts
+    ├── engine/             # wheel/build.ts, spells, values, gems, optimizer, messages
     ├── components/         # React UI components
     ├── hooks/              # usePersistentInputs, useDebouncedValue
     ├── lib/                # api.ts facade, geometry, inputState, labels (pure, tested)
@@ -108,18 +108,23 @@ summary, rationale) → UI renders the wheel and the summary.
 
 Full details: [`docs/modules/engine.md`](docs/modules/engine.md).
 
-- **Model** (`src/engine/wheel/`): 36 slices in 5 rings (4×50, 8×75, 12×100, 8×150, 4×200 = 4000 points,
-  1000 per domain), layout/capacities/unlock prerequisites/per-slot bonuses taken from the canary server sources.
-  `geometry.ts` builds angles (clockwise from 12 o'clock) and symmetric adjacency; per-vocation files
-  (`vocations/*.ts`) define dedication per point, spell augments, 200-slot passives and the 4 revelations
-  (thresholds 250/500/1000). Monk is marked approximate.
-- **Unlock rule**: ring-1 slices are always available; any other slice needs at least one full adjacent slice.
-- **Scoring** (`scoring.ts`): each perk has an (off, def, util) value vector with element tags;
-  `value = (1−p)·off·offMult + p·def·defMult·threat + 0.1·util`, where `offMult = mean (modifier/100)²`
-  over the perk's elements, `defMult` rewards coverage of the monster's damage types and `threat` scales with
-  `maxDamage`.
-- **Search** (`optimizer.ts`): beam search (width 24) over full-slice fills ranked by score + revelation
-  look-ahead + remaining·density, greedy completion with a partially filled last slice; deterministic, 2–6 ms.
+- **Model** (`src/engine/wheel/build.ts`):
+  - Built from `getWheelData()` (planner): 36 slices (4×50, 8×75, 12×100, 8×150, 4×200 = 4000 points, 1000 per domain), dedication perks, and convictions (augments come in twin pairs for stage I/II).
+  - 4 revelations at 250/500/1000 revelation points; each full Revelation Mastery slice adds +125.
+  - 8 vessels (0-based `vesselId`): vessel n unlocks at n+1 full Gem Vessel slices.
+  - Basic and supreme gem mods are mapped to `WheelDefinition.vessels`/`mods`.
+- **Unlock rule**: the planner's directed graph. Slices 14/15/20/21 start unlocked; any other slice needs at least one *full* predecessor.
+- **Valuation** (`spells.ts`, `values.ts`):
+  - Every source gives `{off, def, util}`, blended as `(1−p)·off + p·def + 0.1·util` (each weight at least 0.05).
+  - Spell value = share of total damage = weight × expected targets (context: solo = tibiapal average, team-lure 5, team-box 9, boss 1.2, single-target 1) × element multiplier (immune → 0).
+  - Cooldowns are capped at 50 % of base. Avatar has value only in boss mode.
+- **Search** (`optimizer.ts`):
+  - Beam search (width 24) over full-slice fills with revelation look-ahead and a partial last slice.
+  - Vessel value = Hungarian placement of owned or recommended gems.
+  - Deterministic, ≤ 10 ms.
+- **Gems** (`gems.ts`):
+  - Owned gems are placed with the Hungarian algorithm; active slots = min(gem, vessel) quality.
+  - Recommendations are per quality at grade IV. Upgrades are +1 grade for active mods, ranked by gain.
 - **Points**: `pointsForLevel(level, scrollPoints = 0) = max(0, level − 50)` (+ up to 50 scroll points).
 
 ## 7. UI (S3 UI)

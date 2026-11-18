@@ -1,152 +1,287 @@
-/** Assembles geometry + per-vocation data into an engine wheel (cached). */
-import type { Domain, Slice, Vocation, WheelDefinition } from '../../types';
-import { buildGeometry, DOMAIN_ORDER, type DedicationKind, type GeoSlice } from './geometry';
+/**
+ * Engine wheel model built from the official planner dataset (`getWheelData`).
+ * Engine slice index === planner grid id (0..35, row-major 6×6).
+ */
+import type {
+  Domain,
+  ModDefinition,
+  PerkCategory,
+  RevelationPerk,
+  Slice,
+  VesselDefinition,
+  Vocation,
+  WheelDefinition,
+} from '../../types';
 import {
-  type EnginePerk,
-  type EngineRevelation,
-  lifeLeechPerk,
-  manaLeechPerk,
-  passivePerk,
-  type PerkStats,
-  type PerkValue,
-  revelationPerk,
-  skillPerk,
-  spellPerk,
-  vesselPerk,
-} from './perks';
-import { VOCATION_SPECS, type VocationSpec } from './vocations';
+  getSpell,
+  getWheelData,
+  WHEEL_DATA,
+  type WheelBasicMod,
+  type WheelRevelation,
+  type WheelSupremeMod,
+  type WheelTile,
+} from '../../data/wheel';
+
+/** Clockwise from 12 o'clock. Engine domain index = position in this list. */
+export const DOMAIN_ORDER: readonly Domain[] = ['topRight', 'bottomRight', 'bottomLeft', 'topLeft'];
+
+export const REVELATION_THRESHOLDS: readonly number[] = WHEEL_DATA.revelation.thresholds;
+/** Flat damage & healing per revelation stage (index = stage). */
+export const REVELATION_FLAT_BONUS: readonly number[] = WHEEL_DATA.revelation.damageHealingBonusPerStage;
+/** Revelation points added to its own domain by a filled Revelation Mastery slice. */
+export const RM_SLICE_POINTS: number = WHEEL_DATA.revelationMastery.pointsPerConvictionSlice;
+/** Momentum chance (%) per mod grade I..IV for supreme cooldown mods. */
+export const MOMENTUM_PER_GRADE: readonly number[] = WHEEL_DATA.momentum.perGrade;
+
+export type ConvictionKind = 'augment' | 'rm' | 'vessel' | 'lifeLeech' | 'manaLeech' | 'skill' | 'unique';
 
 export interface EngineSlice {
+  idx: number;
+  tile: WheelTile;
   slice: Slice;
-  geo: GeoSlice;
-  /** Index into DOMAIN_ORDER. */
   domainIdx: number;
-  /** Value of ONE dedication point. */
-  ded: PerkValue;
-  /** Raw stats of ONE dedication point. */
-  dedStats: PerkStats;
-  conv: EnginePerk;
-  adj: number[];
+  capacity: number;
+  initiallyUnlocked: boolean;
+  /** Slices whose complete fill unlocks this one (directed graph, reversed). */
+  unlockedBy: number[];
+  kind: ConvictionKind;
+  /** Augments: index of the other copy, else -1. */
+  twin: number;
+}
+
+export interface EngineRevelation {
+  data: WheelRevelation;
+  perk: RevelationPerk;
+  domainIdx: number;
 }
 
 export interface EngineWheel {
   vocation: Vocation;
-  spec: VocationSpec;
   slices: EngineSlice[];
   /** Indexed like DOMAIN_ORDER. */
   revelations: EngineRevelation[];
+  basicMods: WheelBasicMod[];
+  supremeMods: WheelSupremeMod[];
+  vesselTiles: number[];
   definition: WheelDefinition;
 }
 
-export const DOMAIN_LABEL: Record<Domain, string> = {
-  topLeft: 'top-left',
-  topRight: 'top-right',
-  bottomLeft: 'bottom-left',
-  bottomRight: 'bottom-right',
-};
+function angleOf(t: WheelTile): number {
+  const x = t.col + 0.5 - 3;
+  const y = 3 - (t.row + 0.5);
+  return ((Math.atan2(x, y) * 180) / Math.PI + 360) % 360;
+}
 
-/** Value units per dedication point (vocation independent, see docs). */
-const DED_VALUE: Record<DedicationKind, PerkValue> = {
-  hp: { off: 0, def: 0.03, util: 0 },
-  mana: { off: 0.015, def: 0.01, util: 0 },
-  capacity: { off: 0, def: 0, util: 0.01 },
-  mitigation: { off: 0, def: 0.03, util: 0 },
-  hpMana: { off: 0.015, def: 0.04, util: 0 },
-};
-
-function dedication(kind: DedicationKind, spec: VocationSpec): { stats: PerkStats; label: string } {
-  switch (kind) {
-    case 'hp':
-      return { stats: { hp: spec.hpPerPoint }, label: `+${spec.hpPerPoint} HP per point` };
-    case 'mana':
-      return { stats: { mana: spec.manaPerPoint }, label: `+${spec.manaPerPoint} mana per point` };
-    case 'capacity':
-      return { stats: { capacity: spec.capacityPerPoint }, label: `+${spec.capacityPerPoint} capacity per point` };
-    case 'mitigation':
-      return { stats: { mitigation: 0.03 }, label: '+0.03% mitigation per point' };
-    case 'hpMana':
-      return {
-        stats: { hp: spec.hpPerPoint, mana: spec.manaPerPoint },
-        label: `+${spec.hpPerPoint} HP and +${spec.manaPerPoint} mana per point`,
-      };
+function convictionKind(t: WheelTile): ConvictionKind {
+  switch (t.conviction.category) {
+    case 'augmentation':
+      return 'augment';
+    case 'revelationMastery':
+      return 'rm';
+    case 'gemVessel':
+      return 'vessel';
+    case 'leech':
+      return /mana/i.test(t.conviction.name) ? 'manaLeech' : 'lifeLeech';
+    case 'skillBonus':
+      return 'skill';
+    default:
+      return 'unique';
   }
 }
 
-function conviction(geo: GeoSlice, spec: VocationSpec): EnginePerk {
-  const id = `${spec.vocation}-${geo.id}`;
-  switch (geo.conviction) {
-    case 'vessel':
-      return vesselPerk(id, DOMAIN_LABEL[geo.domain]);
-    case 'lifeLeech':
-      return lifeLeechPerk(id);
-    case 'manaLeech':
-      return manaLeechPerk(id);
-    case 'skill':
-      return skillPerk(id, spec.skillName, spec.skillValue);
-    case 'passiveGreen':
-      return passivePerk(id, spec.passiveGreen);
-    case 'passivePurple':
-      return passivePerk(id, spec.passivePurple);
-    default: {
-      const group = geo.conviction.slice(5) as keyof VocationSpec['spells'];
-      return spellPerk(id, spec.spells[group]);
+const UNIQUE_CATEGORY: Record<string, PerkCategory> = {
+  'Battle Healing': 'defense',
+  'Healing Link': 'defense',
+  'Guiding Presence': 'utility',
+};
+
+function convictionCategory(t: WheelTile, kind: ConvictionKind): PerkCategory {
+  switch (kind) {
+    case 'augment': {
+      const spell = getSpell(t.conviction.augment?.spells[0] ?? '');
+      return spell?.kind === 'healing' ? 'defense' : spell?.kind === 'support' ? 'utility' : 'offense';
     }
+    case 'lifeLeech':
+      return 'defense';
+    case 'skill':
+      return 'offense';
+    case 'unique':
+      return UNIQUE_CATEGORY[t.conviction.name] ?? 'offense';
+    default:
+      return 'utility';
   }
+}
+
+function convictionDescription(t: WheelTile, kind: ConvictionKind): string {
+  const c = t.conviction;
+  if (kind === 'augment' && c.augment) return `I: ${c.augment.stage1}\nII: ${c.augment.stage2}`;
+  if (kind === 'vessel') return c.description || 'Unlocks the next gem vessel; +1 damage and healing.';
+  if (kind === 'rm') return `+${RM_SLICE_POINTS} points towards the ${c.name.replace('Revelation Mastery ', '')} revelation.`;
+  if (c.description) return c.description;
+  return c.displayValue ? `${c.name} ${c.displayValue}` : c.name;
+}
+
+function dedicationLabel(t: WheelTile): string {
+  return (
+    t.dedication.perks.map((p) => `+${p.perPoint}${p.unit ?? ''} ${p.name}`).join(', ') + ' per point'
+  );
+}
+
+const REVELATION_CATEGORY: Record<string, PerkCategory> = {
+  'Gift of Life': 'defense',
+  'Blessing of the Grove': 'defense',
+};
+
+function supremeCategory(m: WheelSupremeMod): PerkCategory {
+  switch (m.category) {
+    case 'augHealing':
+      return 'defense';
+    case 'revelationMastery':
+      return 'utility';
+    case 'effect':
+      return /dodge|life leech/i.test(m.name) ? 'defense' : /mana/i.test(m.name) ? 'utility' : 'offense';
+    case 'augCooldown': {
+      const s = getSpell(m.spell ?? '');
+      return s?.kind === 'healing' ? 'defense' : 'offense';
+    }
+    default:
+      return 'offense';
+  }
+}
+
+function basicCategory(m: WheelBasicMod): PerkCategory {
+  return m.effects.every((e) => e.effectId === 11 || e.effectId === 12) ? 'utility' : 'defense';
 }
 
 function build(vocation: Vocation): EngineWheel {
-  const spec = VOCATION_SPECS[vocation];
-  const geos = buildGeometry();
-  const index = new Map(geos.map((g, i) => [g.id, i]));
-  const slices: EngineSlice[] = geos.map((geo) => {
-    const d = dedication(geo.dedication, spec);
-    const conv = conviction(geo, spec);
-    const { id, name, description, category } = conv;
+  const data = getWheelData(vocation);
+  const graph = WHEEL_DATA.unlockGraph;
+  const tiles = [...data.tiles].sort((a, b) => a.gridId - b.gridId);
+  const n = tiles.length;
+
+  const unlockedBy: number[][] = tiles.map(() => []);
+  const neighbours: Set<number>[] = tiles.map(() => new Set());
+  for (const [from, tos] of Object.entries(graph.edges)) {
+    for (const to of tos) {
+      unlockedBy[to].push(Number(from));
+      neighbours[to].add(Number(from));
+      neighbours[Number(from)].add(to);
+    }
+  }
+
+  // indexInRing: clockwise angle order within each ring.
+  const indexInRing = new Array<number>(n);
+  const ringSize = new Map<number, number>();
+  for (const ring of new Set(tiles.map((t) => t.ring))) {
+    const inRing = tiles.filter((t) => t.ring === ring).sort((a, b) => angleOf(a) - angleOf(b));
+    inRing.forEach((t, k) => (indexInRing[t.gridId] = k));
+    ringSize.set(ring, inRing.length);
+  }
+
+  const kinds = tiles.map(convictionKind);
+  const twins = tiles.map((t, i) => {
+    if (kinds[i] !== 'augment') return -1;
+    return tiles.findIndex((o, j) => j !== i && o.conviction.id === t.conviction.id && kinds[j] === 'augment');
+  });
+
+  const sliceId = (i: number) => tiles[i].tileName;
+  const slices: EngineSlice[] = tiles.map((t, i) => {
+    const kind = kinds[i];
+    const slice: Slice = {
+      id: sliceId(i),
+      domain: t.domain,
+      ring: t.ring,
+      indexInRing: indexInRing[i],
+      slicesInRing: ringSize.get(t.ring)!,
+      capacity: t.capacity,
+      adjacent: [...neighbours[i]].sort((a, b) => a - b).map(sliceId),
+      conviction: {
+        id: `${vocation}-${t.tileName}`,
+        name: t.conviction.name,
+        description: convictionDescription(t, kind),
+        category: convictionCategory(t, kind),
+      },
+      dedicationLabel: dedicationLabel(t),
+    };
     return {
-      geo,
-      domainIdx: DOMAIN_ORDER.indexOf(geo.domain),
-      ded: DED_VALUE[geo.dedication],
-      dedStats: d.stats,
-      conv,
-      adj: geo.adjacent.map((a) => index.get(a)!),
-      slice: {
-        id: geo.id,
-        domain: geo.domain,
-        ring: geo.ring,
-        indexInRing: geo.indexInRing,
-        slicesInRing: geo.slicesInRing,
-        capacity: geo.capacity,
-        adjacent: [...geo.adjacent],
-        conviction: { id, name, description, category },
-        dedicationLabel: d.label,
+      idx: i,
+      tile: t,
+      slice,
+      domainIdx: DOMAIN_ORDER.indexOf(t.domain),
+      capacity: t.capacity,
+      initiallyUnlocked: graph.initiallyUnlocked.includes(t.gridId),
+      unlockedBy: unlockedBy[i].sort((a, b) => a - b),
+      kind,
+      twin: twins[i],
+    };
+  });
+
+  const revelations: EngineRevelation[] = DOMAIN_ORDER.map((domain, d) => {
+    const r = data.revelations.find((x) => x.domain === domain)!;
+    return {
+      data: r,
+      domainIdx: d,
+      perk: {
+        id: `${vocation}-revelation-${domain}`,
+        name: r.name,
+        description: r.description,
+        category: REVELATION_CATEGORY[r.name] ?? 'offense',
+        domain,
+        thresholds: [...REVELATION_THRESHOLDS],
       },
     };
   });
-  const colorOf: Record<Domain, keyof VocationSpec['revelations']> = {
-    topLeft: 'green',
-    topRight: 'red',
-    bottomRight: 'purple',
-    bottomLeft: 'blue',
-  };
-  const revelations = DOMAIN_ORDER.map((domain) =>
-    revelationPerk(`${vocation}-revelation-${colorOf[domain]}`, domain, spec.revelations[colorOf[domain]]),
-  );
+
+  const vessels: VesselDefinition[] = data.vessels.map((v) => ({
+    id: v.id,
+    quality: v.quality,
+    unlockOrder: v.unlockOrder,
+  }));
+
+  const basicMods = data.mods.basic;
+  const supremeMods = data.mods.supreme;
+  const mods: ModDefinition[] = [
+    ...basicMods.map(
+      (m): ModDefinition => ({
+        id: m.id,
+        kind: 'basic',
+        name: m.name,
+        category: basicCategory(m),
+        gradeValues: [...m.gradeValues],
+        slots: [...m.slots],
+      }),
+    ),
+    ...supremeMods.map((m): ModDefinition => {
+      const def: ModDefinition = {
+        id: m.id,
+        kind: 'supreme',
+        name: m.name,
+        category: supremeCategory(m),
+        gradeValues: [...m.gradeValues],
+      };
+      const target = m.category === 'revelationMastery' ? m.revelation : (m.spell ?? m.revelation);
+      if (target) def.target = target;
+      return def;
+    }),
+  ];
+
   const definition: WheelDefinition = {
     vocation,
-    vessels: [],
-    mods: [],
     slices: slices.map((s) => s.slice),
-    revelations: revelations.map(({ id, name, description, category, domain, thresholds }) => ({
-      id,
-      name,
-      description,
-      category,
-      domain,
-      thresholds: [...thresholds],
-    })),
-    totalCapacity: slices.reduce((sum, s) => sum + s.slice.capacity, 0),
+    revelations: revelations.map((r) => r.perk),
+    totalCapacity: slices.reduce((sum, s) => sum + s.capacity, 0),
+    vessels,
+    mods,
   };
-  return { vocation, spec, slices, revelations, definition };
+  return {
+    vocation,
+    slices,
+    revelations,
+    basicMods,
+    supremeMods,
+    vesselTiles: slices.filter((s) => s.kind === 'vessel').map((s) => s.idx),
+    definition,
+  };
 }
 
 const cache = new Map<Vocation, EngineWheel>();
@@ -158,4 +293,19 @@ export function getEngineWheel(vocation: Vocation): EngineWheel {
     cache.set(vocation, w);
   }
   return w;
+}
+
+/** Directed unlock rule: initially unlocked, or a completely filled slice unlocks it. */
+export function isAvailable(w: EngineWheel, alloc: ArrayLike<number>, i: number): boolean {
+  const s = w.slices[i];
+  if (alloc[i] >= s.capacity) return false;
+  if (s.initiallyUnlocked) return true;
+  for (const j of s.unlockedBy) if (alloc[j] >= w.slices[j].capacity) return true;
+  return false;
+}
+
+export function stageFor(points: number, thresholds: readonly number[] = REVELATION_THRESHOLDS): number {
+  let stage = 0;
+  for (let k = 0; k < thresholds.length; k++) if (points >= thresholds[k]) stage = k + 1;
+  return stage;
 }
