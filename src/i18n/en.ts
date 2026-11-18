@@ -210,10 +210,9 @@ export const en = {
   'wheel.sliceAria': '{domain} ring {ring}: {name}, {points} of {capacity} points',
   'wheel.points': 'points',
   'wheel.ring': 'ring {ring}',
-  'wheel.step': 'step {n}',
   'wheel.revelations': 'Active revelation perks',
   'wheel.revelationPts': '{n} pts',
-  'wheel.hint': 'Numbers on the wheel show the fill order. Hover or focus a slice for details.',
+  'wheel.hint': 'Hover or focus a slice for details.',
 
   'results.offense': 'Offense',
   'results.defense': 'Defense',

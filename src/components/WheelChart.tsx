@@ -21,7 +21,6 @@ interface WheelChartProps {
 interface SliceShape {
   slice: Slice;
   points: number;
-  order: number;
   bg: string;
   fill: string | null;
   centroid: { x: number; y: number };
@@ -34,7 +33,6 @@ export function WheelChart({ wheel, result }: WheelChartProps) {
 
   const shapes = useMemo<SliceShape[]>(() => {
     const ringCount = Math.max(1, ...wheel.slices.map((s) => s.ring));
-    const order = new Map(result?.path.map((id, i) => [id, i + 1]) ?? []);
     return wheel.slices.map((slice) => {
       const [a0, a1] = sliceAngles(slice.indexInRing, slice.slicesInRing);
       const { inner, outer } = ringBounds(slice.ring, ringCount, HUB, OUTER);
@@ -43,7 +41,6 @@ export function WheelChart({ wheel, result }: WheelChartProps) {
       return {
         slice,
         points,
-        order: order.get(slice.id) ?? 0,
         bg: annularSectorPath(C, C, inner, outer, a0, a1),
         fill: frac > 0 ? annularSectorPath(C, C, inner, fillRadius(inner, outer, frac), a0, a1) : null,
         centroid: sectorCentroid(C, C, inner, outer, a0, a1),
@@ -95,16 +92,6 @@ export function WheelChart({ wheel, result }: WheelChartProps) {
           <text x={C} y={C + 12} textAnchor="middle" className="fill-parchment-400" fontSize={8}>
             {t('wheel.points')}
           </text>
-          {shapes
-            .filter((s) => s.order > 0)
-            .map(({ slice, order, centroid }) => (
-              <g key={`b-${slice.id}`} pointerEvents="none" aria-hidden="true">
-                <circle cx={centroid.x} cy={centroid.y} r={8.5} fill="#0d0a07" fillOpacity={0.85} stroke="#f3d27c" strokeWidth={1} />
-                <text x={centroid.x} y={centroid.y + 3} textAnchor="middle" fontSize={order > 99 ? 7 : 9} fontWeight={700} fill="#f3d27c">
-                  {order}
-                </text>
-              </g>
-            ))}
         </svg>
 
         {active && (
@@ -129,7 +116,6 @@ export function WheelChart({ wheel, result }: WheelChartProps) {
             </p>
             <p className="mt-0.5 text-parchment-400">
               {t(`category.${active.slice.conviction.category}`)} · {active.slice.dedicationLabel}
-              {active.order > 0 && ` · ${t('wheel.step', { n: active.order })}`}
             </p>
           </div>
         )}

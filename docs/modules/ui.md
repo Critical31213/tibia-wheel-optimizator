@@ -24,7 +24,7 @@ screens it is two columns (controls left, results right).
 | `src/lib/planner.ts` | Re-exports `PLANNER_URL`/`plannerUrl(code)` from `src/data/wheel/plannerCode` (single source); `copyText` (Clipboard API → `execCommand` fallback) (tested). |
 | `src/components/MonsterCard.tsx` | Name, HP/exp, element chips, damage types. |
 | `src/components/PrioritySlider.tsx` | 0–100 range slider. |
-| `src/components/WheelChart.tsx` | SVG wheel, fill-order badges, tooltip, active revelation perks per domain. |
+| `src/components/WheelChart.tsx` | SVG wheel, tooltip, active revelation perks per domain (no fill-order badges). |
 | `src/components/ResultsPanel.tsx` | Scores, revelations, convictions, stats, rationale, fill order. |
 | `src/components/SegmentedControl.tsx` | Generic compact `radiogroup` (roving tabindex, arrows/Home/End, `disabled`). |
 | `src/components/FightContextPanel.tsx` | Hunt / Boss toggle (hunt style removed, D20); Avatar / single-target hints. |

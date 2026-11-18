@@ -204,10 +204,9 @@ export const pl: Dictionary = {
   'wheel.sliceAria': '{domain}, pierścień {ring}: {name}, {points} z {capacity} pkt',
   'wheel.points': 'pkt',
   'wheel.ring': 'pierścień {ring}',
-  'wheel.step': 'krok {n}',
   'wheel.revelations': 'Aktywne perki revelation',
   'wheel.revelationPts': '{n} pkt',
-  'wheel.hint': 'Liczby na kole pokazują kolejność wypełniania. Najedź lub ustaw fokus na polu, aby zobaczyć szczegóły.',
+  'wheel.hint': 'Najedź lub ustaw fokus na polu, aby zobaczyć szczegóły.',
 
   'results.offense': 'Atak',
   'results.defense': 'Obrona',

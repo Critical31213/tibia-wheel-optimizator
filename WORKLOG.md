@@ -355,7 +355,14 @@ Max mana was scored as offense, so at DPS-leaning priority lesser gems for every
 - **Tests:** new `iteration5.test.ts` (6). Engine 173 passed; perf worst ≈ 39 ms (sorcerer 3200 boss).
 - **For S4:** `src/integration.test.ts` "character level and skills change the output" compares only gem `gain`s, now equal (3.2/1.8/1.4) although the supreme mod differs (Divine Caldera vs Ethereal Barrage); compare mods too. The `source === 'recommended'` branch there is dead code.
 
-### 2026-11-18 — EK mitigation calibrationUser Cyclopedia (EK): 119 shielding → 1.34 % (knight shielding factor 1.148 → 1.126); Ectoplasmic Shield (def 49) → +1.27 % (fits factor 2.56); with Sanguine Hatchet +1.51 % total (one-handed weapon defense not modelled yet, ~+0.24 %). Test added.
+### 2026-11-18 — EK mitigation calibration
+
+User Cyclopedia (EK): 119 shielding → 1.34 % (knight shielding factor 1.148 → 1.126); Ectoplasmic Shield (def 49) → +1.27 % (fits factor 2.56); with Sanguine Hatchet +1.51 % total (one-handed weapon defense not modelled yet, ~+0.24 %). Test added.
+
+### 2026-11-18 — UI: wheel fill-order badges removed
+
+Numbered badges on the wheel, the tooltip step and the `wheel.step` key were removed; the hint no longer mentions numbers. The fill-order list in the results panel stays.
+
 ## In progress / Next
 
 - [x] S1 Data — scraper + monster dataset + search API.
