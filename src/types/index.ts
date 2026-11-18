@@ -245,6 +245,30 @@ export interface SpellUsage {
 }
 
 // ---------------------------------------------------------------------------
+// Character
+// ---------------------------------------------------------------------------
+
+/**
+ * Per-vocation fields (UI shows only the relevant ones):
+ * knight: level, mainSkill (melee), shielding · paladin: level, mainSkill
+ * (distance), shielding, magicLevel · sorcerer/druid: level, magicLevel ·
+ * monk: level, mainSkill (fist), magicLevel. Missing values are estimated
+ * from level.
+ */
+export interface CharacterStats {
+  level: number;
+  mainSkill?: number;
+  shielding?: number;
+  magicLevel?: number;
+}
+
+export interface WeightedMonster {
+  monster: Monster;
+  /** Relative share of kills/damage at the spot (any positive scale). */
+  weight: number;
+}
+
+// ---------------------------------------------------------------------------
 // Optimizer I/O
 // ---------------------------------------------------------------------------
 
@@ -260,6 +284,12 @@ export interface OptimizerInput {
   context?: FightContext;
   /** Gems the player owns; empty/undefined = recommend only. */
   gems?: OwnedGem[];
+  /** Character stats; defaults estimated from points + 50 as level. */
+  character?: CharacterStats;
+  /** Hunting spot with several monsters; takes precedence over `monster`. */
+  monsters?: WeightedMonster[];
+  /** Number of alternative builds to return (default 2). */
+  alternatives?: number;
 }
 
 export interface StatLine {
@@ -304,4 +334,20 @@ export interface OptimizerResult {
   upgradeRecommendations: UpgradeRecommendation[];
   /** Spells considered and how useful they are in this context. */
   spells: SpellUsage[];
+  /** Export code for the official Wheel of Destiny planner (incl. gems). */
+  plannerCode?: string;
+  /** Alternative builds (e.g. different revelation focus), best first. */
+  alternatives?: AlternativeBuild[];
+}
+
+export interface AlternativeBuild {
+  /** Short label, e.g. "Avatar focus". */
+  label: string;
+  labelMsg?: EngineMessage;
+  /** What you gain/lose compared to the main build. */
+  tradeoff: string;
+  tradeoffMsg?: EngineMessage;
+  /** Total objective score relative to the main build (main = 100). */
+  relativeScore: number;
+  result: Omit<OptimizerResult, 'alternatives'>;
 }

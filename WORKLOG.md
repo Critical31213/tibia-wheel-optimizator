@@ -28,6 +28,10 @@ Roles:
 | D9 | 2026-11-18 | Spell augments valued automatically by context: expected targets, spell element vs monster resistances, single-target vs area. | User requirement. |
 | D10 | 2026-11-18 | Gems: user-owned gem inventory (quality, mods, grades I–IV) placed optimally into vessels + recommendations of best gems and most valuable mod-grade upgrades. | User requirement. |
 | D11 | 2026-11-18 | UI language switch PL / EN. | User requirement. |
+| D12 | 2026-11-18 | Realistic mitigation: depends on shielding/level; tiny at mid levels (user's RP ≈ 1%). Target audience level 200–1500; HP preferred below ~1200 (EK) / ~1500 (RP) — must emerge from the math, not a hard rule. | User feedback. |
+| D13 | 2026-11-18 | Character inputs per vocation: EK level+melee+shielding; RP level+distance+shielding+mlvl; MS/ED level+mlvl; Monk level+fist+mlvl. | Needed for HP/mana, mitigation, spell damage and healing (e.g. RP mas san scales with mlvl). |
+| D14 | 2026-11-18 | Flat "Damage and Healing" bonus valued relative to real per-hit damage/healing; consider Revelation Mastery gems that reach the next revelation stage (bigger flat bonus). Leech slices strongly devalued. | User guidance. |
+| D15 | 2026-11-18 | Multiple monsters per hunting spot with weights; best build + 2 alternatives; export-only planner code (incl. gems); gem/upgrade ranking by gain only (no cost). UI polishing postponed until functionality is accepted. | User answers. |
 
 ---
 
