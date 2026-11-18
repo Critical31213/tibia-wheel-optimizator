@@ -1,5 +1,66 @@
 # Integration & QA (S4 Integration)
 
+## Iteration 3 (2026-11-18)
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `src/lib/planner.ts` | Duplicate `PLANNER_URL`/`plannerUrl` removed. They are now re-exported from `src/data/wheel/plannerCode.ts`, the single source of the planner format. |
+| `src/data/wheel/plannerCode.ts` | `plannerUrl` trims the code. This behaviour was previously only in the UI copy. |
+| `src/engine/optimizer.ts` | Three fixes. (1) If an alternative's search beats the main build on the main objective, it is promoted to main and the alternatives are recomputed (up to 3 rounds). Before, `relativeScore` reached 106 % (paladin, hunt, 1200 points). (2) Alternatives are sorted by `relativeScore`. (3) A revelation-focus label names every revelation at the top stage, which avoids two identical "Ascetic focus" labels (monk, solo). |
+| `src/engine/optimizer.ts` | `SpellUsage.share` is set again for useful damage spells. Iteration 3 had dropped it, so the UI "% dmg" never showed. |
+| `src/engine/messages.ts`, `src/i18n/pl.ts` | `rationale.hunt` no longer says that single-target spells count for 1 target, which contradicted D16. PL wording was reviewed for the new keys (`rationale.character/singleTarget/spot/hpOverMitigation/mitigationOverHp`, `spell/gem.singleTargetHunt`, `alt.*`). It follows the UI terms "Hunt", "spell na pojedynczy cel" and "Expowisko", and keeps planner names in English (Hit Points, Mitigation Multiplier, Revelation). |
+| `vite.config.ts` | The comment documents the new main chunk contents. The 800 kB limit is unchanged. |
+| `src/integration.test.ts` | Iteration 3 E2E tests (see below). |
+
+### Bundle
+
+| Chunk | Size | Gzip | Contents |
+|-------|------|------|----------|
+| main | 724 kB | 158 kB | React, engine, wheel data, damage formulas (127 kB JSON), fflate `inflateSync` (tree-shaken) |
+| data (lazy) | 699 kB | 76 kB | monsters |
+| CSS | 27 kB | 6 kB | |
+
+`optimize()` needs the damage formulas and the planner encoder synchronously for the first render, so both stay in the main chunk. fflate is used only for decoding; encoding uses the in-repo zlib-compatible deflater.
+
+### Test matrix additions (`src/integration.test.ts`, 200 tests total, +65)
+
+| Area | Cases |
+|------|-------|
+| D16 | 5 vocations × solo / team-lure / team-box (level 800, owned gems). Every single-target damage spell has `useful = false`, no share and `spell.singleTargetHunt`. No gem recommendation (main build or alternatives) boosts a single-target spell, and `rationale.singleTarget` is present. In boss mode, single-target spells are evaluated normally (at least 3 vocations have one). |
+| Planner code | 30 seeded random inputs (vocation, 0–4000 points, priority, context, gems, character level). For the main build and each alternative, the code decodes to the same vocation, tile points and the vessel gems the planner can store. The export URL is checked too. |
+| Planner WASM | The same 30 inputs: `updateByCode` returns 1, and the planner's tile points and vessel mods equal ours. Skipped if `scripts/.cache/wod/skillgrid.cjs` is missing. |
+| Alternatives | 5 vocations × boss / solo at 1200 points. There are exactly 2 alternatives, pairwise ≥ 120 points apart (10 % of the budget). Codes and labels are distinct and `relativeScore` is in (0, 100]. Each alternative passes the full validity, directed-path and message checks, and its labels resolve in PL and EN. |
+| Hunting spot | Askarak Demon (fire 125 %) + Chakoya Windcaller (energy 115 %) for a sorcerer in team-box. At 9:1 the top damage spell is not energy; at 1:9 it is. The allocations differ, scale-free weights give the same build, and the `rationale.spot` list reads "Askarak Demon 90%, Chakoya Windcaller 10%". The URL → `resolveMonsters` path gives the same engine input. |
+| Character | A level 400 paladin gets `hpOverMitigation` and no lesser Mitigation Multiplier gem. A knight at level 400 vs 1500 (priority 100): the HP/mitigation ratio drops, Mitigation Multiplier becomes the lesser gem, and HP grows. Skills change gem gains. `characterOf` sends only the vocation's skills. |
+| URL state | `lv sc sk sh ml m=id*w_…` round-trip. In a full link, absent optional keys clear their fields. Legacy `monsterId` migrates. Unknown ids, duplicates and invalid weights are dropped. |
+
+### Browser check (dev server, T3 preview)
+
+Paladin, level 600 → 550 points, with Dragon Lord + Demon added (URL `m=dragon-lord_demon`).
+- Best, Alt 1 and Alt 2 each switch the shown build. Each has a different code, a label, a score and a trade-off.
+- Copy code, Copy planner link and Open planner are present, and the link points to test.tibia.com with the code.
+- In PL, boss mode gives "Nastawiony na Avatara (Avatar of Light)". The rationale lines render with no `{param}` left over.
+- No console errors or warnings and no Vite overlay.
+
+### Gate results (2026-11-18)
+
+| Gate | Result |
+|------|--------|
+| `npx tsc -b` | 0 errors |
+| `npx vitest run` | 17 files, 494 tests passed (WASM tests ran) |
+| `npm run lint` | 0 warnings / errors |
+| `npm run build` | OK (sizes above) |
+
+### Open issues
+
+- Healing formulas are approximate (canary), and the cooldowns of the 2026 spells are estimates.
+- Armor is not modelled. Base mitigation assumes default equipment.
+- Alternatives are absent near a full wheel: there is no room for a build ≥ 10 % different.
+- UI polish is postponed (D15). There are no DOM/component tests.
+- The header score is rounded ("92 %") while the trade-off text shows one decimal ("92.3 %"). This is cosmetic.
+
 ## Iteration 2 (2026-11-18)
 
 ### Files changed

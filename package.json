@@ -11,9 +11,11 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "scrape:monsters": "tsx scripts/scrape-monsters.ts",
-    "extract:wheel": "node scripts/extract-wheel.mjs"
+    "extract:wheel": "node scripts/extract-wheel.mjs",
+    "datamine:damage": "node scripts/datamine-tibiatools.mjs"
   },
   "dependencies": {
+    "fflate": "^0.8.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

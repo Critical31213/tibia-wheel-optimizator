@@ -9,7 +9,12 @@ import type { EngineMessage } from '../types';
 export const ENGINE_MESSAGES = {
   // Rationale
   'rationale.priority': 'Priority {priority}/100: offense weighted {offense}%, survivability {defense}%.',
-  'rationale.hunt': 'Hunt ({style}): area spells are valued for about {targets} targets each, single-target spells for 1.',
+  'rationale.character': 'Character level {level}: {hp} base HP, base mitigation ≈ {mitigation}%; spell damage uses your level and skills.',
+  'rationale.singleTarget': 'Hunt mode: single-target spells are not valued ({spells}).',
+  'rationale.spot': 'Hunting spot: {list}; element and damage-type modifiers are weighted.',
+  'rationale.hpOverMitigation': 'At your level one Hit Points dedication point is worth ~{ratio}× a Mitigation point (HP buffer vs typical spikes).',
+  'rationale.mitigationOverHp': 'At your level one Mitigation point is worth ~{ratio}× a Hit Points point (sustained damage reduction).',
+  'rationale.hunt': 'Hunt ({style}): area spells are valued for about {targets} targets each; single-target spells are ignored.',
   'rationale.boss': 'Boss fight: every spell counts ~1 target, so single-target damage and Avatar matter most.',
   'rationale.avatarIgnored': '{avatar} is ignored while hunting (valued in boss mode only).',
   'rationale.weak': '{monster} takes {list} damage, so {spells} were favoured.',
@@ -27,6 +32,7 @@ export const ENGINE_MESSAGES = {
 
   // Spells
   'spell.avatarHunt': 'Avatar: valued only in boss mode.',
+  'spell.singleTargetHunt': 'Single-target spell: not valued while hunting (boss mode only).',
   'spell.avatarBoss': 'Avatar: burst window for the boss fight.',
   'spell.immune': '{monster} is immune to {element}.',
   'spell.damage': '~{targets} targets, {element} {modifier}%: {share}% of your damage.',
@@ -39,6 +45,7 @@ export const ENGINE_MESSAGES = {
 
   // Gems
   'gem.spell': 'Boosts {spell} (~{targets} targets, {share}% of your damage).',
+  'gem.singleTargetHunt': 'Boosts {spell}, a single-target spell (useful in boss fights only).',
   'gem.healing': 'Boosts {spell} healing.',
   'gem.cooldown': 'Shorter {spell} cooldown (+{momentum}% Momentum at grade IV).',
   'gem.avatar': 'Shorter {spell} cooldown: more Avatar windows in boss fights.',
@@ -63,6 +70,13 @@ export const ENGINE_MESSAGES = {
   'stat.unique': '{name}',
   'stat.vessels': 'Gem vessels unlocked',
   'stat.gemMod': '{name} (gems)',
+
+  // Alternatives
+  'alt.revelationFocus': '{revelation} focus',
+  'alt.avatarFocus': 'Avatar focus ({revelation})',
+  'alt.defensive': 'More defensive',
+  'alt.offensive': 'More offensive',
+  'alt.tradeoff': 'Offense {offense}, defense {defense} vs the best build ({score}% of its value); revelations: {revelations}.',
 } as const;
 
 export type EngineMessageKey = keyof typeof ENGINE_MESSAGES;

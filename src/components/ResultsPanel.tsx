@@ -1,4 +1,5 @@
-import type { OptimizerResult, PerkCategory, WheelDefinition } from '../types';
+import type { PerkCategory, WheelDefinition } from '../types';
+import type { BuildResult } from '../lib/api';
 import { engineText, useT } from '../i18n';
 import { cx, DOMAIN_COLORS, formatNumber } from '../lib/labels';
 
@@ -36,7 +37,7 @@ function SubHeading({ children }: { children: string }) {
 
 interface ResultsPanelProps {
   wheel: WheelDefinition;
-  result: OptimizerResult;
+  result: BuildResult;
 }
 
 /** Textual breakdown of the optimized build. */

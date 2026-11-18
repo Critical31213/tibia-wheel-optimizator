@@ -8,7 +8,10 @@
  * subscribers once the data is ready.
  */
 import { useEffect, useSyncExternalStore } from 'react';
-import type { Monster } from '../types';
+import type { Monster, OptimizerResult } from '../types';
+
+/** One build (main or alternative) as shown by the wheel / summary / vessels. */
+export type BuildResult = Omit<OptimizerResult, 'alternatives'>;
 
 export { getWheel, MAX_SCROLL_POINTS, optimize, pointsForLevel } from '../engine';
 

@@ -11,7 +11,7 @@ const CHIP: Record<ModifierKind, string> = {
   neutral: 'border-ink-600 bg-ink-950/50 text-parchment-300',
 };
 
-function ElementChip({ element, kind, percent }: { element: Element; kind: ModifierKind; percent?: number }) {
+export function ElementChip({ element, kind, percent }: { element: Element; kind: ModifierKind; percent?: number }) {
   const t = useT();
   const name = t(`element.${element}`);
   return (

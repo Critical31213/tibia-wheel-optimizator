@@ -218,10 +218,10 @@ function basicReason(env: GemEnv, m: WheelBasicMod, monster: string | undefined)
   const res = m.effects
     .map((e) => RESIST_EFFECT[e.effectId])
     .filter((e) => e !== undefined)
-    .sort((a, b) => incomingShare(env.v.monster, b) - incomingShare(env.v.monster, a));
+    .sort((a, b) => incomingShare(env.v, b) - incomingShare(env.v, a));
   if (res.length && m.effects.every((e) => RESIST_EFFECT[e.effectId] !== undefined)) {
     const element = res[0];
-    if (monster && incomingShare(env.v.monster, element) > 0) return text('gem.resistMonster', { monster, element });
+    if (monster && incomingShare(env.v, element) > 0) return text('gem.resistMonster', { monster, element });
     return text('gem.resist', { element });
   }
   if (m.effects.every((e) => e.effectId === 11 || e.effectId === 12)) return text('gem.utility', { mod: m.name });
@@ -246,8 +246,8 @@ function supremeReason(env: GemEnv, m: WheelSupremeMod) {
   }
   if (m.category === 'augHealing') return text('gem.healing', { spell });
   if (s && s.kind === 'damage') {
-    const d = revelationIndex(wheel.revelations, m.revelation);
-    const share = displayShare(v.model, spell, d >= 0 ? Math.max(1, facts.stages[d]) : 3);
+    if (!s.usable) return text('gem.singleTargetHunt', { spell });
+    const share = displayShare(v.model, spell, facts.stages);
     return text('gem.spell', { spell, targets: round1(s.targets), share: Math.round(share) });
   }
   return text('gem.effect', { mod: m.name });

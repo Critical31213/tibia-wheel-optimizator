@@ -111,3 +111,7 @@ templates). Wheel facts: official Tibia Wheel of Destiny planner (CipSoft). The 
 - Values come from the **test server** and may change before release; re-run the extraction after updates.
 - The planner uses grade IV for all mods; lower grades come from the strings file only.
 - tibiapal builds predate the new layout (`legacyCode`).
+
+## Planner export code
+
+Build ↔ official planner code/URL (pure TS, byte-identical to the planner): see [planner-code.md](planner-code.md).

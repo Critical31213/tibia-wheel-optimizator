@@ -1,6 +1,7 @@
 import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { ModDefinition, ModGrade, OptimizerResult, OwnedGem, Vocation } from '../types';
+import type { ModDefinition, ModGrade, OwnedGem, Vocation } from '../types';
+import type { BuildResult } from '../lib/api';
 import { engineText, useT } from '../i18n';
 import { findMod, slotKind, slotsForQuality } from '../lib/gems';
 import { cx, formatNumber, gemName, ROMAN } from '../lib/labels';
@@ -44,7 +45,7 @@ function GemMods({ gem, mods }: { gem: OwnedGem; mods: ModDefinition[] }) {
 
 interface VesselsPanelProps {
   vocation: Vocation;
-  result: OptimizerResult;
+  result: BuildResult;
   mods: ModDefinition[];
 }
 

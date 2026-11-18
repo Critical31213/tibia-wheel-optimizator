@@ -1,18 +1,22 @@
 /**
- * Perk valuation. Units: `off` ≈ +1 % total damage output, `def` ≈ +1 % effective survivability,
- * `util` = convenience (mana, capacity). Constants are engine estimates (see docs/modules/engine.md).
+ * Perk valuation. Units: `off` = % of total damage per turn (ΔT / T0, real formulas, see spells.ts),
+ * `def` = survivability units (see K and docs/modules/engine.md), `util` = convenience (mana, capacity).
  */
 import type { Element, FightContext, Monster, Vocation } from '../types';
 import type { WheelSupremeMod, WheelTile } from '../data/wheel';
+import { maxHitPoints, maxMana, mitigationPercent } from '../data/character';
 import {
-  baseCooldown,
-  BEAM_CENTRAL_REACH,
   cooldownGain,
   damageShare,
-  elementMultiplier,
+  deltaOff,
   healShare,
+  NO_MODS,
+  NO_STAGES,
+  type RotationInput,
   type SpellModel,
-  targetsAt,
+  type SpellMods,
+  spellCooldown,
+  spotElementMultiplier,
 } from './spells';
 import { MOMENTUM_PER_GRADE, REVELATION_FLAT_BONUS, stageFor, type EngineRevelation } from './wheel/build';
 
@@ -25,63 +29,40 @@ export interface Parts {
 export const ZERO: Parts = { off: 0, def: 0, util: 0 };
 
 export const K = {
-  /** +1 skill / magic level. */
-  SKILL_OFF: 0.7,
-  /** Baseline critical hit chance and extra damage (imbuements). */
-  CRIT_CHANCE: 0.1,
-  CRIT_EXTRA: 0.5,
-  LIFE_LEECH_DEF: 0.8,
-  MANA_LEECH_OFF: 0.4,
-  MANA_LEECH_DEF: 0.3,
-  /** Per +1 % of base hit points. */
-  HP_DEF: 0.5,
+  /** Per +1 % of max HP, × spike factor (HP is a buffer against spikes). */
+  HP_DEF: 1,
+  /**
+   * Per +1 percentage point of damage reduction on all incoming damage. Reduction works on every hit
+   * (sustain: less healing and mana needed) as well as on spikes, hence > HP_DEF.
+   */
+  DR_DEF: 3,
+  /** Spike = this × level when no monster max damage is known. */
+  SPIKE_PER_LEVEL: 3,
+  /** Spike factor = clamp(SPIKE_HP × spike / maxHP, min, max). */
+  SPIKE_HP: 2,
+  SPIKE_MIN: 0.25,
+  SPIKE_MAX: 1.5,
+  /** Leech is strongly devalued (D14). Per +1 % leech. */
+  LIFE_LEECH_DEF: 0.15,
+  MANA_LEECH_OFF: 0.1,
+  MANA_LEECH_DEF: 0.05,
   /** Per +1 % of base mana. */
-  MANA_OFF: 0.15,
-  MANA_DEF: 0.1,
-  /** Per +1 % damage reduction on all incoming damage. */
-  MIT_DR_DEF: 1,
-  /** Per +1 % resistance × share of incoming damage of that element. */
-  RES_DEF: 1,
-  DODGE_DEF: 1,
-  /** Per +1 % healing of the vocation's healing. */
+  MANA_OFF: 0.1,
+  MANA_DEF: 0.05,
+  /** Per +1 % healing output. */
   HEAL_DEF: 0.3,
   CAP_UTIL: 0.002,
   MANA_COST_UTIL: 0.05,
-  /** Larger area / range augments (+% damage of that spell while hunting). */
-  AREA_GAIN: 15,
-  /** Per +1 % momentum: fraction of damage from cooldown-bound spells. */
+  /** Larger area / shape: extra targets while hunting. */
+  AREA_TARGETS: 1,
+  /** Per +1 % momentum. */
   MOMENTUM_OFF: 0.5,
   MOMENTUM_DEF: 0.2,
-  /** Average damage (and healing) per hit ≈ 4 × level, for flat bonuses. */
-  HIT_PER_LEVEL: 4,
-  /** Avatar: boss fight length (s) and typical interval between boss fights (min). */
+  /** Avatar: boss fight length (s), typical interval between boss fights (min), duration (s). */
   BOSS_FIGHT_S: 120,
   BOSS_INTERVAL_MIN: 30,
   AVATAR_DURATION_S: 15,
 } as const;
-
-const HP_PER_LEVEL: Record<Vocation, number> = { knight: 15, paladin: 10, sorcerer: 5, druid: 5, monk: 10 };
-/**
- * Typical base mitigation (% damage reduction) at mid/high level, APPROXIMATE.
- * In-game mitigation = (defense + shielding) × equipment × wheel multiplier × stance; the wheel's
- * "Mitigation Multiplier" scales it multiplicatively. Knights (shield, high shielding) are highest,
- * mages (wand + spellbook) lowest.
- */
-export const BASE_MITIGATION: Record<Vocation, number> = { knight: 20, paladin: 10, monk: 14, sorcerer: 6, druid: 6 };
-const MANA_PER_LEVEL: Record<Vocation, number> = { knight: 5, paladin: 15, sorcerer: 30, druid: 30, monk: 10 };
-
-/** Share of incoming damage per element without a monster. */
-const GENERIC_INCOMING: Partial<Record<Element, number>> = {
-  physical: 0.35,
-  fire: 0.1,
-  earth: 0.1,
-  energy: 0.1,
-  ice: 0.1,
-  holy: 0.05,
-  death: 0.1,
-  lifeDrain: 0.05,
-  manaDrain: 0.05,
-};
 
 /** Basic-mod effect ids (planner) → resistance element. */
 export const RESIST_EFFECT: Record<number, Element> = {
@@ -100,13 +81,39 @@ export const EFFECT_HP = 10;
 export const EFFECT_MANA = 11;
 export const EFFECT_CAPACITY = 12;
 
+/** Share of incoming damage per element without a monster. */
+const GENERIC_INCOMING: Partial<Record<Element, number>> = {
+  physical: 0.35,
+  fire: 0.1,
+  earth: 0.1,
+  energy: 0.1,
+  ice: 0.1,
+  holy: 0.05,
+  death: 0.1,
+  lifeDrain: 0.05,
+  manaDrain: 0.05,
+};
+
 export interface ValuationContext {
   vocation: Vocation;
   context: FightContext;
+  /** Representative monster (single monster, or a weighted "spot" aggregate), null = generic. */
   monster: Monster | null;
   model: SpellModel;
   level: number;
+  /** Defense multiplier from monster max damage. */
   threat: number;
+  /** Base max HP / mana at the level. */
+  hp: number;
+  mana: number;
+  /** Base mitigation (%) from shielding/defense. */
+  mitigation: number;
+  /** clamp(2 × spike / maxHP): how much a bigger HP buffer matters. */
+  spikeFactor: number;
+  /** Share of incoming damage per element (weighted over the spot). */
+  incoming: Partial<Record<Element, number>>;
+  /** Δ% damage of +1 main skill / magic level (skill boost convictions). */
+  skillOff: number;
 }
 
 export function add(a: Parts, b: Parts, k = 1): Parts {
@@ -123,39 +130,86 @@ export function threatOf(monster: Monster | null): number {
   return Math.min(1.6, Math.max(0.6, monster.maxDamage / 1000));
 }
 
-export function incomingShare(monster: Monster | null, e: Element): number {
-  const types: Element[] = monster?.damageTypes.filter((t) => t !== 'healing') ?? [];
-  if (!types.length) return GENERIC_INCOMING[e] ?? 0;
-  return types.includes(e) ? 1 / types.length : 0;
+/** Weighted share of incoming damage per element over a spot (generic shares without monsters). */
+export function incomingShares(monsters: { monster: Monster; weight: number }[]): Partial<Record<Element, number>> {
+  const known = monsters.filter((m) => m.monster.damageTypes.some((t) => t !== 'healing'));
+  if (!known.length) return { ...GENERIC_INCOMING };
+  const total = known.reduce((s, m) => s + m.weight, 0);
+  const out: Partial<Record<Element, number>> = {};
+  for (const { monster, weight } of known) {
+    const types = monster.damageTypes.filter((t) => t !== 'healing');
+    for (const t of types) out[t] = (out[t] ?? 0) + weight / total / types.length;
+  }
+  return out;
+}
+
+export function incomingShare(v: Pick<ValuationContext, 'incoming'>, e: Element): number {
+  return v.incoming[e] ?? 0;
+}
+
+/** Aggregated "spot" monster: weighted element modifiers / max damage, union of damage types. */
+export function spotMonster(monsters: { monster: Monster; weight: number }[]): Monster | null {
+  if (!monsters.length) return null;
+  if (monsters.length === 1) return monsters[0].monster;
+  const elems = new Set(monsters.flatMap((m) => Object.keys(m.monster.elementModifiers) as Element[]));
+  const elementModifiers: Partial<Record<Element, number>> = {};
+  for (const e of elems) elementModifiers[e] = Math.round(spotElementMultiplier(monsters, e) * 1000) / 10;
+  const withDmg = monsters.filter((m) => m.monster.maxDamage);
+  const wd = withDmg.reduce((s, m) => s + m.weight, 0);
+  const sorted = [...monsters].sort((a, b) => b.weight - a.weight || a.monster.name.localeCompare(b.monster.name));
+  return {
+    id: monsters.map((m) => m.monster.id).join('+'),
+    name: sorted.map((m) => m.monster.name).join(' / '),
+    elementModifiers,
+    damageTypes: [...new Set(monsters.flatMap((m) => m.monster.damageTypes))],
+    maxDamage: wd > 0 ? Math.round(withDmg.reduce((s, m) => s + m.weight * m.monster.maxDamage!, 0) / wd) : undefined,
+  };
+}
+
+export function spikeFactor(vocation: Vocation, level: number, monsters: { monster: Monster; weight: number }[]): number {
+  const withDmg = monsters.filter((m) => m.monster.maxDamage);
+  const wd = withDmg.reduce((s, m) => s + m.weight, 0);
+  const spike = wd > 0 ? withDmg.reduce((s, m) => s + m.weight * m.monster.maxDamage!, 0) / wd : K.SPIKE_PER_LEVEL * level;
+  return Math.min(K.SPIKE_MAX, Math.max(K.SPIKE_MIN, (K.SPIKE_HP * spike) / maxHitPoints(vocation, level)));
+}
+
+/** Base character facts for valuation. */
+export function characterFacts(vocation: Vocation, level: number, shielding: number) {
+  return { hp: maxHitPoints(vocation, level), mana: maxMana(vocation, level), mitigation: mitigationPercent(vocation, level, { shielding }) };
 }
 
 const def = (v: ValuationContext, x: number): Parts => ({ off: 0, def: x * v.threat, util: 0 });
 
 export function hpParts(v: ValuationContext, hp: number): Parts {
-  return def(v, (hp / (HP_PER_LEVEL[v.vocation] * v.level)) * 100 * K.HP_DEF);
+  return def(v, ((100 * hp) / v.hp) * K.HP_DEF * v.spikeFactor);
 }
 
 export function manaParts(v: ValuationContext, mana: number): Parts {
-  const pct = (mana / (MANA_PER_LEVEL[v.vocation] * v.level)) * 100;
+  const pct = (100 * mana) / v.mana;
   return { off: pct * K.MANA_OFF, def: pct * K.MANA_DEF * v.threat, util: 0 };
 }
 
 /** Extra damage reduction (percentage points) from a +`multiplierPct` % mitigation multiplier. */
-export function mitigationGain(vocation: Vocation, multiplierPct: number): number {
-  return (BASE_MITIGATION[vocation] * multiplierPct) / 100;
+export function mitigationGain(v: Pick<ValuationContext, 'mitigation'>, multiplierPct: number): number {
+  return (v.mitigation * multiplierPct) / 100;
+}
+
+/** Damage reduction in percentage points, valued as relative reduction of damage taken. */
+export function reductionParts(v: ValuationContext, pp: number): Parts {
+  return def(v, (pp / Math.max(0.5, 1 - v.mitigation / 100)) * K.DR_DEF);
 }
 
 export function mitigationParts(v: ValuationContext, multiplierPct: number): Parts {
-  return def(v, mitigationGain(v.vocation, multiplierPct) * K.MIT_DR_DEF);
+  return reductionParts(v, mitigationGain(v, multiplierPct));
 }
 
 export function resistParts(v: ValuationContext, e: Element, pct: number): Parts {
-  return def(v, pct * K.RES_DEF * incomingShare(v.monster, e));
+  return def(v, pct * K.DR_DEF * incomingShare(v, e));
 }
 
+/** Flat damage & healing bonus: real per-hit damage (× bonus factor × targets) and healing per cast. */
 export function flatParts(v: ValuationContext, flat: number): Parts {
-  const pct = (flat / (K.HIT_PER_LEVEL * v.level)) * 100;
-  return { off: pct, def: pct * K.HEAL_DEF * v.threat, util: 0 };
+  return { off: flat * v.model.flatOffPerPoint, def: flat * v.model.flatHealPerPoint * K.HEAL_DEF * v.threat, util: 0 };
 }
 
 /** Value of ONE dedication point of a tile. */
@@ -222,75 +276,71 @@ const SUPPORT_VALUE: Record<string, Parts> = {
   'Focus Harmony': { off: 3, def: 0, util: 0 },
 };
 
+function toMods(effects: SpellEffect[], hunt: boolean): SpellMods {
+  const m = { ...NO_MODS };
+  for (const e of effects) {
+    if (e.kind === 'dmg') m.pct += e.amount;
+    else if (e.kind === 'critChance') m.critChance += e.amount;
+    else if (e.kind === 'critDmg') m.critExtra += e.amount;
+    else if (e.kind === 'cd') m.cd += e.amount;
+    else if (hunt && e.kind === 'jumps') m.extraTargets += e.amount;
+    else if (hunt && e.kind === 'area') m.extraTargets += K.AREA_TARGETS;
+  }
+  return m;
+}
+
+/** Stages vector with the domain of `spell` set to `stage` (if any). */
+export function stagesFor(model: SpellModel, spell: string, stage: number): number[] {
+  const s = model.spells.get(spell);
+  const out = [...NO_STAGES];
+  if (s && s.stageDomain >= 0) out[s.stageDomain] = stage;
+  return out;
+}
+
 /**
- * Value of a set of effects applied to one spell. Cooldowns are summed first so the 50 % floor
- * applies; `stage` is the revelation stage for revelation spells.
+ * Value of a set of effects applied to one spell against the rotation at `stages`. Cooldowns are summed
+ * first so the 50 % floor applies. Damage spells: Δ rotation damage (D16: single-target spells in hunt = 0).
  */
-export function spellBundleParts(v: ValuationContext, spell: string, effects: SpellEffect[], stage = 3): Parts {
+export function spellBundleParts(v: ValuationContext, spell: string, effects: SpellEffect[], stages: readonly number[] = NO_STAGES): Parts {
   const s = v.model.spells.get(spell);
   if (!s) return ZERO;
+  const stage = s.stageDomain >= 0 ? stages[s.stageDomain] : 3;
   if (s.avatar) return avatarParts(v, stage, effects.filter((e) => e.kind === 'cd').reduce((a, e) => a + e.amount, 0));
   if (s.revelation >= 0 && stage < 1) return ZERO;
+  if (s.kind === 'damage') {
+    if (!s.usable) return ZERO;
+    const base: RotationInput = { stages };
+    const mods = new Map([[spell, toMods(effects, v.context.mode === 'hunt')]]);
+    const off = deltaOff(v.model, { stages, mods }, base);
+    const leech = effects.filter((e) => e.kind === 'leech').reduce((a, e) => a + e.amount, 0);
+    let dfn = 0;
+    if (leech > 0) dfn += (leech * K.LIFE_LEECH_DEF * damageShare(v.model, spell, stages)) / 100;
+    if (effects.some((e) => e.kind === 'defHit')) dfn += 0.5;
+    const util = effects.reduce((a, e) => a + (e.kind === 'mana' ? e.amount * K.MANA_COST_UTIL : 0), 0);
+    return { off, def: dfn * v.threat, util };
+  }
   let off = 0;
   let dfn = 0;
   let util = 0;
   let cd = 0;
-  const share = damageShare(v.model, spell, stage);
   const hs = s.kind === 'healing' ? healShare(v.model, spell) : 0;
   for (const e of effects) {
-    switch (e.kind) {
-      case 'dmg':
-        off += (e.amount * share) / 100;
-        break;
-      case 'critDmg':
-        off += (e.amount * K.CRIT_CHANCE * share) / 100;
-        break;
-      case 'critChance':
-        off += (e.amount * K.CRIT_EXTRA * share) / 100;
-        break;
-      case 'leech':
-        dfn += (e.amount * K.LIFE_LEECH_DEF * share) / 100;
-        break;
-      case 'area':
-        if (v.context.mode === 'hunt') off += (K.AREA_GAIN * share) / 100;
-        break;
-      case 'jumps': {
-        if (v.context.mode === 'boss' || !s.meta) break;
-        const t = targetsAt(v.model, s, stage);
-        const pool = v.context.huntStyle === 'solo' ? t + e.amount * 0.5 : v.context.huntStyle === 'teamLure' ? 5 : 9;
-        const nt = Math.min(s.meta.maxTargets + e.amount, Math.max(t, pool));
-        off += share * (nt / t - 1);
-        break;
-      }
-      case 'heal':
-        dfn += e.amount * hs * K.HEAL_DEF;
-        break;
-      case 'mana':
-        util += e.amount * K.MANA_COST_UTIL;
-        break;
-      case 'duration':
-        util += 1;
-        break;
-      case 'defHit':
-        dfn += 0.5;
-        break;
-      case 'cd':
-        cd += e.amount;
-        break;
-    }
+    if (e.kind === 'heal') dfn += e.amount * hs * K.HEAL_DEF;
+    else if (e.kind === 'mana') util += e.amount * K.MANA_COST_UTIL;
+    else if (e.kind === 'duration') util += 1;
+    else if (e.kind === 'defHit') dfn += 0.5;
+    else if (e.kind === 'cd') cd += e.amount;
+    else if (e.kind === 'jumps' && s.kind === 'support') util += e.amount * 0.5;
+    else if (e.kind === 'area' && s.kind === 'healing' && v.context.mode === 'hunt' && v.context.huntStyle !== 'solo') dfn += 100 * hs * K.HEAL_DEF * 0.1;
   }
   if (cd > 0) {
-    const base = baseCooldown(spell, stage);
-    if (base) {
-      const g = cooldownGain(base, cd);
-      if (s.kind === 'damage') off += share * g;
-      else if (s.kind === 'healing') dfn += 100 * hs * K.HEAL_DEF * g;
-      else {
-        const sup = SUPPORT_VALUE[spell] ?? { off: 1, def: 0, util: 1 };
-        off += sup.off * g;
-        dfn += sup.def * g;
-        util += sup.util * g;
-      }
+    const g = cooldownGain(spellCooldown(spell, stage), cd);
+    if (s.kind === 'healing') dfn += 100 * hs * K.HEAL_DEF * g;
+    else {
+      const sup = SUPPORT_VALUE[spell] ?? { off: 1, def: 0, util: 1 };
+      off += sup.off * g;
+      dfn += sup.def * g;
+      util += sup.util * g;
     }
   }
   return { off, def: dfn * v.threat, util };
@@ -303,8 +353,8 @@ export function avatarParts(v: ValuationContext, stage: number, cdReduction = 0)
   const cdMin = Math.max([120, 90, 60][stage - 1] * 0.5, [120, 90, 60][stage - 1] - cdReduction / 60);
   const fights = Math.min(1, K.BOSS_INTERVAL_MIN / cdMin);
   const uptime = K.AVATAR_DURATION_S / K.BOSS_FIGHT_S;
-  const boost = (1 + K.CRIT_EXTRA + extra) / (1 + K.CRIT_CHANCE * K.CRIT_EXTRA) - 1;
-  return { off: 100 * uptime * boost * fights, def: 100 * uptime * extra * fights * v.threat, util: 0 };
+  const boost = (1 + 0.5 + extra) / (1 + 0.1 * 0.5) - 1;
+  return { off: 100 * uptime * boost * fights, def: 100 * uptime * extra * fights * K.DR_DEF * v.threat, util: 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -338,7 +388,7 @@ export function convictionParts(v: ValuationContext, t: WheelTile): Parts {
         : def(v, pct * K.LIFE_LEECH_DEF);
     }
     case 'skillBonus':
-      return { off: (c.numericValue ?? 1) * K.SKILL_OFF, def: 0, util: 0 };
+      return { off: (c.numericValue ?? 1) * v.skillOff, def: 0, util: 0 };
     case 'unique':
       return UNIQUE[c.name]?.(v) ?? { off: 1, def: 1, util: 0 };
     default:
@@ -370,56 +420,31 @@ export function revelationParts(v: ValuationContext, r: EngineRevelation, stage:
   const d = r.data;
   let p: Parts;
   if (d.isAvatar) p = avatarParts(v, stage);
-  else if (d.spells.length) {
-    let best = 0;
-    let sum = 0;
-    for (const s of d.spells) {
-      const sh = damageShare(v.model, s, stage);
-      best = Math.max(best, sh);
-      sum += sh;
-    }
-    p = { off: Math.max(best, sum), def: 0, util: 0 };
-  } else p = passiveRevelation(v, d.name, stage, d.affectsSpells);
+  else {
+    const stages = [...NO_STAGES];
+    stages[r.domainIdx] = stage;
+    const off = deltaOff(v.model, { stages }, { stages: NO_STAGES });
+    p = add({ off, def: 0, util: 0 }, passiveRevelation(v, d.name, stage));
+  }
   return add(p, flat);
 }
 
-function passiveRevelation(v: ValuationContext, name: string, stage: number, affects: string[]): Parts {
+/** Effects not covered by the rotation model (defensive / support revelations). */
+function passiveRevelation(v: ValuationContext, name: string, stage: number): Parts {
   const th = v.threat;
   switch (name) {
     case 'Gift of Life':
       return { off: 0, def: stageVal([3, 4.5, 6], stage) * th * (v.context.mode === 'boss' ? 1.3 : 1), util: 0 };
     case 'Combat Mastery':
-      return { off: stageVal([3, 3.6, 4.2], stage), def: stageVal([2, 2.4, 2.8], stage) * th, util: 0 };
+      return { off: 0, def: stageVal([2, 2.4, 2.8], stage) * th, util: 0 };
     case 'Divine Empowerment': {
       const cd = [32, 28, 24][stage - 1];
       return { off: stageVal([8, 10, 12], stage) * Math.min(1, 5 / cd), def: 0, util: 0 };
     }
-    case 'Beam Mastery': {
-      let off = 0;
-      let hits = 0;
-      for (const b of affects) {
-        const s = v.model.spells.get(b);
-        if (!s) continue;
-        const share = damageShare(v.model, b, stage);
-        const central = Math.max(s.targets, BEAM_CENTRAL_REACH);
-        const total = central + s.outerTargets;
-        const bonus = Math.min(stageVal([30, 36, 42], stage), stageVal([10, 12, 14], stage) * total);
-        off += (share * bonus) / 100 + share * (stageVal([25, 40, 70], stage) / 100) * (s.outerTargets / central);
-        hits = Math.max(hits, total);
-      }
-      return { off: off + Math.min(3, hits) * 0.5, def: 0, util: 0 };
-    }
-    case 'Lord of Destruction': {
-      const m = v.monster;
-      const e = Math.max(elementMultiplier(m, 'fire'), elementMultiplier(m, 'energy'), elementMultiplier(m, 'death'));
-      return { off: stageVal([2, 3, 4], stage) * e, def: 0, util: 0 };
-    }
     case 'Blessing of the Grove':
       return { off: 0, def: stageVal([3.5, 4.5, 6], stage) * th * (team(v.context) ? 1.5 : 1), util: 0 };
-    case 'Ascetic':
-      return { off: stageVal([2, 3.5, 5], stage), def: 0, util: 0 };
     default:
-      return { off: stageVal([1, 2, 3], stage), def: 0, util: 0 };
+      return ZERO;
   }
 }
 
@@ -485,8 +510,8 @@ export function supremeModParts(
 ): Parts {
   const x = m.values[grade - 1] ?? 0;
   if (m.category === 'effect') {
-    if (/dodge/i.test(m.name)) return def(v, x * K.DODGE_DEF);
-    if (/critical/i.test(m.name)) return { off: x * K.CRIT_CHANCE, def: 0, util: 0 };
+    if (/dodge/i.test(m.name)) return reductionParts(v, x);
+    if (/critical/i.test(m.name)) return { off: deltaOff(v.model, { stages: facts.stages, critExtra: x }, { stages: facts.stages }), def: 0, util: 0 };
     if (/life leech/i.test(m.name)) return def(v, x * K.LIFE_LEECH_DEF);
     if (/mana leech/i.test(m.name)) return { off: x * K.MANA_LEECH_OFF, def: x * K.MANA_LEECH_DEF * v.threat, util: 0 };
     return ZERO;
@@ -494,19 +519,17 @@ export function supremeModParts(
   if (m.category === 'revelationMastery') {
     const d = revelationIndex(revs, m.revelation);
     if (d < 0) return ZERO;
-    const before = facts.stages[d];
+    const before = stageFor(facts.revPoints[d]);
     const after = stageFor(facts.revPoints[d] + x);
     return sub(revelationParts(v, revs[d], after), revelationParts(v, revs[d], before));
   }
   const spell = m.spell;
   if (!spell) return ZERO;
-  const d = revelationIndex(revs, m.revelation);
-  const stage = d >= 0 ? facts.stages[d] : 3;
   if (v.model.spells.get(spell)?.avatar && v.context.mode !== 'boss') return ZERO;
   const wheel = facts.wheelEffects.get(spell) ?? [];
   let p = sub(
-    spellBundleParts(v, spell, [...wheel, ...supremeEffects(m, grade)], stage),
-    spellBundleParts(v, spell, wheel, stage),
+    spellBundleParts(v, spell, [...wheel, ...supremeEffects(m, grade)], facts.stages),
+    spellBundleParts(v, spell, wheel, facts.stages),
   );
   if (m.momentum) {
     const mom = m.momentum[grade - 1] ?? MOMENTUM_PER_GRADE[grade - 1] ?? 0;

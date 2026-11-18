@@ -68,32 +68,37 @@ describe('expected targets per context', () => {
 });
 
 describe('spell shares', () => {
-  it('team box values area spells more (relative to single-target) than solo', () => {
-    const ratio = (ctx: FightContext) => {
-      const m = buildSpellModel('knight', ctx, null);
-      return damageShare(m, 'Fierce Berserk') / damageShare(m, 'Annihilation');
-    };
-    expect(ratio(BOX)).toBeGreaterThan(ratio(HUNT));
-    const solo = buildSpellModel('sorcerer', HUNT, null);
-    const box = buildSpellModel('sorcerer', BOX, null);
-    expect(damageShare(box, 'Energy Wave') / damageShare(box, 'Lightning')).toBeGreaterThan(
-      damageShare(solo, 'Energy Wave') / damageShare(solo, 'Lightning'),
-    );
+  it('team box counts more targets for area spells than solo', () => {
+    for (const [voc, area] of [
+      ['knight', 'Fierce Berserk'],
+      ['sorcerer', 'Energy Wave'],
+    ] as const) {
+      const solo = buildSpellModel(voc, HUNT, null);
+      const box = buildSpellModel(voc, BOX, null);
+      expect(box.spells.get(area)!.targets).toBeGreaterThan(solo.spells.get(area)!.targets);
+    }
   });
 
-  it('boss mode favours single-target spells', () => {
-    for (const [voc, single, area] of [
-      ['knight', 'Annihilation', 'Fierce Berserk'],
-      ['paladin', 'Divine Missile', 'Divine Caldera'],
-      ['sorcerer', 'Strong Energy Strike', 'Rage of the Skies'],
-    ] as const) {
+  it('D16: single-target spells are worthless while hunting, used against bosses', () => {
+    for (const voc of ['knight', 'paladin', 'sorcerer', 'druid', 'monk'] as const) {
+      for (const ctx of [HUNT, BOX]) {
+        const hunt = buildSpellModel(voc, ctx, null);
+        for (const s of hunt.spells.values()) {
+          if (!s.singleTarget) continue;
+          expect(s.usable).toBe(false);
+          expect(damageShare(hunt, s.name)).toBe(0);
+        }
+      }
       const boss = buildSpellModel(voc, BOSS, null);
-      const hunt = buildSpellModel(voc, HUNT, null);
-      expect(damageShare(boss, single)).toBeGreaterThan(damageShare(hunt, single));
-      expect(damageShare(boss, single) / damageShare(boss, area)).toBeGreaterThan(
-        damageShare(hunt, single) / damageShare(hunt, area),
-      );
+      for (const s of boss.spells.values()) if (s.dmg) expect(s.usable && s.targets <= BOSS_AREA_TARGETS + 1e-9).toBe(true);
     }
+    expect(damageShare(buildSpellModel('knight', BOSS, null), 'Annihilation')).toBeGreaterThan(0);
+    const v = valuationFor({ vocation: 'knight', points: 1500, monster: null, context: HUNT });
+    const aug = getEngineWheel('knight').slices.find((s) => s.tile.conviction.name === 'Augmented Annihilation');
+    if (aug) expect(augmentParts(v, aug.tile).every((p) => p.off === 0)).toBe(true);
+    const r = optimize({ vocation: 'knight', points: 1500, monster: null, priority: 50, context: HUNT });
+    expect(r.convictions.some((c) => c.name === 'Augmented Annihilation')).toBe(false);
+    expect(r.rationaleMsgs?.some((m) => m.key === 'rationale.singleTarget')).toBe(true);
   });
 
   it('an immune monster makes that element\'s spells useless', () => {

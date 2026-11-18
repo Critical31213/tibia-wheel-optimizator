@@ -1,10 +1,12 @@
-import { useDeferredValue, useMemo } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
+import { BuildSwitcher } from './components/BuildSwitcher';
+import { CharacterPanel } from './components/CharacterPanel';
+import { ExportPanel } from './components/ExportPanel';
 import { FightContextPanel } from './components/FightContextPanel';
 import { GemsPanel } from './components/GemsPanel';
 import { LanguageSwitch } from './components/LanguageSwitch';
 import { MonsterSearch } from './components/MonsterSearch';
 import { Panel } from './components/Panel';
-import { PointsInput } from './components/PointsInput';
 import { PrioritySlider } from './components/PrioritySlider';
 import { ResultsPanel } from './components/ResultsPanel';
 import { VesselsPanel } from './components/VesselsPanel';
@@ -14,7 +16,9 @@ import { usePersistentGems } from './hooks/usePersistentGems';
 import { usePersistentInputs } from './hooks/usePersistentInputs';
 import { useT } from './i18n';
 import { getMonsterById, getWheel, optimize, useMonsterData } from './lib/api';
-import { contextOf } from './lib/inputState';
+import type { BuildResult } from './lib/api';
+import { characterOf, contextOf } from './lib/inputState';
+import { resolveMonsters } from './lib/monsters';
 import { VOCATION_LABELS } from './lib/labels';
 
 export default function App() {
@@ -24,20 +28,22 @@ export default function App() {
   const monstersReady = useMonsterData();
   const deferred = useDeferredValue(inputs);
   const deferredGems = useDeferredValue(gems);
+  const [view, setView] = useState(0);
 
   const wheel = useMemo(() => getWheel(inputs.vocation), [inputs.vocation]);
   const maxPoints = wheel.totalCapacity;
-  const monster = useMemo(
-    () => (monstersReady && inputs.monsterId ? (getMonsterById(inputs.monsterId) ?? null) : null),
-    [inputs.monsterId, monstersReady],
+  const spot = useMemo(
+    () => (monstersReady ? resolveMonsters(inputs.monsters, getMonsterById) : []),
+    [inputs.monsters, monstersReady],
   );
   const context = useMemo(() => contextOf(inputs), [inputs]);
 
   const points = Math.min(deferred.points, maxPoints);
-  const deferredMonster = useMemo(
-    () => (monstersReady && deferred.monsterId ? (getMonsterById(deferred.monsterId) ?? null) : null),
-    [deferred.monsterId, monstersReady],
+  const deferredSpot = useMemo(
+    () => (monstersReady ? resolveMonsters(deferred.monsters, getMonsterById) : []),
+    [deferred.monsters, monstersReady],
   );
+  const character = useMemo(() => characterOf(deferred), [deferred]);
   const { mode, huntStyle } = deferred;
   const result = useMemo(
     () =>
@@ -45,15 +51,21 @@ export default function App() {
         ? optimize({
             vocation: deferred.vocation,
             points,
-            monster: deferredMonster,
+            monster: null,
+            monsters: deferredSpot,
             priority: deferred.priority,
             context: { mode, huntStyle },
             gems: deferredGems,
+            character,
+            alternatives: 2,
           })
         : null,
-    [deferred.vocation, points, deferredMonster, deferred.priority, mode, huntStyle, deferredGems],
+    [deferred.vocation, points, deferredSpot, deferred.priority, mode, huntStyle, deferredGems, character],
   );
   const resultWheel = useMemo(() => getWheel(deferred.vocation), [deferred.vocation]);
+  const alternatives = result?.alternatives ?? [];
+  const viewIndex = view <= alternatives.length ? view : 0;
+  const shown: BuildResult | null = result && viewIndex > 0 ? alternatives[viewIndex - 1].result : result;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
@@ -66,29 +78,39 @@ export default function App() {
       <div className="grid gap-4 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-start lg:gap-6">
         <div className="flex flex-col gap-4">
           <VocationPicker value={inputs.vocation} onChange={(vocation) => update({ vocation })} />
-          <PointsInput value={inputs.points} max={maxPoints} onChange={(p) => update({ points: p })} />
-          <MonsterSearch value={monster} ready={monstersReady} onChange={(m) => update({ monsterId: m?.id ?? null })} />
+          <CharacterPanel vocation={inputs.vocation} value={inputs} max={maxPoints} onChange={update} />
+          <MonsterSearch value={spot} ready={monstersReady} onChange={(monsters) => update({ monsters })} />
           <FightContextPanel value={context} onChange={update} />
           <PrioritySlider value={inputs.priority} onChange={(priority) => update({ priority })} />
           <GemsPanel vocation={inputs.vocation} gems={gems} mods={wheel.mods} onChange={setGems} />
         </div>
 
         <div className="flex flex-col gap-4">
+          {result && alternatives.length > 0 && (
+            <Panel title={t('alts.title')} headingId="alts-heading">
+              <BuildSwitcher alternatives={alternatives} value={viewIndex} onChange={setView} />
+            </Panel>
+          )}
           <Panel title={t('app.wheelTitle', { vocation: VOCATION_LABELS[deferred.vocation] })} headingId="wheel-heading">
-            <WheelChart wheel={resultWheel} result={result} />
+            <WheelChart wheel={resultWheel} result={shown} />
           </Panel>
           <Panel title={t('app.summaryTitle')} headingId="results-heading">
             <div aria-live="polite">
-              {result ? (
-                <ResultsPanel wheel={resultWheel} result={result} />
+              {shown ? (
+                <ResultsPanel wheel={resultWheel} result={shown} />
               ) : (
                 <p className="py-6 text-center text-sm text-parchment-300">{t('app.empty')}</p>
               )}
             </div>
           </Panel>
-          {result && (
+          {shown && (
+            <Panel title={t('export.title')} headingId="export-heading">
+              <ExportPanel key={shown.plannerCode ?? ''} code={shown.plannerCode} />
+            </Panel>
+          )}
+          {shown && (
             <Panel title={t('vessels.title')} headingId="vessels-heading">
-              <VesselsPanel vocation={deferred.vocation} result={result} mods={resultWheel.mods} />
+              <VesselsPanel vocation={deferred.vocation} result={shown} mods={resultWheel.mods} />
             </Panel>
           )}
         </div>

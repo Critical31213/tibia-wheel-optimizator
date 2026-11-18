@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import type { OptimizerResult, Slice, WheelDefinition } from '../types';
+import type { Slice, WheelDefinition } from '../types';
+import type { BuildResult } from '../lib/api';
 import { annularSectorPath, fillRadius, ringBounds, sectorCentroid, sliceAngles } from '../lib/geometry';
 import { useT } from '../i18n';
 import { DOMAIN_COLORS, DOMAINS, formatNumber } from '../lib/labels';
@@ -11,7 +12,7 @@ const OUTER = 192;
 
 interface WheelChartProps {
   wheel: WheelDefinition;
-  result: OptimizerResult | null;
+  result: BuildResult | null;
 }
 
 interface SliceShape {

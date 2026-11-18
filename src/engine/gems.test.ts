@@ -4,7 +4,7 @@ import { optimize } from './index';
 import { activeSlots, assign, bestGems, type GemEnv, gemParts, placeGems, toOwnedGem, upgrades } from './gems';
 import { blendWith, valuationFor, weightsFor } from './optimizer';
 import { getEngineWheel } from './wheel/build';
-import { BASE_MITIGATION, mitigationGain, mitigationParts } from './values';
+import { mitigationGain, mitigationParts } from './values';
 
 function env(vocation: (typeof VOCATIONS)[number] = 'knight', points = 2000): GemEnv {
   return {
@@ -143,10 +143,11 @@ describe('upgrade recommendations', () => {
 
 describe('mitigation multiplier', () => {
   it('multiplies the vocation base mitigation instead of adding flat %', () => {
-    expect(mitigationGain('knight', 30)).toBeCloseTo(6);
-    expect(mitigationGain('sorcerer', 30)).toBeLessThan(mitigationGain('paladin', 30));
-    expect(mitigationGain('paladin', 30)).toBeLessThan(mitigationGain('knight', 30));
-    for (const vocation of VOCATIONS) expect(BASE_MITIGATION[vocation]).toBeLessThan(30);
+    const g = (vocation: (typeof VOCATIONS)[number]) => mitigationGain(env(vocation).v, 30);
+    expect(mitigationGain({ mitigation: 20 }, 30)).toBeCloseTo(6);
+    expect(g('sorcerer')).toBeLessThan(g('paladin'));
+    expect(g('paladin')).toBeLessThan(g('knight'));
+    for (const vocation of VOCATIONS) expect(env(vocation).v.mitigation).toBeLessThan(30);
   });
 
   it('values grade IV below a flat 30 % damage reduction and scales by vocation', () => {

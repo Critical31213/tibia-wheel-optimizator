@@ -1,0 +1,5379 @@
+{
+  "meta": {
+    "source": "TibiaTools damage API (https://tibiatools.io/api/v1), as used by tibiapal.com/damage-calculator",
+    "generatedBy": "npm run datamine:damage (scripts/datamine-tibiatools.mjs)",
+    "requests": {
+      "damageRequests": 279,
+      "metaRequests": 9,
+      "note": "one /damage response covers every spell of the vocation"
+    },
+    "note": "avg/min/max = raw damage per hit per target before crit, creature resistances and mitigation.",
+    "levelTerm": "g(L) = L/5 to 500, then +1 per 6 levels to 1100, per 7 to 1800, per 8 to 2600, per 9 above",
+    "models": {
+      "magic": "const + levelTerm*g(L) + magicLevel*M",
+      "weapon": "const + levelTerm*g(L) + skill*S + attack*A + skill*attack*SA [+ levelSkillAttack*g(L)*S*A/1000] (attack = weapon + ammo)",
+      "shield": "const + levelTerm*g(L) + shielding*H + shieldDefense*D + shielding*shieldDefense*HD"
+    }
+  },
+  "rules": {
+    "flatBonus": "raw += bonus * variant.bonusFactor (per hit, per target, before crit); bonusFactor equals the variant level multiplier",
+    "baseDamagePct": "raw = levelPart + (raw - levelPart) * (1 + pct/100), levelPart = bonusFactor * g(L) (the level term is not boosted); probes: ratio 0.100 +- 0.003",
+    "crit": "effective = raw * (1 + chance * extra); spell crit perks and the character \"Critical hit extra damage\" perk add to chance/extra",
+    "creatures": "effective *= damageMods[element] * (1 - creature.mitigation/100); physical additionally reduced by armor (~7 % for Demon)",
+    "revelations": {
+      "Combat Mastery": {
+        "scope": "knight spells",
+        "effectiveMultiplierByStage": [
+          1.0308,
+          1.0368,
+          1.045
+        ],
+        "note": "raw unchanged (crit-side effect)"
+      },
+      "Ascetic": {
+        "scope": "harmony monk spells",
+        "rawMultiplierByStage": [
+          1.0478,
+          1.0957,
+          1.1446
+        ],
+        "note": "at 5 harmony assumed by the API"
+      },
+      "Lord of Destruction": {
+        "scope": "fire spells, Master of Flames stance",
+        "rawMultiplierByStage": [
+          1.0148,
+          1.0222,
+          1.0296
+        ]
+      },
+      "Master of Flames stance": {
+        "scope": "fire spells",
+        "rawMultiplier": 1.0305
+      }
+    },
+    "targets": "API summary per turn = per-hit effective * targets of the rotation entry"
+  },
+  "critDefaults": {
+    "critChance": 10,
+    "critDamage": 50,
+    "note": "tibiapal default: Powerful Strike imbuement; expected multiplier 1 + chance*extra"
+  },
+  "weaponBrackets": {
+    "knight": {
+      "200": {
+        "weapon": "Cobra Axe",
+        "weaponId": 37,
+        "attack": 52,
+        "shield": "Great Shield"
+      },
+      "400": {
+        "weapon": "Soulbiter",
+        "weaponId": 162,
+        "attack": 52,
+        "shield": "Great Shield"
+      },
+      "600": {
+        "weapon": "Sanguine Hatchet",
+        "weaponId": 156,
+        "attack": 54,
+        "shield": "Great Shield"
+      },
+      "800": {
+        "weapon": "Grand Sanguine Hatchet",
+        "weaponId": 95,
+        "attack": 54,
+        "shield": "Great Shield"
+      },
+      "1000": {
+        "weapon": "Moonsilver Axe",
+        "weaponId": 839,
+        "attack": 56,
+        "shield": "Great Shield"
+      },
+      "1250": {
+        "weapon": "Stellar Moonsilver Axe",
+        "weaponId": 850,
+        "attack": 56,
+        "shield": "Great Shield"
+      },
+      "1500": {
+        "weapon": "Stellar Moonsilver Axe",
+        "weaponId": 850,
+        "attack": 56,
+        "shield": "Great Shield"
+      }
+    },
+    "paladin": {
+      "200": {
+        "weapon": "Cobra Crossbow",
+        "weaponId": 437,
+        "attack": 85,
+        "ammo": "Spectral Bolt"
+      },
+      "400": {
+        "weapon": "Soulpiercer",
+        "weaponId": 471,
+        "attack": 87,
+        "ammo": "Spectral Bolt"
+      },
+      "600": {
+        "weapon": "Sanguine Crossbow",
+        "weaponId": 469,
+        "attack": 88,
+        "ammo": "Spectral Bolt"
+      },
+      "800": {
+        "weapon": "Grand Sanguine Crossbow",
+        "weaponId": 455,
+        "attack": 88,
+        "ammo": "Spectral Bolt"
+      },
+      "1000": {
+        "weapon": "Moonsilver Crossbow",
+        "weaponId": 844,
+        "attack": 89,
+        "ammo": "Spectral Bolt"
+      },
+      "1250": {
+        "weapon": "Stellar Moonsilver Crossbow",
+        "weaponId": 855,
+        "attack": 89,
+        "ammo": "Spectral Bolt"
+      },
+      "1500": {
+        "weapon": "Stellar Moonsilver Crossbow",
+        "weaponId": 855,
+        "attack": 89,
+        "ammo": "Spectral Bolt"
+      }
+    },
+    "monk": {
+      "200": {
+        "weapon": "Cobra Bo",
+        "weaponId": 483,
+        "attack": 42
+      },
+      "400": {
+        "weapon": "Soulkamas",
+        "weaponId": 510,
+        "attack": 44
+      },
+      "600": {
+        "weapon": "Sanguine Claws",
+        "weaponId": 507,
+        "attack": 45
+      },
+      "800": {
+        "weapon": "Grand Sanguine Claws",
+        "weaponId": 493,
+        "attack": 45
+      },
+      "1000": {
+        "weapon": "Moonsilver Katar",
+        "weaponId": 847,
+        "attack": 46
+      },
+      "1250": {
+        "weapon": "Stellar Moonsilver Katar",
+        "weaponId": 858,
+        "attack": 46
+      },
+      "1500": {
+        "weapon": "Stellar Moonsilver Katar",
+        "weaponId": 858,
+        "attack": 46
+      }
+    },
+    "sorcerer": {
+      "200": {
+        "weapon": "Cobra Wand",
+        "weaponId": 730,
+        "attack": 0
+      },
+      "400": {
+        "weapon": "Soultainter",
+        "weaponId": 801,
+        "attack": 0
+      },
+      "600": {
+        "weapon": "Sanguine Coil",
+        "weaponId": 791,
+        "attack": 0
+      },
+      "800": {
+        "weapon": "Grand Sanguine Coil",
+        "weaponId": 748,
+        "attack": 0
+      },
+      "1000": {
+        "weapon": "Moonsilver Channeler",
+        "weaponId": 841,
+        "attack": 0
+      },
+      "1250": {
+        "weapon": "Moonsilver Channeler",
+        "weaponId": 841,
+        "attack": 0
+      },
+      "1500": {
+        "weapon": "Moonsilver Channeler",
+        "weaponId": 841,
+        "attack": 0
+      }
+    },
+    "druid": {
+      "200": {
+        "weapon": "Cobra Rod",
+        "weaponId": 729,
+        "attack": 0
+      },
+      "400": {
+        "weapon": "Soulhexer",
+        "weaponId": 800,
+        "attack": 0
+      },
+      "600": {
+        "weapon": "Sanguine Rod",
+        "weaponId": 792,
+        "attack": 0
+      },
+      "800": {
+        "weapon": "Grand Sanguine Rod",
+        "weaponId": 749,
+        "attack": 0
+      },
+      "1000": {
+        "weapon": "Moonsilver Sceptre",
+        "weaponId": 849,
+        "attack": 0
+      },
+      "1250": {
+        "weapon": "Moonsilver Sceptre",
+        "weaponId": 849,
+        "attack": 0
+      },
+      "1500": {
+        "weapon": "Moonsilver Sceptre",
+        "weaponId": 849,
+        "attack": 0
+      }
+    }
+  },
+  "spells": [
+    {
+      "name": "Annihilation",
+      "apiName": "Annihilation",
+      "vocations": [
+        "knight"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 30,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 60,
+        "critDamage": 61,
+        "critChance": 62
+      },
+      "variants": [
+        {
+          "apiId": 10,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 27.705587,
+            "levelTerm": 0.999361,
+            "skill": 0.019782,
+            "attack": 0.066262,
+            "skillAttack": 0.12458
+          },
+          "min": {
+            "const": 21.201594,
+            "levelTerm": 0.998883,
+            "skill": -0.000272,
+            "attack": 0.014499,
+            "skillAttack": 0.084891
+          },
+          "max": {
+            "const": 41.179103,
+            "levelTerm": 0.9993,
+            "skill": -0.004204,
+            "attack": 0.009413,
+            "skillAttack": 0.164985
+          },
+          "fit": {
+            "n": 55,
+            "maxAbsErr": 0.703,
+            "rmse": 0.263,
+            "maxRelErr": 0.00076
+          }
+        }
+      ]
+    },
+    {
+      "name": "Berserk",
+      "apiName": "Berserk",
+      "vocations": [
+        "knight"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 4,
+      "avgTargetsHunt": 6.3,
+      "perkIds": {
+        "baseDamage": 48,
+        "critDamage": 49,
+        "critChance": 50
+      },
+      "variants": [
+        {
+          "apiId": 3,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 14.094096,
+            "levelTerm": 0.999366,
+            "skill": -0.026286,
+            "attack": -0.059299,
+            "skillAttack": 0.044486
+          },
+          "min": {
+            "const": 11.484147,
+            "levelTerm": 0.999229,
+            "skill": -0.027102,
+            "attack": -0.06289,
+            "skillAttack": 0.032493
+          },
+          "max": {
+            "const": 10.714586,
+            "levelTerm": 0.99944,
+            "skill": 0.026286,
+            "attack": 0.057072,
+            "skillAttack": 0.055514
+          },
+          "fit": {
+            "n": 55,
+            "maxAbsErr": 0.876,
+            "rmse": 0.44,
+            "maxRelErr": 0.00291
+          }
+        }
+      ]
+    },
+    {
+      "name": "Brutal Strike",
+      "apiName": "Brutal Strike",
+      "vocations": [
+        "knight"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 6,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 63,
+        "critDamage": 64,
+        "critChance": 65
+      },
+      "variants": [
+        {
+          "apiId": 11,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 8.187084,
+            "levelTerm": 0.999621,
+            "skill": 0.009619,
+            "attack": 0.021489,
+            "skillAttack": 0.038848
+          },
+          "min": {
+            "const": 5.015878,
+            "levelTerm": 0.999461,
+            "skill": 0.017483,
+            "attack": 0.03758,
+            "skillAttack": 0.02866
+          },
+          "max": {
+            "const": 9.850022,
+            "levelTerm": 0.999721,
+            "skill": 0.021414,
+            "attack": 0.045328,
+            "skillAttack": 0.048566
+          },
+          "fit": {
+            "n": 55,
+            "maxAbsErr": 0.859,
+            "rmse": 0.283,
+            "maxRelErr": 0.00239
+          }
+        }
+      ]
+    },
+    {
+      "name": "Executioner's Throw",
+      "apiName": "Executioner's Throw",
+      "vocations": [
+        "knight"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "chain",
+      "singleTarget": false,
+      "cooldownSeconds": 18,
+      "avgTargetsHunt": 3.2,
+      "perkIds": {
+        "baseDamage": 57,
+        "critDamage": 58,
+        "critChance": 59
+      },
+      "variants": [
+        {
+          "apiId": 6,
+          "label": "No Bonus",
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 17.512718,
+            "levelTerm": 0.999502,
+            "skill": -0.020054,
+            "attack": -0.04399,
+            "skillAttack": 0.060312
+          },
+          "min": {
+            "const": 17.268952,
+            "levelTerm": 0.999184,
+            "skill": -0.023714,
+            "attack": -0.076236,
+            "skillAttack": 0.055514
+          },
+          "max": {
+            "const": 21.751745,
+            "levelTerm": 0.999341,
+            "skill": -0.043769,
+            "attack": -0.108407,
+            "skillAttack": 0.065826
+          },
+          "fit": {
+            "n": 55,
+            "maxAbsErr": 0.774,
+            "rmse": 0.292,
+            "maxRelErr": 0.00153
+          }
+        },
+        {
+          "apiId": 7,
+          "label": "Stage 1",
+          "part": "extra",
+          "stage": 1,
+          "bonusFactor": 2,
+          "avg": {
+            "const": 35.025435,
+            "levelTerm": 1.999003,
+            "skill": -0.040109,
+            "attack": -0.087981,
+            "skillAttack": 0.120623
+          },
+          "min": {
+            "const": 34.537903,
+            "levelTerm": 1.998368,
+            "skill": -0.047428,
+            "attack": -0.152471,
+            "skillAttack": 0.111029
+          },
+          "max": {
+            "const": 43.503489,
+            "levelTerm": 1.998682,
+            "skill": -0.087537,
+            "attack": -0.216814,
+            "skillAttack": 0.131652
+          },
+          "fit": {
+            "n": 55,
+            "maxAbsErr": 1.542,
+            "rmse": 0.583,
+            "maxRelErr": 0.00153
+          }
+        },
+        {
+          "apiId": 8,
+          "label": "Stage 2",
+          "part": "extra",
+          "stage": 2,
+          "bonusFactor": 2.25,
+          "avg": {
+            "const": 40.032615,
+            "levelTerm": 2.248472,
+            "skill": -0.046241,
+            "attack": -0.096249,
+            "skillAttack": 0.13567
+          },
+          "min": {
+            "const": 39.315634,
+            "levelTerm": 2.247192,
+            "skill": -0.052238,
+            "attack": -0.176768,
+            "skillAttack": 0.124938
+          },
+          "max": {
+            "const": 50.690021,
+            "levelTerm": 2.248015,
+            "skill": -0.10837,
+            "attack": -0.271871,
+            "skillAttack": 0.148318
+          },
+          "fit": {
+            "n": 55,
+            "maxAbsErr": 1.381,
+            "rmse": 0.687,
+            "maxRelErr": 0.00178
+          }
+        },
+        {
+          "apiId": 9,
+          "label": "Stage 3",
+          "part": "extra",
+          "stage": 3,
+          "bonusFactor": 2.5,
+          "avg": {
+            "const": 44.17846,
+            "levelTerm": 2.498461,
+            "skill": -0.050136,
+            "attack": -0.110797,
+            "skillAttack": 0.150779
+          },
+          "min": {
+            "const": 43.723562,
+            "levelTerm": 2.496876,
+            "skill": -0.059285,
+            "attack": -0.192608,
+            "skillAttack": 0.138786
+          },
+          "max": {
+            "const": 54.482695,
+            "levelTerm": 2.498646,
+            "skill": -0.109421,
+            "attack": -0.270197,
+            "skillAttack": 0.164565
+          },
+          "fit": {
+            "n": 55,
+            "maxAbsErr": 1.749,
+            "rmse": 0.722,
+            "maxRelErr": 0.00162
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fierce Berserk",
+      "apiName": "Fierce Berserk",
+      "vocations": [
+        "knight"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 6,
+      "avgTargetsHunt": 6,
+      "perkIds": {
+        "baseDamage": 45,
+        "critDamage": 46,
+        "critChance": 47
+      },
+      "variants": [
+        {
+          "apiId": 2,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 23.01063,
+            "levelTerm": 0.99929,
+            "skill": -0.003116,
+            "attack": -0.006041,
+            "skillAttack": 0.092087
+          },
+          "min": {
+            "const": 15.103286,
+            "levelTerm": 0.999317,
+            "skill": 0.016667,
+            "attack": 0.031503,
+            "skillAttack": 0.066667
+          },
+          "max": {
+            "const": 31.893769,
+            "levelTerm": 0.999286,
+            "skill": -0.027374,
+            "attack": -0.038392,
+            "skillAttack": 0.117384
+          },
+          "fit": {
+            "n": 55,
+            "maxAbsErr": 0.713,
+            "rmse": 0.327,
+            "maxRelErr": 0.00142
+          }
+        }
+      ]
+    },
+    {
+      "name": "Front Sweep",
+      "apiName": "Front Sweep",
+      "vocations": [
+        "knight"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 6,
+      "avgTargetsHunt": 4,
+      "perkIds": {
+        "baseDamage": 54,
+        "critDamage": 55,
+        "critChance": 56
+      },
+      "variants": [
+        {
+          "apiId": 5,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 19.88185,
+            "levelTerm": 0.999819,
+            "skill": -0.003932,
+            "attack": -0.0062,
+            "skillAttack": 0.080094
+          },
+          "min": {
+            "const": 17.512718,
+            "levelTerm": 0.999502,
+            "skill": -0.020054,
+            "attack": -0.04399,
+            "skillAttack": 0.060312
+          },
+          "max": {
+            "const": 24.904341,
+            "levelTerm": 0.999403,
+            "skill": 0,
+            "attack": -0.001113,
+            "skillAttack": 0.1
+          },
+          "fit": {
+            "n": 55,
+            "maxAbsErr": 0.73,
+            "rmse": 0.301,
+            "maxRelErr": 0.00154
+          }
+        }
+      ]
+    },
+    {
+      "name": "Groundshaker",
+      "apiName": "Groundshaker",
+      "vocations": [
+        "knight"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 8,
+      "avgTargetsHunt": 6.3,
+      "perkIds": {
+        "baseDamage": 51,
+        "critDamage": 52,
+        "critChance": 53
+      },
+      "variants": [
+        {
+          "apiId": 4,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 11.484147,
+            "levelTerm": 0.999229,
+            "skill": -0.027102,
+            "attack": -0.06289,
+            "skillAttack": 0.032493
+          },
+          "min": {
+            "const": 5.689146,
+            "levelTerm": 0.999358,
+            "skill": 0.003388,
+            "attack": -0.01446,
+            "skillAttack": 0.023022
+          },
+          "max": {
+            "const": 12.396133,
+            "levelTerm": 0.999638,
+            "skill": -0.013551,
+            "attack": -0.042474,
+            "skillAttack": 0.041246
+          },
+          "fit": {
+            "n": 55,
+            "maxAbsErr": 0.967,
+            "rmse": 0.339,
+            "maxRelErr": 0.00292
+          }
+        }
+      ]
+    },
+    {
+      "name": "Shield Bash",
+      "apiName": "Shield Bash",
+      "vocations": [
+        "knight"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": false,
+      "scalesWith": "shielding",
+      "model": "shield",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 6,
+      "cooldownApprox": true,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 266,
+        "critDamage": 267,
+        "critChance": 268
+      },
+      "variants": [
+        {
+          "apiId": 89,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 15.383629,
+            "levelTerm": 0.999405,
+            "shielding": 0.09294,
+            "shieldDefense": -0.051098,
+            "shieldingDefense": 0.055429
+          },
+          "min": {
+            "const": 9.320916,
+            "levelTerm": 0.999408,
+            "shielding": 0.147447,
+            "shieldDefense": 0.070001,
+            "shieldingDefense": 0.052093
+          },
+          "max": {
+            "const": 4.586716,
+            "levelTerm": 0.999406,
+            "shielding": 0.193882,
+            "shieldDefense": 0.184813,
+            "shieldingDefense": 0.055383
+          },
+          "fit": {
+            "n": 55,
+            "maxAbsErr": 0.426,
+            "rmse": 0.233,
+            "maxRelErr": 0.00368
+          }
+        }
+      ]
+    },
+    {
+      "name": "Shield Slam",
+      "apiName": "Shield Slam",
+      "vocations": [
+        "knight"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": false,
+      "scalesWith": "shielding",
+      "model": "shield",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 6,
+      "cooldownApprox": true,
+      "avgTargetsHunt": null,
+      "perkIds": {
+        "baseDamage": 269,
+        "critDamage": 270,
+        "critChance": 271
+      },
+      "variants": [
+        {
+          "apiId": 90,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 15.157146,
+            "levelTerm": 0.999404,
+            "shielding": 0.080192,
+            "shieldDefense": -0.04651,
+            "shieldingDefense": 0.05245
+          },
+          "min": {
+            "const": 14.274124,
+            "levelTerm": 0.999407,
+            "shielding": 0.06999,
+            "shieldDefense": -0.049002,
+            "shieldingDefense": 0.050656
+          },
+          "max": {
+            "const": 12.352272,
+            "levelTerm": 0.999407,
+            "shielding": 0.120194,
+            "shieldDefense": 0.009452,
+            "shieldingDefense": 0.053761
+          },
+          "fit": {
+            "n": 55,
+            "maxAbsErr": 0.429,
+            "rmse": 0.236,
+            "maxRelErr": 0.00363
+          }
+        }
+      ]
+    },
+    {
+      "name": "Whirlwind Throw",
+      "apiName": "Whirlwind Throw",
+      "vocations": [
+        "knight"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 6,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 66,
+        "critDamage": 67,
+        "critChance": 68
+      },
+      "variants": [
+        {
+          "apiId": 12,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 11.484147,
+            "levelTerm": 0.999229,
+            "skill": -0.027102,
+            "attack": -0.06289,
+            "skillAttack": 0.032493
+          },
+          "min": {
+            "const": 5.689146,
+            "levelTerm": 0.999358,
+            "skill": 0.003388,
+            "attack": -0.01446,
+            "skillAttack": 0.023022
+          },
+          "max": {
+            "const": 12.396133,
+            "levelTerm": 0.999638,
+            "skill": -0.013551,
+            "attack": -0.042474,
+            "skillAttack": 0.041246
+          },
+          "fit": {
+            "n": 55,
+            "maxAbsErr": 0.967,
+            "rmse": 0.339,
+            "maxRelErr": 0.00292
+          }
+        }
+      ]
+    },
+    {
+      "name": "Divine Barrage",
+      "apiName": "Divine Barrage",
+      "vocations": [
+        "paladin"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "holy",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 4,
+      "cooldownApprox": true,
+      "avgTargetsHunt": 6.5,
+      "perkIds": {
+        "baseDamage": 246,
+        "critDamage": 247,
+        "critChance": 248
+      },
+      "variants": [
+        {
+          "apiId": 84,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 31.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 5.199155
+          },
+          "min": {
+            "const": 29.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 4.799155
+          },
+          "max": {
+            "const": 34.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 5.599155
+          },
+          "fit": {
+            "n": 59,
+            "maxAbsErr": 0.418,
+            "rmse": 0.248,
+            "maxRelErr": 0.0015
+          }
+        }
+      ]
+    },
+    {
+      "name": "Divine Caldera",
+      "apiName": "Divine Caldera",
+      "vocations": [
+        "paladin"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "holy",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 4,
+      "avgTargetsHunt": 7.3,
+      "perkIds": {
+        "baseDamage": 69,
+        "critDamage": 70,
+        "critChance": 71
+      },
+      "variants": [
+        {
+          "apiId": 13,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 36.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 5.999155
+          },
+          "min": {
+            "const": 31.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 5.199155
+          },
+          "max": {
+            "const": 41.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 6.799155
+          },
+          "fit": {
+            "n": 59,
+            "maxAbsErr": 0.418,
+            "rmse": 0.248,
+            "maxRelErr": 0.00138
+          }
+        }
+      ]
+    },
+    {
+      "name": "Divine Grenade",
+      "apiName": "Divine Grenade",
+      "vocations": [
+        "paladin"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "holy",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 26,
+      "cooldownApprox": true,
+      "avgTargetsHunt": 7.5,
+      "perkIds": {
+        "baseDamage": 72,
+        "critDamage": 73,
+        "critChance": 74
+      },
+      "variants": [
+        {
+          "apiId": 14,
+          "label": "Stage 1",
+          "part": "main",
+          "stage": 1,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 46.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 7.599155
+          },
+          "min": {
+            "const": 34.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 5.599155
+          },
+          "max": {
+            "const": 59.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 9.599155
+          },
+          "fit": {
+            "n": 59,
+            "maxAbsErr": 0.418,
+            "rmse": 0.248,
+            "maxRelErr": 0.00118
+          }
+        },
+        {
+          "apiId": 15,
+          "label": "Stage 2",
+          "part": "main",
+          "stage": 2,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 54.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 8.799155
+          },
+          "min": {
+            "const": 41.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 6.799155
+          },
+          "max": {
+            "const": 66.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 10.799155
+          },
+          "fit": {
+            "n": 59,
+            "maxAbsErr": 0.418,
+            "rmse": 0.248,
+            "maxRelErr": 0.00107
+          }
+        },
+        {
+          "apiId": 16,
+          "label": "Stage 3",
+          "part": "main",
+          "stage": 3,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 61.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 9.999155
+          },
+          "min": {
+            "const": 49.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 7.999155
+          },
+          "max": {
+            "const": 74.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 11.999155
+          },
+          "fit": {
+            "n": 59,
+            "maxAbsErr": 0.418,
+            "rmse": 0.248,
+            "maxRelErr": 0.00098
+          }
+        }
+      ]
+    },
+    {
+      "name": "Divine Missile",
+      "apiName": "Divine Missile",
+      "vocations": [
+        "paladin"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "holy",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 81,
+        "critDamage": 82,
+        "critChance": 83
+      },
+      "variants": [
+        {
+          "apiId": 19,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 14.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 2.399155
+          },
+          "min": {
+            "const": 10.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 1.799155
+          },
+          "max": {
+            "const": 17.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 2.999155
+          },
+          "fit": {
+            "n": 59,
+            "maxAbsErr": 0.418,
+            "rmse": 0.248,
+            "maxRelErr": 0.00219
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ethereal Barrage",
+      "apiName": "Ethereal Barrage",
+      "vocations": [
+        "paladin"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": false,
+      "scalesWith": "distance",
+      "model": "weapon",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 4,
+      "cooldownApprox": true,
+      "avgTargetsHunt": 6.5,
+      "perkIds": {
+        "baseDamage": 243,
+        "critDamage": 244,
+        "critChance": 245
+      },
+      "variants": [
+        {
+          "apiId": 83,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 8.384087,
+            "levelTerm": 0.999645,
+            "skill": 2.25,
+            "attack": -0.002512,
+            "skillAttack": 0
+          },
+          "min": {
+            "const": 7.384087,
+            "levelTerm": 0.999645,
+            "skill": 2.083333,
+            "attack": -0.002512,
+            "skillAttack": 0
+          },
+          "max": {
+            "const": 10.744783,
+            "levelTerm": 0.999648,
+            "skill": 2.4,
+            "attack": 0.000548,
+            "skillAttack": 0
+          },
+          "fit": {
+            "n": 59,
+            "maxAbsErr": 0.788,
+            "rmse": 0.285,
+            "maxRelErr": 0.002
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ethereal Spear",
+      "apiName": "Ethereal Spear",
+      "vocations": [
+        "paladin"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": false,
+      "scalesWith": "distance",
+      "model": "weapon",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 78,
+        "critDamage": 79,
+        "critChance": 80
+      },
+      "variants": [
+        {
+          "apiId": 18,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 4.744783,
+            "levelTerm": 0.999648,
+            "skill": 0.833333,
+            "attack": 0.000548,
+            "skillAttack": 0
+          },
+          "min": {
+            "const": 3.744783,
+            "levelTerm": 0.999648,
+            "skill": 0.666667,
+            "attack": 0.000548,
+            "skillAttack": 0
+          },
+          "max": {
+            "const": 5.744783,
+            "levelTerm": 0.999648,
+            "skill": 1,
+            "attack": 0.000548,
+            "skillAttack": 0
+          },
+          "fit": {
+            "n": 59,
+            "maxAbsErr": 0.419,
+            "rmse": 0.248,
+            "maxRelErr": 0.00214
+          }
+        }
+      ]
+    },
+    {
+      "name": "Holy Missile",
+      "apiName": "Holy Missile Rune",
+      "vocations": [
+        "paladin"
+      ],
+      "kind": "damage",
+      "spellType": "rune",
+      "element": "holy",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 1,
+      "perkIds": null,
+      "variants": [
+        {
+          "apiId": 20,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 16.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 2.799155
+          },
+          "min": {
+            "const": 10.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 1.799155
+          },
+          "max": {
+            "const": 22.813252,
+            "levelTerm": 0.999649,
+            "magicLevel": 3.799155
+          },
+          "fit": {
+            "n": 59,
+            "maxAbsErr": 0.418,
+            "rmse": 0.248,
+            "maxRelErr": 0.00206
+          }
+        }
+      ]
+    },
+    {
+      "name": "Strong Ethereal Spear",
+      "apiName": "Strong Ethereal Spear",
+      "vocations": [
+        "paladin"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": false,
+      "scalesWith": "distance",
+      "model": "weapon",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 8,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 75,
+        "critDamage": 76,
+        "critChance": 77
+      },
+      "variants": [
+        {
+          "apiId": 17,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 5.744783,
+            "levelTerm": 0.999648,
+            "skill": 1.3,
+            "attack": 0.000548,
+            "skillAttack": 0
+          },
+          "min": {
+            "const": 4.744783,
+            "levelTerm": 0.999648,
+            "skill": 1.033333,
+            "attack": 0.000548,
+            "skillAttack": 0
+          },
+          "max": {
+            "const": 5.744783,
+            "levelTerm": 0.999648,
+            "skill": 1.566667,
+            "attack": 0.000548,
+            "skillAttack": 0
+          },
+          "fit": {
+            "n": 59,
+            "maxAbsErr": 0.419,
+            "rmse": 0.248,
+            "maxRelErr": 0.00175
+          }
+        }
+      ]
+    },
+    {
+      "name": "Death Echo",
+      "apiName": "Death Echo",
+      "vocations": [
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "death",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 4,
+      "cooldownApprox": true,
+      "avgTargetsHunt": 5.9,
+      "perkIds": {
+        "baseDamage": 250,
+        "critDamage": 251,
+        "critChance": 252
+      },
+      "variants": [
+        {
+          "apiId": 85,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1.5,
+          "avg": {
+            "const": 26.834169,
+            "levelTerm": 1.500116,
+            "magicLevel": 4.500126
+          },
+          "min": {
+            "const": 26.702776,
+            "levelTerm": 1.499105,
+            "magicLevel": 4.382159
+          },
+          "max": {
+            "const": 29.233566,
+            "levelTerm": 1.49725,
+            "magicLevel": 4.616995
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 1.166,
+            "rmse": 0.419,
+            "maxRelErr": 0.00182
+          }
+        }
+      ]
+    },
+    {
+      "name": "Death Strike",
+      "apiName": "Death Strike",
+      "vocations": [
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "death",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 117,
+        "critDamage": 118,
+        "critChance": 119
+      },
+      "variants": [
+        {
+          "apiId": 34,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 10.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.800115
+          },
+          "min": {
+            "const": 7.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.400115
+          },
+          "max": {
+            "const": 12.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.200115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00209
+          }
+        }
+      ]
+    },
+    {
+      "name": "Energy Beam",
+      "apiName": "Energy Beam",
+      "vocations": [
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "energy",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "beam",
+      "singleTarget": false,
+      "cooldownSeconds": 4,
+      "avgTargetsHunt": null,
+      "perkIds": {
+        "baseDamage": 120,
+        "critDamage": 121,
+        "critChance": 122
+      },
+      "variants": [
+        {
+          "apiId": 35,
+          "label": "Central",
+          "part": "main",
+          "stage": 0,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 14.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.400115
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00178
+          }
+        },
+        {
+          "apiId": 97,
+          "label": "Stage 1 Sides",
+          "part": "extra",
+          "stage": 1,
+          "bonusFactor": 0.25,
+          "avg": {
+            "const": 4.204154,
+            "levelTerm": 0.248536,
+            "magicLevel": 0.600261
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.5,
+            "rmse": 0.258,
+            "maxRelErr": 0.00641
+          }
+        },
+        {
+          "apiId": 98,
+          "label": "Stage 2 Sides",
+          "part": "extra",
+          "stage": 2,
+          "bonusFactor": 0.4,
+          "avg": {
+            "const": 6.045576,
+            "levelTerm": 0.400472,
+            "magicLevel": 0.960768
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.591,
+            "rmse": 0.271,
+            "maxRelErr": 0.00376
+          }
+        },
+        {
+          "apiId": 99,
+          "label": "Stage 3 Sides",
+          "part": "extra",
+          "stage": 3,
+          "bonusFactor": 0.7,
+          "avg": {
+            "const": 11.062681,
+            "levelTerm": 0.698655,
+            "magicLevel": 1.679855
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.654,
+            "rmse": 0.307,
+            "maxRelErr": 0.00215
+          }
+        }
+      ]
+    },
+    {
+      "name": "Energy Strike",
+      "apiName": "Energy Strike",
+      "vocations": [
+        "sorcerer",
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "energy",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 195,
+        "critDamage": 196,
+        "critChance": 197
+      },
+      "variants": [
+        {
+          "apiId": 69,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 10.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.800115
+          },
+          "min": {
+            "const": 7.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.400115
+          },
+          "max": {
+            "const": 12.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.200115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00209
+          }
+        }
+      ]
+    },
+    {
+      "name": "Energy Wave",
+      "apiName": "Energy Wave",
+      "vocations": [
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "energy",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 8,
+      "avgTargetsHunt": 6.4,
+      "perkIds": {
+        "baseDamage": 84,
+        "critDamage": 85,
+        "critChance": 86
+      },
+      "variants": [
+        {
+          "apiId": 21,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 36.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 6.000115
+          },
+          "min": {
+            "const": 26.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 4.400115
+          },
+          "max": {
+            "const": 46.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 7.600115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00096
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fire Wave",
+      "apiName": "Fire Wave",
+      "vocations": [
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "fire",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 4,
+      "avgTargetsHunt": null,
+      "perkIds": {
+        "baseDamage": 102,
+        "critDamage": 103,
+        "critChance": 104
+      },
+      "variants": [
+        {
+          "apiId": 29,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 9.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.600115
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00221
+          }
+        }
+      ]
+    },
+    {
+      "name": "Flame Strike",
+      "apiName": "Flame Strike",
+      "vocations": [
+        "sorcerer",
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "fire",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 192,
+        "critDamage": 193,
+        "critChance": 194
+      },
+      "variants": [
+        {
+          "apiId": 68,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 10.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.800115
+          },
+          "min": {
+            "const": 7.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.400115
+          },
+          "max": {
+            "const": 12.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.200115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00209
+          }
+        }
+      ]
+    },
+    {
+      "name": "Great Death Beam",
+      "apiName": "Great Death Beam",
+      "vocations": [
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "death",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "beam",
+      "singleTarget": false,
+      "cooldownSeconds": 10,
+      "avgTargetsHunt": 2.4,
+      "avgTargetsHuntOuter": 3.7,
+      "perkIds": {
+        "baseDamage": 99,
+        "critDamage": 100,
+        "critChance": 101
+      },
+      "variants": [
+        {
+          "apiId": 26,
+          "label": "Central",
+          "part": "main",
+          "stage": 0,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 37.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 6.200115
+          },
+          "min": {
+            "const": 31.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 5.200115
+          },
+          "max": {
+            "const": 44.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 7.200115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00093
+          }
+        },
+        {
+          "apiId": 91,
+          "label": "Stage 1 Sides",
+          "part": "extra",
+          "stage": 1,
+          "bonusFactor": 0.25,
+          "avg": {
+            "const": 9.843006,
+            "levelTerm": 0.250265,
+            "magicLevel": 1.549058
+          },
+          "min": {
+            "const": 7.988842,
+            "levelTerm": 0.251848,
+            "magicLevel": 1.300122
+          },
+          "max": {
+            "const": 11.87499,
+            "levelTerm": 0.248948,
+            "magicLevel": 1.799843
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.46,
+            "rmse": 0.252,
+            "maxRelErr": 0.00233
+          }
+        },
+        {
+          "apiId": 92,
+          "label": "Stage 2 Sides",
+          "part": "extra",
+          "stage": 2,
+          "bonusFactor": 0.4,
+          "avg": {
+            "const": 15.688877,
+            "levelTerm": 0.398131,
+            "magicLevel": 2.482124
+          },
+          "min": {
+            "const": 12.902843,
+            "levelTerm": 0.400135,
+            "magicLevel": 2.081172
+          },
+          "max": {
+            "const": 18.142141,
+            "levelTerm": 0.400652,
+            "magicLevel": 2.879636
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.706,
+            "rmse": 0.309,
+            "maxRelErr": 0.00301
+          }
+        },
+        {
+          "apiId": 93,
+          "label": "Stage 3 Sides",
+          "part": "extra",
+          "stage": 3,
+          "bonusFactor": 0.7,
+          "avg": {
+            "const": 26.731752,
+            "levelTerm": 0.699756,
+            "magicLevel": 4.341402
+          },
+          "min": {
+            "const": 22.446562,
+            "levelTerm": 0.698892,
+            "magicLevel": 3.644482
+          },
+          "max": {
+            "const": 31.648099,
+            "levelTerm": 0.698768,
+            "magicLevel": 5.043
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.8,
+            "rmse": 0.304,
+            "maxRelErr": 0.0012
+          }
+        }
+      ]
+    },
+    {
+      "name": "Great Energy Beam",
+      "apiName": "Great Energy Beam",
+      "vocations": [
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "energy",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "beam",
+      "singleTarget": false,
+      "cooldownSeconds": 6,
+      "avgTargetsHunt": 2.4,
+      "avgTargetsHuntOuter": 3.7,
+      "perkIds": {
+        "baseDamage": 96,
+        "critDamage": 97,
+        "critChance": 98
+      },
+      "variants": [
+        {
+          "apiId": 25,
+          "label": "Central",
+          "part": "main",
+          "stage": 0,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 37.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 6.200115
+          },
+          "min": {
+            "const": 30.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 5.000115
+          },
+          "max": {
+            "const": 45.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 7.400115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00093
+          }
+        },
+        {
+          "apiId": 94,
+          "label": "Stage 1 Sides",
+          "part": "extra",
+          "stage": 1,
+          "bonusFactor": 0.25,
+          "avg": {
+            "const": 9.843006,
+            "levelTerm": 0.250265,
+            "magicLevel": 1.549058
+          },
+          "min": {
+            "const": 8.016395,
+            "levelTerm": 0.248413,
+            "magicLevel": 1.252717
+          },
+          "max": {
+            "const": 11.843006,
+            "levelTerm": 0.250265,
+            "magicLevel": 1.849058
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.46,
+            "rmse": 0.252,
+            "maxRelErr": 0.00233
+          }
+        },
+        {
+          "apiId": 95,
+          "label": "Stage 2 Sides",
+          "part": "extra",
+          "stage": 2,
+          "bonusFactor": 0.4,
+          "avg": {
+            "const": 15.688877,
+            "levelTerm": 0.398131,
+            "magicLevel": 2.482124
+          },
+          "min": {
+            "const": 12.889646,
+            "levelTerm": 0.399561,
+            "magicLevel": 2.000041
+          },
+          "max": {
+            "const": 18.633628,
+            "levelTerm": 0.399851,
+            "magicLevel": 2.961698
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.706,
+            "rmse": 0.309,
+            "maxRelErr": 0.00301
+          }
+        },
+        {
+          "apiId": 96,
+          "label": "Stage 3 Sides",
+          "part": "extra",
+          "stage": 3,
+          "bonusFactor": 0.7,
+          "avg": {
+            "const": 26.731752,
+            "levelTerm": 0.699756,
+            "magicLevel": 4.341402
+          },
+          "min": {
+            "const": 21.828607,
+            "levelTerm": 0.700437,
+            "magicLevel": 3.499988
+          },
+          "max": {
+            "const": 32.522698,
+            "levelTerm": 0.698169,
+            "magicLevel": 5.183665
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.8,
+            "rmse": 0.304,
+            "maxRelErr": 0.0012
+          }
+        }
+      ]
+    },
+    {
+      "name": "Great Fire Wave",
+      "apiName": "Great Fire Wave",
+      "vocations": [
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "fire",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 4,
+      "avgTargetsHunt": 6.3,
+      "perkIds": {
+        "baseDamage": 87,
+        "critDamage": 88,
+        "critChance": 89
+      },
+      "variants": [
+        {
+          "apiId": 22,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 24.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 4.000115
+          },
+          "min": {
+            "const": 17.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 3.000115
+          },
+          "max": {
+            "const": 30.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 5.000115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00129
+          }
+        }
+      ]
+    },
+    {
+      "name": "Hell's Core",
+      "apiName": "Hell's Core",
+      "vocations": [
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "fire",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 40,
+      "avgTargetsHunt": 13.7,
+      "perkIds": {
+        "baseDamage": 90,
+        "critDamage": 91,
+        "critChance": 92
+      },
+      "variants": [
+        {
+          "apiId": 23,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 61.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 10.000115
+          },
+          "min": {
+            "const": 49.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 8.000115
+          },
+          "max": {
+            "const": 74.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 12.000115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00063
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ice Strike",
+      "apiName": "Ice Strike",
+      "vocations": [
+        "sorcerer",
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "ice",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 198,
+        "critDamage": 199,
+        "critChance": 200
+      },
+      "variants": [
+        {
+          "apiId": 70,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 10.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.800115
+          },
+          "min": {
+            "const": 7.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.400115
+          },
+          "max": {
+            "const": 12.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.200115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00209
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lightning",
+      "apiName": "Lightning",
+      "vocations": [
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "energy",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 8,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 123,
+        "critDamage": 124,
+        "critChance": 125
+      },
+      "variants": [
+        {
+          "apiId": 36,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 26.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 4.400115
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.0012
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rage of the Skies",
+      "apiName": "Rage of the Skies",
+      "vocations": [
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "energy",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 40,
+      "avgTargetsHunt": 15.5,
+      "perkIds": {
+        "baseDamage": 93,
+        "critDamage": 94,
+        "critChance": 95
+      },
+      "variants": [
+        {
+          "apiId": 24,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 49.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 8.000115
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00076
+          }
+        }
+      ]
+    },
+    {
+      "name": "Strong Energy Strike",
+      "apiName": "Strong Energy Strike",
+      "vocations": [
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "energy",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 8,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 108,
+        "critDamage": 109,
+        "critChance": 110
+      },
+      "variants": [
+        {
+          "apiId": 31,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 30.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 5.000115
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.0011
+          }
+        }
+      ]
+    },
+    {
+      "name": "Strong Flame Strike",
+      "apiName": "Strong Flame Strike",
+      "vocations": [
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "fire",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 8,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 105,
+        "critDamage": 106,
+        "critChance": 107
+      },
+      "variants": [
+        {
+          "apiId": 30,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 30.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 5.000115
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.0011
+          }
+        }
+      ]
+    },
+    {
+      "name": "Terra Strike",
+      "apiName": "Terra Strike",
+      "vocations": [
+        "sorcerer",
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "earth",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 201,
+        "critDamage": 202,
+        "critChance": 203
+      },
+      "variants": [
+        {
+          "apiId": 71,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 10.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.800115
+          },
+          "min": {
+            "const": 7.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.400115
+          },
+          "max": {
+            "const": 12.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.200115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00209
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ultimate Energy Strike",
+      "apiName": "Ultimate Energy Strike",
+      "vocations": [
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "energy",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 30,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 114,
+        "critDamage": 115,
+        "critChance": 116
+      },
+      "variants": [
+        {
+          "apiId": 33,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 51.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 8.400115
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00073
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ultimate Flame Strike",
+      "apiName": "Ultimate Flame Strike",
+      "vocations": [
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "fire",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 30,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 111,
+        "critDamage": 112,
+        "critChance": 113
+      },
+      "variants": [
+        {
+          "apiId": 32,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 51.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 8.400115
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00073
+          }
+        }
+      ]
+    },
+    {
+      "name": "Avalanche",
+      "apiName": "Avalanche Rune",
+      "vocations": [
+        "druid",
+        "knight",
+        "monk",
+        "paladin",
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "rune",
+      "element": "ice",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 9.1,
+      "perkIds": null,
+      "variants": [
+        {
+          "apiId": 72,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 11.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.000115
+          },
+          "min": {
+            "const": 6.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.200115
+          },
+          "max": {
+            "const": 16.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.800115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00198
+          }
+        }
+      ]
+    },
+    {
+      "name": "Eternal Winter",
+      "apiName": "Eternal Winter",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "ice",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 40,
+      "avgTargetsHunt": 13.7,
+      "perkIds": {
+        "baseDamage": 135,
+        "critDamage": 136,
+        "critChance": 137
+      },
+      "variants": [
+        {
+          "apiId": 46,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 49.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 8.000124
+          },
+          "min": {
+            "const": 32.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 5.400124
+          },
+          "max": {
+            "const": 65.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 10.600124
+          },
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 0.49,
+            "rmse": 0.23,
+            "maxRelErr": 0.00074
+          }
+        }
+      ]
+    },
+    {
+      "name": "Explosion",
+      "apiName": "Explosion Rune",
+      "vocations": [
+        "druid",
+        "knight",
+        "monk",
+        "paladin",
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "rune",
+      "element": "physical",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": null,
+      "perkIds": null,
+      "variants": [
+        {
+          "apiId": 77,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 14.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.400115
+          },
+          "min": {
+            "const": 9.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.600115
+          },
+          "max": {
+            "const": 19.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 3.200115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00178
+          }
+        }
+      ]
+    },
+    {
+      "name": "Fireball",
+      "apiName": "Fireball Rune",
+      "vocations": [
+        "druid",
+        "knight",
+        "monk",
+        "paladin",
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "rune",
+      "element": "fire",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 1,
+      "perkIds": null,
+      "variants": [
+        {
+          "apiId": 79,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 14.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.400115
+          },
+          "min": {
+            "const": 10.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.800115
+          },
+          "max": {
+            "const": 17.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 3.000115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00178
+          }
+        }
+      ]
+    },
+    {
+      "name": "Forked Glacier",
+      "apiName": "Forked Glacier",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "ice",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "chain",
+      "singleTarget": false,
+      "cooldownSeconds": 4,
+      "cooldownApprox": true,
+      "avgTargetsHunt": 7.5,
+      "perkIds": {
+        "baseDamage": 253,
+        "critDamage": 254,
+        "critChance": 255
+      },
+      "variants": [
+        {
+          "apiId": 86,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 21.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 3.600124
+          },
+          "min": {
+            "const": 21.637389,
+            "levelTerm": 0.999019,
+            "magicLevel": 3.522051
+          },
+          "max": {
+            "const": 21.356047,
+            "levelTerm": 0.999019,
+            "magicLevel": 3.689382
+          },
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 0.49,
+            "rmse": 0.23,
+            "maxRelErr": 0.00135
+          }
+        }
+      ]
+    },
+    {
+      "name": "Forked Thorns",
+      "apiName": "Forked Thorns",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "earth",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "chain",
+      "singleTarget": false,
+      "cooldownSeconds": 4,
+      "cooldownApprox": true,
+      "avgTargetsHunt": 6.7,
+      "perkIds": {
+        "baseDamage": 256,
+        "critDamage": 257,
+        "critChance": 258
+      },
+      "variants": [
+        {
+          "apiId": 87,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 24.214425,
+            "levelTerm": 0.999018,
+            "magicLevel": 3.877644
+          },
+          "min": {
+            "const": 22.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 3.800124
+          },
+          "max": {
+            "const": 24.496718,
+            "levelTerm": 0.999019,
+            "magicLevel": 3.955717
+          },
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 0.531,
+            "rmse": 0.246,
+            "maxRelErr": 0.00114
+          }
+        }
+      ]
+    },
+    {
+      "name": "Great Fireball",
+      "apiName": "Great Fireball Rune",
+      "vocations": [
+        "druid",
+        "knight",
+        "monk",
+        "paladin",
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "rune",
+      "element": "fire",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 9.1,
+      "perkIds": null,
+      "variants": [
+        {
+          "apiId": 73,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 11.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.000115
+          },
+          "min": {
+            "const": 6.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.200115
+          },
+          "max": {
+            "const": 16.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.800115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00198
+          }
+        }
+      ]
+    },
+    {
+      "name": "Heavy Magic Missile",
+      "apiName": "Heavy Magic Missile Rune",
+      "vocations": [
+        "druid",
+        "knight",
+        "monk",
+        "paladin",
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "rune",
+      "element": "energy",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 1,
+      "perkIds": null,
+      "variants": [
+        {
+          "apiId": 81,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 6.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.200115
+          },
+          "min": {
+            "const": 4.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 0.800115
+          },
+          "max": {
+            "const": 9.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.600115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00251
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ice Burst",
+      "apiName": "Ice Burst",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "ice",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 22,
+      "avgTargetsHunt": 9.5,
+      "perkIds": {
+        "baseDamage": 129,
+        "critDamage": 130,
+        "critChance": 131
+      },
+      "variants": [
+        {
+          "apiId": 38,
+          "label": "No Bonus",
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 27.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 4.600124
+          },
+          "min": {
+            "const": 20.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 3.400124
+          },
+          "max": {
+            "const": 35.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 5.800124
+          },
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 0.49,
+            "rmse": 0.23,
+            "maxRelErr": 0.00114
+          }
+        },
+        {
+          "apiId": 39,
+          "label": "Stage 1",
+          "part": "extra",
+          "stage": 1,
+          "bonusFactor": 1.2,
+          "avg": {
+            "const": 33.7747,
+            "levelTerm": 1.198782,
+            "magicLevel": 5.520573
+          },
+          "min": {
+            "const": 25.426166,
+            "levelTerm": 1.198516,
+            "magicLevel": 4.082383
+          },
+          "max": {
+            "const": 43.351765,
+            "levelTerm": 1.198158,
+            "magicLevel": 6.963525
+          },
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 0.867,
+            "rmse": 0.398,
+            "maxRelErr": 0.00172
+          }
+        },
+        {
+          "apiId": 40,
+          "label": "Stage 2",
+          "part": "extra",
+          "stage": 2,
+          "bonusFactor": 1.4,
+          "avg": {
+            "const": 39.569904,
+            "levelTerm": 1.396609,
+            "magicLevel": 6.442636
+          },
+          "min": {
+            "const": 29.43031,
+            "levelTerm": 1.39928,
+            "magicLevel": 4.761968
+          },
+          "max": {
+            "const": 50.492229,
+            "levelTerm": 1.398609,
+            "magicLevel": 8.122164
+          },
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 1.066,
+            "rmse": 0.462,
+            "maxRelErr": 0.00181
+          }
+        },
+        {
+          "apiId": 41,
+          "label": "Stage 3",
+          "part": "extra",
+          "stage": 3,
+          "bonusFactor": 1.6,
+          "avg": {
+            "const": 45.204867,
+            "levelTerm": 1.59809,
+            "magicLevel": 7.358797
+          },
+          "min": {
+            "const": 33.462979,
+            "levelTerm": 1.599448,
+            "magicLevel": 5.443009
+          },
+          "max": {
+            "const": 57.910123,
+            "levelTerm": 1.598091,
+            "magicLevel": 9.281278
+          },
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 1.177,
+            "rmse": 0.38,
+            "maxRelErr": 0.00175
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ice Wave",
+      "apiName": "Ice Wave",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "ice",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 4,
+      "avgTargetsHunt": null,
+      "perkIds": {
+        "baseDamage": 159,
+        "critDamage": 160,
+        "critChance": 161
+      },
+      "variants": [
+        {
+          "apiId": 54,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 7.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 1.400124
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 0.49,
+            "rmse": 0.23,
+            "maxRelErr": 0.0023
+          }
+        }
+      ]
+    },
+    {
+      "name": "Icicle",
+      "apiName": "Icicle Rune",
+      "vocations": [
+        "druid",
+        "knight",
+        "monk",
+        "paladin",
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "rune",
+      "element": "ice",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 1,
+      "perkIds": null,
+      "variants": [
+        {
+          "apiId": 78,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 14.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.400115
+          },
+          "min": {
+            "const": 10.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.800115
+          },
+          "max": {
+            "const": 17.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 3.000115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00178
+          }
+        }
+      ]
+    },
+    {
+      "name": "Light Magic Missile",
+      "apiName": "Light Magic Missile Rune",
+      "vocations": [
+        "druid",
+        "knight",
+        "monk",
+        "paladin",
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "rune",
+      "element": "energy",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 1,
+      "perkIds": null,
+      "variants": [
+        {
+          "apiId": 82,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 2.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 0.600115
+          },
+          "min": {
+            "const": 1.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 0.400115
+          },
+          "max": {
+            "const": 4.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 0.800115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00316
+          }
+        }
+      ]
+    },
+    {
+      "name": "Physical Strike",
+      "apiName": "Physical Strike",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "earth",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 156,
+        "critDamage": 157,
+        "critChance": 158
+      },
+      "variants": [
+        {
+          "apiId": 53,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 11.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 2.000124
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 0.49,
+            "rmse": 0.23,
+            "maxRelErr": 0.00193
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stalagmite",
+      "apiName": "Stalagmite Rune",
+      "vocations": [
+        "druid",
+        "knight",
+        "monk",
+        "paladin",
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "rune",
+      "element": "earth",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 1,
+      "perkIds": null,
+      "variants": [
+        {
+          "apiId": 80,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 6.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.200115
+          },
+          "min": {
+            "const": 4.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 0.800115
+          },
+          "max": {
+            "const": 9.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.600115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00251
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stone Shower",
+      "apiName": "Stone Shower Rune",
+      "vocations": [
+        "druid",
+        "knight",
+        "monk",
+        "paladin",
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "rune",
+      "element": "earth",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 9.1,
+      "perkIds": null,
+      "variants": [
+        {
+          "apiId": 75,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 11.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.000115
+          },
+          "min": {
+            "const": 6.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.200115
+          },
+          "max": {
+            "const": 16.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.800115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00198
+          }
+        }
+      ]
+    },
+    {
+      "name": "Strong Ice Strike",
+      "apiName": "Strong Ice Strike",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "ice",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 8,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 144,
+        "critDamage": 145,
+        "critChance": 146
+      },
+      "variants": [
+        {
+          "apiId": 49,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 27.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 4.600124
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 0.49,
+            "rmse": 0.23,
+            "maxRelErr": 0.00114
+          }
+        }
+      ]
+    },
+    {
+      "name": "Strong Ice Wave",
+      "apiName": "Strong Ice Wave",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "ice",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 8,
+      "avgTargetsHunt": 5.3,
+      "perkIds": {
+        "baseDamage": 141,
+        "critDamage": 142,
+        "critChance": 143
+      },
+      "variants": [
+        {
+          "apiId": 48,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 34.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 5.600124
+          },
+          "min": {
+            "const": 24.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 4.000124
+          },
+          "max": {
+            "const": 43.073754,
+            "levelTerm": 0.999018,
+            "magicLevel": 7.211309
+          },
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 0.49,
+            "rmse": 0.23,
+            "maxRelErr": 0.00098
+          }
+        }
+      ]
+    },
+    {
+      "name": "Strong Terra Strike",
+      "apiName": "Strong Terra Strike",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "earth",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 8,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 147,
+        "critDamage": 148,
+        "critChance": 149
+      },
+      "variants": [
+        {
+          "apiId": 50,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 27.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 4.600124
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 0.49,
+            "rmse": 0.23,
+            "maxRelErr": 0.00114
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sudden Death",
+      "apiName": "Sudden Death Rune",
+      "vocations": [
+        "druid",
+        "knight",
+        "monk",
+        "paladin",
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "rune",
+      "element": "death",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 1,
+      "perkIds": null,
+      "variants": [
+        {
+          "apiId": 76,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 36.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 6.000115
+          },
+          "min": {
+            "const": 27.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 4.600115
+          },
+          "max": {
+            "const": 45.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 7.400115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00096
+          }
+        }
+      ]
+    },
+    {
+      "name": "Terra Burst",
+      "apiName": "Terra Burst",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "earth",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 22,
+      "avgTargetsHunt": 9.5,
+      "perkIds": {
+        "baseDamage": 132,
+        "critDamage": 133,
+        "critChance": 134
+      },
+      "variants": [
+        {
+          "apiId": 42,
+          "label": "No Bonus",
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 27.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 4.600124
+          },
+          "min": {
+            "const": 20.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 3.400124
+          },
+          "max": {
+            "const": 35.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 5.800124
+          },
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 0.49,
+            "rmse": 0.23,
+            "maxRelErr": 0.00114
+          }
+        },
+        {
+          "apiId": 43,
+          "label": "Stage 1",
+          "part": "extra",
+          "stage": 1,
+          "bonusFactor": 1.2,
+          "avg": {
+            "const": 33.7747,
+            "levelTerm": 1.198782,
+            "magicLevel": 5.520573
+          },
+          "min": {
+            "const": 25.426166,
+            "levelTerm": 1.198516,
+            "magicLevel": 4.082383
+          },
+          "max": {
+            "const": 43.351765,
+            "levelTerm": 1.198158,
+            "magicLevel": 6.963525
+          },
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 0.867,
+            "rmse": 0.398,
+            "maxRelErr": 0.00172
+          }
+        },
+        {
+          "apiId": 44,
+          "label": "Stage 2",
+          "part": "extra",
+          "stage": 2,
+          "bonusFactor": 1.4,
+          "avg": {
+            "const": 39.569904,
+            "levelTerm": 1.396609,
+            "magicLevel": 6.442636
+          },
+          "min": {
+            "const": 29.43031,
+            "levelTerm": 1.39928,
+            "magicLevel": 4.761968
+          },
+          "max": {
+            "const": 50.492229,
+            "levelTerm": 1.398609,
+            "magicLevel": 8.122164
+          },
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 1.066,
+            "rmse": 0.462,
+            "maxRelErr": 0.00181
+          }
+        },
+        {
+          "apiId": 45,
+          "label": "Stage 3",
+          "part": "extra",
+          "stage": 3,
+          "bonusFactor": 1.6,
+          "avg": {
+            "const": 45.204867,
+            "levelTerm": 1.59809,
+            "magicLevel": 7.358797
+          },
+          "min": {
+            "const": 33.462979,
+            "levelTerm": 1.599448,
+            "magicLevel": 5.443009
+          },
+          "max": {
+            "const": 57.910123,
+            "levelTerm": 1.598091,
+            "magicLevel": 9.281278
+          },
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 1.177,
+            "rmse": 0.38,
+            "maxRelErr": 0.00175
+          }
+        }
+      ]
+    },
+    {
+      "name": "Terra Wave",
+      "apiName": "Terra Wave",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "earth",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 4,
+      "avgTargetsHunt": 5.8,
+      "perkIds": {
+        "baseDamage": 126,
+        "critDamage": 127,
+        "critChance": 128
+      },
+      "variants": [
+        {
+          "apiId": 37,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 29.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 4.800124
+          },
+          "min": {
+            "const": 19.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 3.200124
+          },
+          "max": {
+            "const": 39.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 6.400124
+          },
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 0.49,
+            "rmse": 0.23,
+            "maxRelErr": 0.0011
+          }
+        }
+      ]
+    },
+    {
+      "name": "Thunderstorm",
+      "apiName": "Thunderstorm Rune",
+      "vocations": [
+        "druid",
+        "knight",
+        "monk",
+        "paladin",
+        "sorcerer"
+      ],
+      "kind": "damage",
+      "spellType": "rune",
+      "element": "energy",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 2,
+      "avgTargetsHunt": 9.1,
+      "perkIds": null,
+      "variants": [
+        {
+          "apiId": 74,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 11.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.000115
+          },
+          "min": {
+            "const": 6.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 1.200115
+          },
+          "max": {
+            "const": 16.956657,
+            "levelTerm": 0.9988,
+            "magicLevel": 2.800115
+          },
+          "fit": {
+            "n": 32,
+            "maxAbsErr": 0.501,
+            "rmse": 0.244,
+            "maxRelErr": 0.00198
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ultimate Ice Strike",
+      "apiName": "Ultimate Ice Strike",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "ice",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 30,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 150,
+        "critDamage": 151,
+        "critChance": 152
+      },
+      "variants": [
+        {
+          "apiId": 51,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 47.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 7.800124
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 0.49,
+            "rmse": 0.23,
+            "maxRelErr": 0.00076
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ultimate Terra Strike",
+      "apiName": "Ultimate Terra Strike",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "earth",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 30,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 153,
+        "critDamage": 154,
+        "critChance": 155
+      },
+      "variants": [
+        {
+          "apiId": 52,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 47.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 7.800124
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 0.49,
+            "rmse": 0.23,
+            "maxRelErr": 0.00076
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wrath of Nature",
+      "apiName": "Wrath of Nature",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "earth",
+      "weaponElement": false,
+      "scalesWith": "magic",
+      "model": "magic",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 40,
+      "avgTargetsHunt": 15.5,
+      "perkIds": {
+        "baseDamage": 138,
+        "critDamage": 139,
+        "critChance": 140
+      },
+      "variants": [
+        {
+          "apiId": 47,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 42.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 7.000124
+          },
+          "min": {
+            "const": 34.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 5.600124
+          },
+          "max": {
+            "const": 51.919682,
+            "levelTerm": 0.999019,
+            "magicLevel": 8.400124
+          },
+          "fit": {
+            "n": 22,
+            "maxAbsErr": 0.49,
+            "rmse": 0.23,
+            "maxRelErr": 0.00083
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chained Penance",
+      "apiName": "Chained Penance",
+      "vocations": [
+        "monk"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "chain",
+      "singleTarget": false,
+      "cooldownSeconds": 4,
+      "avgTargetsHunt": 5,
+      "perkIds": {
+        "baseDamage": 162,
+        "critDamage": 163,
+        "critChance": 164
+      },
+      "variants": [
+        {
+          "apiId": 55,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 18.158354,
+            "levelTerm": 0.999753,
+            "skill": -0.007579,
+            "attack": -0.023867,
+            "skillAttack": 0.070253
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 47,
+            "maxAbsErr": 0.793,
+            "rmse": 0.337,
+            "maxRelErr": 0.00433
+          }
+        }
+      ]
+    },
+    {
+      "name": "Devastating Knockout",
+      "apiName": "Devastating Knockout",
+      "vocations": [
+        "monk"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 24,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 183,
+        "critDamage": 184,
+        "critChance": 185
+      },
+      "variants": [
+        {
+          "apiId": 65,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 31.738056,
+            "levelTerm": 1.071394,
+            "skill": 0.006588,
+            "attack": -0.016919,
+            "skillAttack": 0.127834,
+            "levelSkillAttack": 0.297417
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 47,
+            "maxAbsErr": 11.997,
+            "rmse": 6.611,
+            "maxRelErr": 0.01183
+          }
+        }
+      ]
+    },
+    {
+      "name": "Double Jab",
+      "apiName": "Double Jab",
+      "vocations": [
+        "monk"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 4,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 186,
+        "critDamage": 187,
+        "critChance": 188
+      },
+      "variants": [
+        {
+          "apiId": 66,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 9.363746,
+            "levelTerm": 0.999652,
+            "skill": 0.00379,
+            "attack": 0.014836,
+            "skillAttack": 0.039874
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 47,
+            "maxAbsErr": 0.834,
+            "rmse": 0.318,
+            "maxRelErr": 0.00711
+          }
+        }
+      ]
+    },
+    {
+      "name": "Flurry of Blows",
+      "apiName": "Flurry of Blows",
+      "vocations": [
+        "monk"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 4,
+      "avgTargetsHunt": 4.3,
+      "perkIds": {
+        "baseDamage": 168,
+        "critDamage": 169,
+        "critChance": 170
+      },
+      "variants": [
+        {
+          "apiId": 57,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 11.285897,
+            "levelTerm": 0.999316,
+            "skill": 0.019193,
+            "attack": 0.080223,
+            "skillAttack": 0.05436
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 47,
+            "maxAbsErr": 0.652,
+            "rmse": 0.308,
+            "maxRelErr": 0.00249
+          }
+        }
+      ]
+    },
+    {
+      "name": "Forceful Uppercut",
+      "apiName": "Forceful Uppercut",
+      "vocations": [
+        "monk"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 60,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 180,
+        "critDamage": 181,
+        "critChance": 182
+      },
+      "variants": [
+        {
+          "apiId": 64,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 31.224784,
+            "levelTerm": 0.999314,
+            "skill": 0.008245,
+            "attack": 0.017787,
+            "skillAttack": 0.12991
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 47,
+            "maxAbsErr": 0.866,
+            "rmse": 0.374,
+            "maxRelErr": 0.0031
+          }
+        }
+      ]
+    },
+    {
+      "name": "Greater Flurry of Blows",
+      "apiName": "Greater Flurry of Blows",
+      "vocations": [
+        "monk"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 16,
+      "avgTargetsHunt": 5.8,
+      "perkIds": {
+        "baseDamage": 165,
+        "critDamage": 166,
+        "critChance": 167
+      },
+      "variants": [
+        {
+          "apiId": 56,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 21.831561,
+            "levelTerm": 0.999299,
+            "skill": -0.001684,
+            "attack": -0.000788,
+            "skillAttack": 0.085982
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 47,
+            "maxAbsErr": 0.507,
+            "rmse": 0.282,
+            "maxRelErr": 0.00223
+          }
+        }
+      ]
+    },
+    {
+      "name": "Greater Tiger Clash",
+      "apiName": "Greater Tiger Clash",
+      "vocations": [
+        "monk"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 8,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 189,
+        "critDamage": 190,
+        "critChance": 191
+      },
+      "variants": [
+        {
+          "apiId": 67,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 23.149319,
+            "levelTerm": 1.05292,
+            "skill": -0.003386,
+            "attack": -0.038413,
+            "skillAttack": 0.090978,
+            "levelSkillAttack": 0.210668
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 47,
+            "maxAbsErr": 8.575,
+            "rmse": 4.745,
+            "maxRelErr": 0.01207
+          }
+        }
+      ]
+    },
+    {
+      "name": "Mystic Repulse",
+      "apiName": "Mystic Repulse",
+      "vocations": [
+        "monk"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 20,
+      "avgTargetsHunt": 1,
+      "perkIds": {
+        "baseDamage": 177,
+        "critDamage": 178,
+        "critChance": 179
+      },
+      "variants": [
+        {
+          "apiId": 63,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 20.584147,
+            "levelTerm": 0.999179,
+            "skill": 0.007824,
+            "attack": 0.021828,
+            "skillAttack": 0.084739
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 47,
+            "maxAbsErr": 0.667,
+            "rmse": 0.323,
+            "maxRelErr": 0.00208
+          }
+        }
+      ]
+    },
+    {
+      "name": "Spiritual Outburst",
+      "apiName": "Spiritual Outburst",
+      "vocations": [
+        "monk"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "chain",
+      "singleTarget": false,
+      "cooldownSeconds": 24,
+      "avgTargetsHunt": 5.9,
+      "perkIds": {
+        "baseDamage": 174,
+        "critDamage": 175,
+        "critChance": 176
+      },
+      "variants": [
+        {
+          "apiId": 59,
+          "label": "Primary",
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 21.939942,
+            "levelTerm": 1.050908,
+            "skill": -0.003667,
+            "attack": -0.02271,
+            "skillAttack": 0.086762,
+            "levelSkillAttack": 0.201136
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 47,
+            "maxAbsErr": 7.646,
+            "rmse": 4.548,
+            "maxRelErr": 0.01204
+          }
+        },
+        {
+          "apiId": 60,
+          "label": "Repeat Stage 1",
+          "part": "extra",
+          "stage": 1,
+          "bonusFactor": 0.4,
+          "avg": {
+            "const": 8.595664,
+            "levelTerm": 0.395514,
+            "skill": -0.001834,
+            "attack": -0.012461,
+            "skillAttack": 0.03258,
+            "levelSkillAttack": 0.075231
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 47,
+            "maxAbsErr": 3.192,
+            "rmse": 1.744,
+            "maxRelErr": 0.01436
+          }
+        },
+        {
+          "apiId": 61,
+          "label": "Repeat Stage 2",
+          "part": "extra",
+          "stage": 2,
+          "bonusFactor": 0.5,
+          "avg": {
+            "const": 11.393325,
+            "levelTerm": 0.526038,
+            "skill": -0.004904,
+            "attack": -0.013115,
+            "skillAttack": 0.04344,
+            "levelSkillAttack": 0.100548
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 47,
+            "maxAbsErr": 3.923,
+            "rmse": 2.266,
+            "maxRelErr": 0.01285
+          }
+        },
+        {
+          "apiId": 62,
+          "label": "Repeat Stage 3",
+          "part": "extra",
+          "stage": 3,
+          "bonusFactor": 0.65,
+          "avg": {
+            "const": 13.973189,
+            "levelTerm": 0.656521,
+            "skill": -0.00093,
+            "attack": -0.000153,
+            "skillAttack": 0.054144,
+            "levelSkillAttack": 0.125646
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 47,
+            "maxAbsErr": 4.839,
+            "rmse": 2.84,
+            "maxRelErr": 0.01296
+          }
+        }
+      ]
+    },
+    {
+      "name": "Sweeping Takedown",
+      "apiName": "Sweeping Takedown",
+      "vocations": [
+        "monk"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 8,
+      "avgTargetsHunt": 6.4,
+      "perkIds": {
+        "baseDamage": 171,
+        "critDamage": 172,
+        "critChance": 173
+      },
+      "variants": [
+        {
+          "apiId": 58,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 24.898104,
+            "levelTerm": 1.056555,
+            "skill": -0.000737,
+            "attack": -0.021839,
+            "skillAttack": 0.099088,
+            "levelSkillAttack": 0.230176
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 47,
+            "maxAbsErr": 9.146,
+            "rmse": 5.072,
+            "maxRelErr": 0.01232
+          }
+        }
+      ]
+    },
+    {
+      "name": "Thousand Fist Blows",
+      "apiName": "Thousand Fist Blows",
+      "vocations": [
+        "monk"
+      ],
+      "kind": "damage",
+      "spellType": "spell",
+      "element": "physical",
+      "weaponElement": true,
+      "scalesWith": "melee",
+      "model": "weapon",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 4,
+      "cooldownApprox": true,
+      "avgTargetsHunt": 7.1,
+      "perkIds": {
+        "baseDamage": 259,
+        "critDamage": 260,
+        "critChance": 261
+      },
+      "variants": [
+        {
+          "apiId": 88,
+          "label": null,
+          "part": "main",
+          "stage": null,
+          "bonusFactor": 1,
+          "avg": {
+            "const": 15.685623,
+            "levelTerm": 0.999814,
+            "skill": 0.000421,
+            "attack": 0.009208,
+            "skillAttack": 0.061838
+          },
+          "min": null,
+          "max": null,
+          "fit": {
+            "n": 47,
+            "maxAbsErr": 0.721,
+            "rmse": 0.317,
+            "maxRelErr": 0.00275
+          }
+        }
+      ]
+    }
+  ],
+  "healing": [
+    {
+      "name": "Intense Wound Cleansing",
+      "vocations": [
+        "knight"
+      ],
+      "kind": "healing",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 600,
+      "model": "magic",
+      "min": {
+        "const": 438,
+        "level": 0.2,
+        "magicLevel": 70
+      },
+      "max": {
+        "const": 544,
+        "level": 0.2,
+        "magicLevel": 92
+      },
+      "avg": {
+        "const": 491,
+        "level": 0.2,
+        "magicLevel": 81
+      },
+      "note": "linear level (not levelTerm)",
+      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+    },
+    {
+      "name": "Fair Wound Cleansing",
+      "vocations": [
+        "knight"
+      ],
+      "kind": "healing",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 1,
+      "model": "magic",
+      "min": {
+        "const": 50,
+        "level": 0.4,
+        "magicLevel": 8
+      },
+      "max": {
+        "const": 102,
+        "level": 0.4,
+        "magicLevel": 15.9
+      },
+      "avg": {
+        "const": 76,
+        "level": 0.4,
+        "magicLevel": 11.95
+      },
+      "note": "linear level (not levelTerm)",
+      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+    },
+    {
+      "name": "Salvation",
+      "vocations": [
+        "paladin"
+      ],
+      "kind": "healing",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 1,
+      "model": "magic",
+      "min": {
+        "const": 75,
+        "level": 0.2,
+        "magicLevel": 12
+      },
+      "max": {
+        "const": 125,
+        "level": 0.2,
+        "magicLevel": 20
+      },
+      "avg": {
+        "const": 100,
+        "level": 0.2,
+        "magicLevel": 16
+      },
+      "note": "linear level (not levelTerm)",
+      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+    },
+    {
+      "name": "Ultimate Healing",
+      "vocations": [
+        "sorcerer",
+        "druid"
+      ],
+      "kind": "healing",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 1,
+      "model": "magic",
+      "min": {
+        "const": 42,
+        "level": 0.2,
+        "magicLevel": 6.8
+      },
+      "max": {
+        "const": 90,
+        "level": 0.2,
+        "magicLevel": 12.9
+      },
+      "avg": {
+        "const": 66,
+        "level": 0.2,
+        "magicLevel": 9.85
+      },
+      "note": "linear level (not levelTerm)",
+      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+    },
+    {
+      "name": "Mass Healing",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "healing",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 2,
+      "model": "magic",
+      "min": {
+        "const": 26,
+        "level": 0.2,
+        "magicLevel": 5.7
+      },
+      "max": {
+        "const": 62,
+        "level": 0.2,
+        "magicLevel": 10.43
+      },
+      "avg": {
+        "const": 44,
+        "level": 0.2,
+        "magicLevel": 8.065
+      },
+      "note": "linear level (not levelTerm)",
+      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+    },
+    {
+      "name": "Heal Friend",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "healing",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 1,
+      "model": "magic",
+      "min": {
+        "const": 3,
+        "level": 0.2,
+        "magicLevel": 10
+      },
+      "max": {
+        "const": 5,
+        "level": 0.2,
+        "magicLevel": 14
+      },
+      "avg": {
+        "const": 4,
+        "level": 0.2,
+        "magicLevel": 12
+      },
+      "note": "linear level (not levelTerm)",
+      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+    },
+    {
+      "name": "Nature's Embrace",
+      "vocations": [
+        "druid"
+      ],
+      "kind": "healing",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 60,
+      "model": "magic",
+      "min": {
+        "const": 0,
+        "level": 0.4,
+        "magicLevel": 20
+      },
+      "max": {
+        "const": 0,
+        "level": 0.4,
+        "magicLevel": 28
+      },
+      "avg": {
+        "const": 0,
+        "level": 0.4,
+        "magicLevel": 24
+      },
+      "note": "linear level (not levelTerm)",
+      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+    },
+    {
+      "name": "Spirit Mend",
+      "vocations": [
+        "monk"
+      ],
+      "kind": "healing",
+      "area": "single",
+      "singleTarget": true,
+      "cooldownSeconds": 1,
+      "model": "magic",
+      "min": {
+        "const": 44,
+        "level": 0.2,
+        "magicLevel": 7.22
+      },
+      "max": {
+        "const": 79,
+        "level": 0.2,
+        "magicLevel": 12.79
+      },
+      "avg": {
+        "const": 61.5,
+        "level": 0.2,
+        "magicLevel": 10.004999999999999
+      },
+      "note": "linear level (not levelTerm)",
+      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+    },
+    {
+      "name": "Mass Spirit Mend",
+      "vocations": [
+        "monk"
+      ],
+      "kind": "healing",
+      "area": "area",
+      "singleTarget": false,
+      "cooldownSeconds": 8,
+      "model": "magic",
+      "min": {
+        "const": 26,
+        "level": 0.2,
+        "magicLevel": 5.7
+      },
+      "max": {
+        "const": 62,
+        "level": 0.2,
+        "magicLevel": 10.43
+      },
+      "avg": {
+        "const": 44,
+        "level": 0.2,
+        "magicLevel": 8.065
+      },
+      "note": "linear level (not levelTerm); Scaled by Harmony in game.",
+      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+    }
+  ],
+  "characterPerks": {
+    "Critical hit extra damage": {
+      "id": 2,
+      "bonusType": "crit-damage",
+      "scopes": [
+        "character"
+      ],
+      "valueType": "percent"
+    },
+    "Critical hit chance": {
+      "id": 3,
+      "bonusType": "crit-chance",
+      "scopes": [
+        "character"
+      ],
+      "valueType": "percent"
+    },
+    "Critical % extra damage for auto‑attacks": {
+      "id": 4,
+      "bonusType": "crit-damage",
+      "scopes": [
+        "auto-attack"
+      ],
+      "valueType": "percent"
+    },
+    "Critical hit chance for auto‑attacks": {
+      "id": 5,
+      "bonusType": "crit-chance",
+      "scopes": [
+        "auto-attack"
+      ],
+      "valueType": "percent"
+    },
+    "Critical % extra damage for runes": {
+      "id": 6,
+      "bonusType": "crit-damage",
+      "scopes": [
+        "rune"
+      ],
+      "valueType": "percent"
+    },
+    "Critical hit chance for runes": {
+      "id": 7,
+      "bonusType": "crit-chance",
+      "scopes": [
+        "rune"
+      ],
+      "valueType": "percent"
+    },
+    "+ magic level": {
+      "id": 210,
+      "bonusType": "magic-level",
+      "scopes": [
+        "character"
+      ],
+      "valueType": "flat"
+    },
+    "Critical % extra damage for death spells and runes": {
+      "id": 24,
+      "bonusType": "crit-damage",
+      "scopes": [
+        "death"
+      ],
+      "valueType": "percent"
+    },
+    "Death critical hit chance": {
+      "id": 25,
+      "bonusType": "crit-chance",
+      "scopes": [
+        "death"
+      ],
+      "valueType": "percent"
+    },
+    "+ death magic level": {
+      "id": 26,
+      "bonusType": "magic-level",
+      "scopes": [
+        "death"
+      ],
+      "valueType": "flat"
+    },
+    "Critical % extra damage for earth spells and runes": {
+      "id": 27,
+      "bonusType": "crit-damage",
+      "scopes": [
+        "earth"
+      ],
+      "valueType": "percent"
+    },
+    "Earth critical hit chance": {
+      "id": 28,
+      "bonusType": "crit-chance",
+      "scopes": [
+        "earth"
+      ],
+      "valueType": "percent"
+    },
+    "+ earth magic level": {
+      "id": 29,
+      "bonusType": "magic-level",
+      "scopes": [
+        "earth"
+      ],
+      "valueType": "flat"
+    },
+    "Critical % extra damage for energy spells and runes": {
+      "id": 30,
+      "bonusType": "crit-damage",
+      "scopes": [
+        "energy"
+      ],
+      "valueType": "percent"
+    },
+    "Energy critical hit chance": {
+      "id": 31,
+      "bonusType": "crit-chance",
+      "scopes": [
+        "energy"
+      ],
+      "valueType": "percent"
+    },
+    "+ energy magic level": {
+      "id": 32,
+      "bonusType": "magic-level",
+      "scopes": [
+        "energy"
+      ],
+      "valueType": "flat"
+    },
+    "Critical % extra damage for fire spells and runes": {
+      "id": 33,
+      "bonusType": "crit-damage",
+      "scopes": [
+        "fire"
+      ],
+      "valueType": "percent"
+    },
+    "Fire critical hit chance": {
+      "id": 34,
+      "bonusType": "crit-chance",
+      "scopes": [
+        "fire"
+      ],
+      "valueType": "percent"
+    },
+    "+ fire magic level": {
+      "id": 35,
+      "bonusType": "magic-level",
+      "scopes": [
+        "fire"
+      ],
+      "valueType": "flat"
+    },
+    "Critical % extra damage for holy spells and runes": {
+      "id": 36,
+      "bonusType": "crit-damage",
+      "scopes": [
+        "holy"
+      ],
+      "valueType": "percent"
+    },
+    "Holy critical hit chance": {
+      "id": 37,
+      "bonusType": "crit-chance",
+      "scopes": [
+        "holy"
+      ],
+      "valueType": "percent"
+    },
+    "+ holy magic level": {
+      "id": 38,
+      "bonusType": "magic-level",
+      "scopes": [
+        "holy"
+      ],
+      "valueType": "flat"
+    },
+    "Critical % extra damage for ice spells and runes": {
+      "id": 39,
+      "bonusType": "crit-damage",
+      "scopes": [
+        "ice"
+      ],
+      "valueType": "percent"
+    },
+    "Ice critical hit chance": {
+      "id": 40,
+      "bonusType": "crit-chance",
+      "scopes": [
+        "ice"
+      ],
+      "valueType": "percent"
+    },
+    "+ ice magic level": {
+      "id": 41,
+      "bonusType": "magic-level",
+      "scopes": [
+        "ice"
+      ],
+      "valueType": "flat"
+    },
+    "Critical % extra damage for physical spells and runes": {
+      "id": 42,
+      "bonusType": "crit-damage",
+      "scopes": [
+        "physical"
+      ],
+      "valueType": "percent"
+    },
+    "Physical critical hit chance": {
+      "id": 43,
+      "bonusType": "crit-chance",
+      "scopes": [
+        "physical"
+      ],
+      "valueType": "percent"
+    },
+    "+ physical magic level": {
+      "id": 44,
+      "bonusType": "magic-level",
+      "scopes": [
+        "physical"
+      ],
+      "valueType": "flat"
+    },
+    "Ascetic": {
+      "id": 240,
+      "bonusType": "base-harmony-bonus",
+      "scopes": [
+        "character"
+      ],
+      "valueType": "stage"
+    },
+    "Combat Mastery": {
+      "id": 249,
+      "bonusType": "combat-mastery",
+      "scopes": [
+        "character"
+      ],
+      "valueType": "stage"
+    },
+    "Lord of Destruction": {
+      "id": 265,
+      "bonusType": "lord-of-destruction",
+      "scopes": [
+        "character"
+      ],
+      "valueType": "stage"
+    }
+  },
+  "rotationPresets": {
+    "druid": [
+      {
+        "name": "2x Fork",
+        "spells": [
+          {
+            "name": "Forked Thorns",
+            "ratio": 1
+          },
+          {
+            "name": "Forked Glacier",
+            "ratio": 1
+          }
+        ]
+      },
+      {
+        "name": "2x Fork - Ice Burst - Eternal Winter",
+        "spells": [
+          {
+            "name": "Forked Thorns",
+            "ratio": 8
+          },
+          {
+            "name": "Forked Glacier",
+            "ratio": 9
+          },
+          {
+            "name": "Ice Burst",
+            "ratio": 2
+          },
+          {
+            "name": "Eternal Winter",
+            "ratio": 1
+          }
+        ]
+      },
+      {
+        "name": "Forked Glacier - Strong Ice Wave",
+        "spells": [
+          {
+            "name": "Forked Glacier",
+            "ratio": 1
+          },
+          {
+            "name": "Strong Ice Wave",
+            "ratio": 1
+          }
+        ]
+      }
+    ],
+    "knight": [
+      {
+        "name": "Exori Gran - Exori - Exori Min",
+        "spells": [
+          {
+            "name": "Fierce Berserk",
+            "ratio": 1
+          },
+          {
+            "name": "Berserk",
+            "ratio": 1
+          },
+          {
+            "name": "Front Sweep",
+            "ratio": 1
+          }
+        ]
+      },
+      {
+        "name": "Exori Gran - Exori - Exori Mas",
+        "spells": [
+          {
+            "name": "Fierce Berserk",
+            "ratio": 1
+          },
+          {
+            "name": "Berserk",
+            "ratio": 1
+          },
+          {
+            "name": "Groundshaker",
+            "ratio": 1
+          }
+        ]
+      }
+    ],
+    "monk": [
+      {
+        "name": "VoH: Chain - GFoB - Chain - TFB - Takedown",
+        "spells": [
+          {
+            "name": "Chained Penance",
+            "ratio": 2
+          },
+          {
+            "name": "Greater Flurry of Blows",
+            "ratio": 1
+          },
+          {
+            "name": "Thousand Fist Blows",
+            "ratio": 1
+          },
+          {
+            "name": "Sweeping Takedown",
+            "ratio": 1
+          }
+        ]
+      },
+      {
+        "name": "VoJ: Chain - GFoB - Chain - TFB - Chain - Takedown",
+        "spells": [
+          {
+            "name": "Chained Penance",
+            "ratio": 3
+          },
+          {
+            "name": "Greater Flurry of Blows",
+            "ratio": 1
+          },
+          {
+            "name": "Thousand Fist Blows",
+            "ratio": 1
+          },
+          {
+            "name": "Sweeping Takedown",
+            "ratio": 1
+          }
+        ]
+      },
+      {
+        "name": "TFB - GFoB - Chain - TFB - Takedown",
+        "spells": [
+          {
+            "name": "Thousand Fist Blows",
+            "ratio": 2
+          },
+          {
+            "name": "Greater Flurry of Blows",
+            "ratio": 1
+          },
+          {
+            "name": "Chained Penance",
+            "ratio": 1
+          },
+          {
+            "name": "Sweeping Takedown",
+            "ratio": 1
+          }
+        ]
+      }
+    ],
+    "paladin": [
+      {
+        "name": "Ethereal Barrage - Divine Caldera",
+        "spells": [
+          {
+            "name": "Ethereal Barrage",
+            "ratio": 1
+          },
+          {
+            "name": "Divine Caldera",
+            "ratio": 1
+          }
+        ]
+      },
+      {
+        "name": "Divine Barrage - Divine Caldera",
+        "spells": [
+          {
+            "name": "Divine Barrage",
+            "ratio": 1
+          },
+          {
+            "name": "Divine Caldera",
+            "ratio": 1
+          }
+        ]
+      },
+      {
+        "name": "Divine Barrage - Ethereal Barrage",
+        "spells": [
+          {
+            "name": "Divine Barrage",
+            "ratio": 1
+          },
+          {
+            "name": "Ethereal Barrage",
+            "ratio": 1
+          }
+        ]
+      }
+    ],
+    "sorcerer": [
+      {
+        "name": "Great Fire Wave - Death Echo",
+        "spells": [
+          {
+            "name": "Great Fire Wave",
+            "ratio": 10
+          },
+          {
+            "name": "Death Echo",
+            "ratio": 10
+          },
+          {
+            "name": "Hell's Core",
+            "ratio": 1
+          }
+        ]
+      },
+      {
+        "name": "Death Echo - Energy Wave - Death Echo - Great Death Beam",
+        "spells": [
+          {
+            "name": "Death Echo",
+            "ratio": 10
+          },
+          {
+            "name": "Energy Wave",
+            "ratio": 5
+          },
+          {
+            "name": "Great Death Beam",
+            "ratio": 5
+          },
+          {
+            "name": "Hell's Core",
+            "ratio": 1
+          }
+        ]
+      },
+      {
+        "name": "Great Fire Wave - Energy Wave - Great Fire Wave - Great Energy Beam",
+        "spells": [
+          {
+            "name": "Great Fire Wave",
+            "ratio": 10
+          },
+          {
+            "name": "Energy Wave",
+            "ratio": 5
+          },
+          {
+            "name": "Great Energy Beam",
+            "ratio": 5
+          },
+          {
+            "name": "Hell's Core",
+            "ratio": 1
+          }
+        ]
+      },
+      {
+        "name": "Energy Wave - Death Echo - Great Energy Beam - Death Echo",
+        "spells": [
+          {
+            "name": "Energy Wave",
+            "ratio": 5
+          },
+          {
+            "name": "Death Echo",
+            "ratio": 10
+          },
+          {
+            "name": "Great Energy Beam",
+            "ratio": 5
+          },
+          {
+            "name": "Hell's Core",
+            "ratio": 1
+          }
+        ]
+      }
+    ]
+  }
+}

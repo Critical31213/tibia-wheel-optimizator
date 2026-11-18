@@ -9,7 +9,11 @@ import {
   pointsForLevel,
   searchMonsters,
 } from './lib/api';
-import { contextOf, DEFAULT_INPUTS, fromQuery, MAX_POINTS, sanitize, toQuery, withKnownMonster } from './lib/inputState';
+import { characterOf, contextOf, DEFAULT_INPUTS, fromQuery, MAX_POINTS, sanitize, toQuery, withKnownMonsters } from './lib/inputState';
+import { resolveMonsters } from './lib/monsters';
+import { PLANNER_URL, plannerUrl } from './lib/planner';
+import { getDamageSpell, isSingleTarget, spellElement } from './data/damage';
+import { decodePlannerCode, gridForSliceId, plannerVesselIssues, type PlannerVessel } from './data/wheel/plannerCode';
 import { gemsStorageKey, modsForSlot, parseGems, serializeGems } from './lib/gems';
 import { MONSTERS } from './data';
 import { getWheelData, WHEEL_DATA } from './data/wheel';
@@ -18,14 +22,17 @@ import { en } from './i18n/en';
 import { pl } from './i18n/pl';
 import {
   VOCATIONS,
+  type CharacterStats,
   type Domain,
   type EngineMessage,
   type FightContext,
   type GemQuality,
   type Monster,
+  type OptimizerInput,
   type OptimizerResult,
   type OwnedGem,
   type Vocation,
+  type WeightedMonster,
   type WheelDefinition,
 } from './types';
 
@@ -157,9 +164,9 @@ describe('integration: input parsing', () => {
   it('drops invalid vocation and unknown monster ids', () => {
     const parsed = fromQuery('?v=necromancer&m=not-a-monster&p=100&prio=20');
     expect(parsed.vocation).toBeUndefined();
-    const state = withKnownMonster({ ...DEFAULT_INPUTS, ...parsed }, known);
-    expect(state).toEqual({ ...DEFAULT_INPUTS, points: 100, priority: 20, monsterId: null });
-    expect(withKnownMonster({ ...DEFAULT_INPUTS, monsterId: 'demon' }, known).monsterId).toBe('demon');
+    const state = withKnownMonsters({ ...DEFAULT_INPUTS, ...parsed }, known);
+    expect(state).toEqual({ ...DEFAULT_INPUTS, points: 100, priority: 20, monsters: [] });
+    expect(withKnownMonsters({ ...DEFAULT_INPUTS, monsters: [{ id: 'demon', weight: 1 }] }, known).monsters).toEqual([{ id: 'demon', weight: 1 }]);
   });
 
   it('clamps out-of-range points and priority', () => {
@@ -175,10 +182,10 @@ describe('integration: input parsing', () => {
   });
 
   it('round-trips a full state through the URL and back into a valid build', () => {
-    const state = { ...DEFAULT_INPUTS, vocation: 'sorcerer' as const, points: 750, monsterId: 'demon', priority: 25 };
-    const back = withKnownMonster({ ...DEFAULT_INPUTS, ...fromQuery(toQuery(state)) }, known);
+    const state = { ...DEFAULT_INPUTS, vocation: 'sorcerer' as const, points: 750, monsters: [{ id: 'demon', weight: 1 }], priority: 25 };
+    const back = withKnownMonsters({ ...DEFAULT_INPUTS, ...fromQuery(toQuery(state)) }, known);
     expect(back).toEqual(state);
-    const r = optimize({ vocation: back.vocation, points: back.points, monster: getMonsterById(back.monsterId!)!, priority: back.priority });
+    const r = optimize({ vocation: back.vocation, points: back.points, monster: getMonsterById(back.monsters[0].id)!, priority: back.priority });
     assertValidResult(getWheel('sorcerer'), r, 750);
   });
 });
@@ -333,5 +340,279 @@ describe('integration: persistence', () => {
     expect(store.size).toBe(VOCATIONS.length);
     expect(parseGems('{broken')).toEqual([]);
     expect(parseGems(null)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Iteration 3: D16, planner code, alternatives, hunting spots, character stats, URL state
+
+const HUNTS = CONTEXTS.filter((c) => c.mode === 'hunt');
+const SLOTS_FOR: Record<GemQuality, readonly ('basic1' | 'basic2' | 'supreme')[]> = {
+  lesser: ['basic1'],
+  regular: ['basic1', 'basic2'],
+  greater: ['basic1', 'basic2', 'supreme'],
+};
+type Build = Omit<OptimizerResult, 'alternatives'>;
+const allBuilds = (r: OptimizerResult): Build[] => [r, ...(r.alternatives ?? []).map((a) => a.result)];
+
+/** Gems the planner can store: unlocked vessel, every slot of the vessel quality filled. */
+function expectedPlannerVessels(vocation: Vocation, r: Build): PlannerVessel[] {
+  const out: PlannerVessel[] = [];
+  for (const v of r.vessels) {
+    const g = v.gem;
+    if (!v.unlocked || !g || SLOTS_FOR[v.quality].some((s) => !g[s])) continue;
+    const pv: PlannerVessel = { vesselId: v.vesselId };
+    for (const s of SLOTS_FOR[v.quality]) pv[s] = g[s]!.modId;
+    if (plannerVesselIssues(vocation, [pv]).length === 0) out.push(pv);
+  }
+  return out;
+}
+
+const gridPoints = (vocation: Vocation, allocation: Record<string, number>) =>
+  Object.fromEntries(Object.entries(allocation).map(([id, p]) => [gridForSliceId(id, vocation), p]));
+
+function rng(seed: number) {
+  let s = seed >>> 0;
+  return () => (s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 2 ** 32;
+}
+
+/** 30 deterministic random inputs across vocations, budgets, contexts, character levels and gems. */
+const RANDOM_INPUTS: OptimizerInput[] = Array.from({ length: 30 }, (_, i) => {
+  const r = rng(i + 7);
+  const vocation = VOCATIONS[i % VOCATIONS.length];
+  const points = Math.floor(r() * 4001);
+  return {
+    vocation,
+    points,
+    monster: null,
+    priority: Math.floor(r() * 101),
+    context: CONTEXTS[Math.floor(r() * CONTEXTS.length)],
+    gems: r() < 0.6 ? ownedGems(getWheel(vocation)) : [],
+    character: r() < 0.7 ? { level: Math.max(points + 50, 200 + Math.floor(r() * 1300)) } : undefined,
+  };
+});
+
+describe('integration: D16 — hunting never values single-target spells', () => {
+  const cases = VOCATIONS.flatMap((v) => HUNTS.map((c) => [v, ctxName(c), c] as const));
+
+  it.each(cases)('%s / %s', (vocation, _name, context) => {
+    const wheel = getWheel(vocation);
+    const r = optimize({ vocation, points: 1500, monster: null, priority: 30, context, gems: ownedGems(wheel), character: { level: 800 } });
+    const single = r.spells.filter((s) => getDamageSpell(s.name) && isSingleTarget(s.name));
+    for (const s of single) {
+      expect(s.useful, s.name).toBe(false);
+      expect(s.share ?? 0, s.name).toBe(0);
+      expect(s.reasonMsg?.key, s.name).toBe('spell.singleTargetHunt');
+    }
+    const singleNames = new Set(single.map((s) => s.name));
+    for (const b of allBuilds(r)) {
+      for (const g of b.gemRecommendations) {
+        const spell = g.reasonMsg?.params?.spell;
+        if (typeof spell === 'string') expect(singleNames.has(spell), `${spell} recommended while hunting`).toBe(false);
+      }
+    }
+    if (single.length) expect((r.rationaleMsgs ?? []).map((m) => m.key)).toContain('rationale.singleTarget');
+  });
+
+  it('boss mode does value single-target spells', () => {
+    let withSingle = 0;
+    for (const vocation of VOCATIONS) {
+      const r = optimize({ vocation, points: 1500, monster: null, priority: 30, context: CONTEXTS[0] });
+      const single = r.spells.filter((s) => getDamageSpell(s.name) && isSingleTarget(s.name));
+      for (const s of single) expect(['spell.damage', 'spell.lowShare', 'spell.revelationLocked']).toContain(s.reasonMsg?.key);
+      withSingle += single.length ? 1 : 0;
+    }
+    expect(withSingle).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('integration: planner export code', () => {
+  it.each(RANDOM_INPUTS.map((x, i) => [i, x.vocation, x.points, x] as const))(
+    '#%i %s %i pts: code decodes to the allocation and gems (main + alternatives)',
+    (_i, vocation, _p, input) => {
+      const r = optimize(input);
+      for (const b of allBuilds(r)) {
+        expect(b.plannerCode).toMatch(/^[KPSDM]1[A-Za-z0-9_-]+$/);
+        const d = decodePlannerCode(b.plannerCode!);
+        expect(d.vocation).toBe(vocation);
+        expect(Object.fromEntries(Object.entries(d.points).filter(([, p]) => p > 0))).toEqual(gridPoints(vocation, b.allocation));
+        expect([...d.vessels].sort((a, c) => a.vesselId - c.vesselId)).toEqual(expectedPlannerVessels(vocation, b));
+      }
+    },
+  );
+
+  it('the export URL points at the official planner with the code', () => {
+    const r = optimize(RANDOM_INPUTS[3]);
+    expect(plannerUrl(r.plannerCode!)).toBe(`${PLANNER_URL}&code=${r.plannerCode}`);
+  });
+});
+
+type NodeMod = Record<string, (...a: unknown[]) => unknown>;
+const nodeImport = (m: string) => import(/* @vite-ignore */ m) as Promise<NodeMod>;
+const proc = (globalThis as unknown as { process?: { cwd(): string } }).process;
+const { existsSync } = await nodeImport('node:fs');
+const WASM_PATH = `${proc?.cwd() ?? '.'}/scripts/.cache/wod/skillgrid.cjs`;
+const VOC_ENUM: Record<Vocation, string> = { knight: 'Knight', paladin: 'Paladin', sorcerer: 'Sorcerer', druid: 'Druid', monk: 'Monk' };
+
+describe.skipIf(!(existsSync(WASM_PATH) as boolean))('integration: official planner WASM accepts optimizer codes', () => {
+  it('30 random inputs: updateByCode loads identical tile points and gems', async () => {
+    const { createRequire } = await nodeImport('node:module');
+    const req = createRequire(import.meta.url) as (p: string) => () => Promise<any>;
+    const M = await req(WASM_PATH)();
+    const list = (v: any) => {
+      const a: any[] = [];
+      for (let i = 0; i < v.size(); i++) a.push(v.get(i));
+      v.delete();
+      return a;
+    };
+    for (const input of RANDOM_INPUTS) {
+      for (const b of allBuilds(optimize(input))) {
+        const planner = new M.SkillwheelPlanner(M.EActiveVocation[VOC_ENUM[input.vocation]]);
+        expect(planner.updateByCode(b.plannerCode), b.plannerCode).toBe(1);
+        const pts = Object.fromEntries(
+          list(planner.getSkillParameters()).filter((t) => t.currentSkillPoints > 0).map((t) => [t.id.value, t.currentSkillPoints]),
+        );
+        const vessels = list(planner.getVesselParameters())
+          .filter((v) => v.keyBasicMod1 >= 0)
+          .map((v) => {
+            const g: PlannerVessel = { vesselId: v.id, basic1: v.keyBasicMod1 };
+            if (v.keyBasicMod2 >= 0) g.basic2 = v.keyBasicMod2;
+            if (v.keySupremeMod >= 0) g.supreme = v.keySupremeMod;
+            return g;
+          })
+          .sort((a, c) => a.vesselId - c.vesselId);
+        planner.delete();
+        expect(pts).toEqual(gridPoints(input.vocation, b.allocation));
+        expect(vessels).toEqual(expectedPlannerVessels(input.vocation, b));
+      }
+    }
+  }, 120_000);
+});
+
+describe('integration: alternatives', () => {
+  const dist = (a: Record<string, number>, b: Record<string, number>) => {
+    let d = 0;
+    for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) d += Math.abs((a[k] ?? 0) - (b[k] ?? 0));
+    return d / 2;
+  };
+
+  it.each(VOCATIONS.flatMap((v) => [CONTEXTS[0], CONTEXTS[1]].map((c) => [v, ctxName(c), c] as const)))(
+    '%s / %s: two distinct, labelled alternatives with resolvable messages',
+    (vocation, _name, context) => {
+      const points = 1200;
+      const r = optimize({ vocation, points, monster: null, priority: 40, context, alternatives: 2 });
+      expect(r.alternatives).toHaveLength(2);
+      const builds = allBuilds(r);
+      for (let i = 0; i < builds.length; i++)
+        for (let j = i + 1; j < builds.length; j++) expect(dist(builds[i].allocation, builds[j].allocation)).toBeGreaterThanOrEqual(120);
+      expect(new Set(builds.map((b) => b.plannerCode)).size).toBe(3);
+      for (const a of r.alternatives!) {
+        assertValidResult(getWheel(vocation), a.result, points);
+        assertDirectedPath(vocation, a.result);
+        assertMessagesResolvable(a.result);
+        expect(a.relativeScore).toBeGreaterThan(0);
+        expect(a.relativeScore).toBeLessThanOrEqual(100);
+        for (const m of [a.labelMsg, a.tradeoffMsg]) {
+          const key = `engine.${m!.key}` as MessageKey;
+          expect(en[key] && pl[key], key).toBeTruthy();
+          for (const lang of ['en', 'pl'] as const) expect(engineText(translator(lang), m, '')).not.toMatch(/\{\w+\}/);
+        }
+      }
+      expect(new Set(r.alternatives!.map((a) => a.label)).size).toBe(2);
+    },
+  );
+});
+
+describe('integration: hunting spot (weighted monsters)', () => {
+  const spot = (fire: number, energy: number): WeightedMonster[] => [
+    { monster: monster('askarak-demon'), weight: fire },
+    { monster: monster('chakoya-windcaller'), weight: energy },
+  ];
+  const run = (fire: number, energy: number) =>
+    optimize({ vocation: 'sorcerer', points: 1500, monster: null, monsters: spot(fire, energy), priority: 30, context: CONTEXTS[3] });
+  const topElement = (r: OptimizerResult) => spellElement(r.spells.find((s) => s.useful && (s.share ?? 0) > 0)!.name);
+
+  it('weights change the preferred element and the build', () => {
+    expect(monster('askarak-demon').elementModifiers.fire).toBeGreaterThan(100);
+    expect(monster('chakoya-windcaller').elementModifiers.energy).toBeGreaterThan(100);
+    const fire = run(9, 1);
+    const energy = run(1, 9);
+    expect(topElement(fire)).not.toBe('energy');
+    expect(topElement(energy)).toBe('energy');
+    expect(fire.allocation).not.toEqual(energy.allocation);
+    expect(run(18, 2).allocation).toEqual(fire.allocation);
+    const spotMsg = fire.rationaleMsgs!.find((m) => m.key === 'rationale.spot');
+    expect(spotMsg?.params?.list).toBe('Askarak Demon 90%, Chakoya Windcaller 10%');
+    assertMessagesResolvable(fire);
+  });
+
+  it('URL monster list resolves to the same engine input', () => {
+    const monsters = [{ id: 'askarak-demon', weight: 9 }, { id: 'chakoya-windcaller', weight: 1 }];
+    const back = { ...DEFAULT_INPUTS, ...fromQuery(toQuery({ ...DEFAULT_INPUTS, vocation: 'sorcerer', points: 1500, monsters })) };
+    expect(resolveMonsters(back.monsters, getMonsterById)).toEqual(spot(9, 1));
+  });
+});
+
+describe('integration: character stats', () => {
+  it('a level 400 paladin prefers Hit Points over mitigation', () => {
+    const r = optimize({ vocation: 'paladin', points: 350, monster: null, priority: 80, character: { level: 400 } });
+    const keys = r.rationaleMsgs!.map((m) => m.key);
+    expect(keys).toContain('rationale.hpOverMitigation');
+    expect(keys).not.toContain('rationale.mitigationOverHp');
+    expect(r.gemRecommendations.find((g) => g.quality === 'lesser')?.mods[0].name).not.toBe('Mitigation Multiplier');
+  });
+
+  it('character level and skills change the output', () => {
+    const base = { vocation: 'knight' as const, points: 1450, monster: null, priority: 100 };
+    const low = optimize({ ...base, character: { level: 400 } });
+    const high = optimize({ ...base, character: { level: 1500 } });
+    const ratio = (r: OptimizerResult) => Number(r.rationaleMsgs!.find((m) => m.key === 'rationale.hpOverMitigation')?.params?.ratio ?? 0);
+    expect(ratio(low)).toBeGreaterThan(ratio(high));
+    expect(high.gemRecommendations.find((g) => g.quality === 'lesser')?.mods[0].name).toBe('Mitigation Multiplier');
+    const charMsg = (r: OptimizerResult) => r.rationaleMsgs!.find((m) => m.key === 'rationale.character')!.params!;
+    expect(charMsg(low).level).toBe(400);
+    expect(Number(charMsg(high).hp)).toBeGreaterThan(Number(charMsg(low).hp));
+    const gains = (character: CharacterStats) =>
+      optimize({ vocation: 'paladin', points: 600, monster: null, priority: 30, character }).gemRecommendations.map((g) => g.gain);
+    expect(gains({ level: 650, mainSkill: 60 })).not.toEqual(gains({ level: 650, mainSkill: 130 }));
+  });
+
+  it('UI state → characterOf → engine: only the vocation skills are sent', () => {
+    const state = { ...DEFAULT_INPUTS, vocation: 'sorcerer' as const, points: 550, level: 600, mainSkill: 99, shielding: 80, magicLevel: 110 };
+    expect(characterOf(state)).toEqual({ level: 600, magicLevel: 110 });
+    expect(characterOf({ ...DEFAULT_INPUTS, points: 300 })).toBeUndefined();
+    const r = optimize({ vocation: 'sorcerer', points: 550, monster: null, priority: 50, character: characterOf(state) });
+    expect(r.rationaleMsgs!.find((m) => m.key === 'rationale.character')?.params?.level).toBe(600);
+  });
+});
+
+describe('integration: URL state (iteration 3 keys)', () => {
+  const known = (id: string) => getMonsterById(id) !== undefined;
+
+  it('round-trips level, scrolls, skills, weighted monsters and context', () => {
+    const state = {
+      ...DEFAULT_INPUTS,
+      vocation: 'paladin' as const,
+      points: 600,
+      level: 600,
+      scrolls: 30,
+      mainSkill: 120,
+      shielding: 40,
+      magicLevel: 30,
+      monsters: [{ id: 'demon', weight: 2.5 }, { id: 'dragon-lord', weight: 1 }],
+      priority: 35,
+      mode: 'boss' as const,
+    };
+    const q = toQuery(state);
+    for (const k of ['lv=600', 'sc=30', 'sk=120', 'sh=40', 'ml=30', 'm=demon*2.5_dragon-lord']) expect(decodeURIComponent(q)).toContain(k);
+    expect(withKnownMonsters({ ...DEFAULT_INPUTS, ...fromQuery(q) }, known)).toEqual(state);
+  });
+
+  it('a full link with absent optional keys clears them; legacy single monster migrates', () => {
+    const q = toQuery({ ...DEFAULT_INPUTS, vocation: 'druid', points: 300 });
+    expect(fromQuery(q)).toMatchObject({ level: null, mainSkill: null, shielding: null, magicLevel: null, scrolls: 0, monsters: [] });
+    expect(sanitize({ monsterId: 'demon' }).monsters).toEqual([{ id: 'demon', weight: 1 }]);
+    expect(withKnownMonsters({ ...DEFAULT_INPUTS, ...fromQuery('?v=knight&m=demon_nope*3') }, known).monsters).toEqual([{ id: 'demon', weight: 1 }]);
+    expect(fromQuery('?m=demon*-1_demon*5').monsters).toEqual([{ id: 'demon', weight: 1 }]);
   });
 });

@@ -38,6 +38,7 @@ export function FightContextPanel({ value, onChange }: FightContextPanelProps) {
               { value: 'teamBox', label: t('context.teamBox') },
             ]}
           />
+          <p className="mt-2 text-xs text-parchment-300">{t('context.singleTargetNote')}</p>
         </>
       )}
       <p className="mt-2 text-xs text-parchment-400">{t('context.hint')}</p>

@@ -1,0 +1,95 @@
+# Damage model (`src/data/damage/`)
+
+Per-spell damage formulas fitted offline on the TibiaTools damage API (`https://tibiatools.io/api/v1`), the backend of
+tibiapal.com/damage-calculator. The app makes no network calls; everything lives in `spell-formulas.json`.
+
+## Loader API (`src/data/damage/index.ts`)
+
+| Function | Returns |
+|---|---|
+| `spellAverageHit(name, character, { vocation?, attack?, shieldDefense?, stage?, part?, baseDamagePct?, flatBonus? })` | Average **raw** damage of one hit on one target, before crit, resistances and mitigation. `part: 'extra'` = revelation extra hit (beam sides, Spiritual Outburst repeat, …). |
+| `spellVariant(spell, stage, part)` | The fitted variant used for that stage/part. |
+| `levelTerm(level)` | Shared level term g(L). |
+| `spellCooldownTurns(name, reductionSeconds?)` | Cooldown in 2 s turns (min 1). |
+| `spellElement`, `spellArea` (`single`/`area`/`beam`/`chain`), `isSingleTarget` | Metadata. `singleTarget` = D16 flag (never valued in hunt mode). |
+| `defaultTargets(name, outer?)` | tibiapal "spell average hits" (real hunting data); 1 for single-target spells. |
+| `rotationPresets(voc)`, `recommendedRotation(voc)` | tibiapal rotation presets, ratios normalized to weights. |
+| `critMultiplier(chance%, extra%)` | `1 + chance·extra` (default 10/50 → 1.05). |
+| `healingAverage(name, character, …)` | Healing spells (Canary formulas, approximate). |
+| `weaponBracket(voc, level)` | Representative weapon/attack per level bracket (default `attack`). |
+
+Missing character fields are filled by `resolveCharacterStats` (`src/data/character`).
+
+## Model
+
+**Level term** (discovered from a level sweep, exact to ±1 damage):
+`g(L) = L/5` up to 500, then +1 per 6 levels up to 1100, per 7 up to 1800, per 8 up to 2600, per 9 above.
+
+| Model | Formula (avg; min/max fitted the same way) |
+|---|---|
+| magic | `const + a·g(L) + M·mlvl` |
+| weapon | `const + a·g(L) + S·skill + A·attack + SA·skill·attack` (+ `LSA·g·skill·attack/1000` for 4 monk spells) |
+| shield | `const + a·g(L) + H·shielding + D·shieldDef + HD·shielding·shieldDef` |
+
+`attack` = weapon + ammo. Knight/monk weapon spells are essentially pure `skill·attack`; paladin Ethereal spells are
+linear in distance skill only. `a` is the variant's level multiplier (`bonusFactor`): 1 for normal hits,
+0.25/0.4/0.7 for Great Death Beam sides, 1.5 Death Echo, 2/2.25/2.5 Executioner's Throw stages, 1.2/1.4/1.6 bursts.
+
+**Fit quality:** 144 variants. All within ≤ 1.7 damage absolute (< 0.7 %), except Sweeping Takedown, Spiritual
+Outburst, Devastating Knockout and Greater Tiger Clash (≤ 1.44 %, ≤ 12 damage), which use the extra level×skill×attack term.
+The committed fixture `__fixtures__/api-samples.json` (10 API responses) is re-checked by the tests.
+
+## Probe rules (`rules` in the JSON)
+
+- **Flat wheel bonus** (revelation stages, vessels): `raw += bonus × bonusFactor` per hit and target, before crit.
+- **Augment "+X % base damage":** boosts everything except the level term:
+  `levelPart + (raw − levelPart)·(1 + X/100)`, `levelPart = bonusFactor·g(L)` (probe ratio 0.100 ± 0.003 on 30 variants).
+- **Crit:** `effective = raw·(1 + chance·extra)`. Spell crit perks and the character "Critical hit extra damage" perk
+  add to chance/extra.
+- **Creatures:** `effective × damageMods[element] × (1 − mitigation/100)`. Physical damage is additionally reduced
+  by armor (≈ 7 % vs Demon). Weapon-element spells use the weapon damage type (physical unless imbued or bonded).
+- **Revelations:**
+
+  | Revelation | Effect by stage 1 / 2 / 3 |
+  |---|---|
+  | Combat Mastery | effective ×1.031 / 1.037 / 1.045 (crit side) |
+  | Ascetic | harmony monk spells raw ×1.048 / 1.096 / 1.145 |
+  | Lord of Destruction (with Master of Flames) | fire ×1.015 / 1.022 / 1.030 |
+
+  The Master of Flames stance alone gives fire ×1.031.
+- **Targets:** the API per-turn value is per-hit × targets of the rotation entry. Use `defaultTargets`.
+
+## Single-target spells (D16)
+
+Annihilation, Brutal Strike, Shield Bash, Whirlwind Throw, Divine Missile, Ethereal Spear, Strong Ethereal Spear,
+Holy Missile, the elemental Strikes (Strong / Ultimate variants included), Lightning, Death/Physical Strike,
+Double Jab, Greater Tiger Clash, Devastating Knockout, Forceful Uppercut, Mystic Repulse, and the target runes
+(Sudden Death, HMM, Icicle, Fireball, Stalagmite, LMM).
+
+## Cooldowns and healing
+
+- Cooldowns come from opentibiabr/canary spell scripts. 2026 spells without public data are marked
+  `cooldownApprox` (Shield Bash/Slam, Divine Grenade, Barrages, Death Echo, Forked spells, Thousand Fist Blows).
+- Healing is not in the API. `healing[]` uses Canary `onGetFormulaValues` with linear `level`, and is approximate.
+
+## Datamine (`npm run datamine:damage`)
+
+`scripts/datamine-tibiatools.mjs` (spell meta in `scripts/datamine-damage-meta.mjs`):
+
+1. Downloads `/meta/*` (9 requests) into the gitignored `scripts/.cache/tibiatools/`.
+2. Sends a planned set of `POST /damage` requests.
+   - The rate limit is about 25 requests per minute, so requests go sequentially, 2.5 s apart, with a generic user agent.
+   - Every response is cached by request hash.
+   - On a 429 it waits 65 s once and then stops (a re-run resumes from the cache). Hard cap: 400 requests.
+3. One response covers every spell of the vocation. Total used: **279 `/damage` + 9 meta**. The plan contains:
+   - level / skill / mlvl / weapon grids;
+   - level-bracket weapons (200 … 1500);
+   - a level sweep;
+   - bonus, crit, perk, revelation, creature and target probes.
+4. Fits each variant by least squares and writes `spell-formulas.json` and the fixtures.
+   `--offline` rebuilds from the cache only.
+
+## Sources and attribution
+
+- TibiaTools API / tibiapal.com damage calculator: formulas, perks, targets data, rotation presets.
+- opentibiabr/canary: cooldowns and healing formulas.

@@ -154,6 +154,87 @@ Roles:
   - `vite preview` serves everything with HTTP 200.
 - **Docs.** README, ARCHITECTURE (pipeline diagram, contracts, gates), `docs/modules/integration.md`, `engine.md`, `ui.md`.
 
+### 2026-11-18 — S3 UI (iteration 3)
+
+- `CharacterPanel` replaces `PointsInput`: level drives points (`pointsForLevel`), scroll points, manual points override, per-vocation skills (D13, empty = auto) → `OptimizerInput.character` via `characterOf`.
+- Hunting spot: several monsters with weights (max 10, 0.1–100), weighted-average element chips / damage types (`src/lib/monsters.ts`); passed as `monsters` with `monster: null`. Hunt mode notes that single-target spells are ignored (D16).
+- `BuildSwitcher` (Best · Alt 1 · Alt 2) switches wheel/summary/export/vessels; `ExportPanel` shows `plannerCode` with Copy code / Copy planner link / Open planner (`src/lib/planner.ts`). Both show empty states until the engine fills `alternatives` / `plannerCode`.
+- Persistence: new URL keys `lv sc sk sh ml`, `m` = `id[*w]` joined by `_` (legacy single `m` / `monsterId` migrated; a link with `v` treats absent optional keys as empty). Integration test inputs adapted (`monsters`, `withKnownMonsters`).
+- New PL/EN strings; `tsc -b`, `vitest run` (363), lint and build pass.
+
+### 2026-11-18 — S1a Planner code (iteration 3)
+
+- Planner code reverse-engineered: `<V><ver>` + base64url (no padding) of raw deflate of 36 tile bytes (by grid id) + 8×3 vessel bytes `[basic1, basic2, supreme]` (`0xFF` empty). Mod keys = wheel-data ids; no grade stored. WASM uses zlib-ng level 9; re-implemented so codes are byte-identical.
+- `src/data/wheel/plannerCode.ts`: `encodePlannerCode`, `decodePlannerCode` (incl. legacy `…0…`), `plannerUrl`, `plannerVesselIssues`, `sliceIdForGrid`/`gridForSliceId` (engine slice id = tile name). New dep `fflate` (inflate).
+- Tests: planner fixtures + 200 random builds vs WASM (skip without cache). Spec: `docs/modules/planner-code.md`.
+
+### 2026-11-18 — S1b Damage model (iteration 3)
+
+- `scripts/datamine-tibiatools.mjs` (`npm run datamine:damage`): 279 cached `/damage` + 9 meta requests to the TibiaTools API (2.5 s apart, stop on 429). Fits 144 spell variants on a shared level term g(L) (L/5 to 500, then /6, /7, /8…): ≤ 1.7 damage error, 4 monk spells ≤ 1.44 %.
+- `src/data/damage/`: `spell-formulas.json` + loader (`spellAverageHit` with stage/part, base-damage % [not on level term], flat bonus × bonusFactor; cooldown turns, element, area, `isSingleTarget` D16, tibiapal targets/rotations, crit, Canary healing). Probe rules (crit, creatures, Combat Mastery, Ascetic, Lord of Destruction) in `rules`.
+- `src/data/character/`: HP/mana/cap, default skills, `mitigationPercent` (RP ≈ 1 % mid levels); as pure eHP an HP point always beats a Mitigation point at 200–1500, so the engine should value mitigation as sustain.
+- Docs: `docs/modules/damage-model.md`, `docs/modules/character-formulas.md`.
+
+### 2026-11-18 — S2 Engine (iteration 3)
+
+- **Damage model.** `spells.ts` was rewritten around a rotation model that uses `src/data/damage` formulas, character level and skills (`input.character`, default level = points + 50), weighted monsters and crit EV.
+  - `off` = % change of rotation damage. Augments, crit, cooldown, the flat bonus (revelation stages and vessel slices), revelation extras and passives (Combat Mastery, Ascetic, Lord of Destruction) are valued as rotation deltas.
+  - Healing spells use the healing formulas, on the defense side.
+  - Shared cooldowns were added: Hell's Core / Rage of the Skies, Eternal Winter / Wrath of Nature, strikes.
+- **D16.** Single-target spells are unusable in hunt mode: no share, no augment or gem value, and the `rationale.singleTarget` / `spell.singleTargetHunt` messages. Boss mode counts 1.2 targets for area spells.
+- **Defense.**
+  - HP is valued as effective HP vs spike (weighted `maxDamage`).
+  - Damage reduction and the Mitigation Multiplier are valued as sustained reduction on the real base mitigation (`src/data/character`).
+  - Leech is strongly devalued, and resistances are weighted by the spot's damage types.
+  - Result: HP wins clearly at RP 400; mitigation is about equal to HP at EK 1500, and the lesser gem becomes Mitigation Multiplier at priority ≥ 90.
+- **RM look-ahead.** RM slices and gems are worth only the next-stage gain. Owned RM gems are included in the search.
+- **Multi-monster.** `input.monsters` weights are normalised (they override `monster`), and `rationale.spot` was added.
+- **Search.**
+  - Allocation-free candidate ranking, and only the top 8 states are completed.
+  - A full wheel short-circuits the search.
+  - A refine pass damps one revelation at a time and keeps the result if the exact objective improves.
+  - Worst case is 31 ms including alternatives (was ~60 ms).
+- **Alternatives / planner code.**
+  - `alternatives` (default 2, max 5) offer revelation focus, Avatar focus (boss), and more defensive / more offensive builds, with a minimum distance of max(50, 10 % of the budget) points.
+  - They come with `label(Msg)`, `tradeoff(Msg)` and `relativeScore`.
+  - `plannerCode` is set on the main build and on each alternative; it is verified by decode, by an unlock-path replay and by the official planner WASM round-trip.
+- **Messages.**
+  - New keys: `rationale.character|singleTarget|spot|hpOverMitigation|mitigationOverHp`, `spell.singleTargetHunt`, `gem.singleTargetHunt`, `alt.revelationFocus|avatarFocus|defensive|offensive|tradeoff`.
+  - PL translations were added in `src/i18n/pl.ts` so that `tsc` passes. **S4: please review the wording.**
+- **Tests.**
+  - New: `src/engine/iteration3.test.ts`.
+  - `spells.test.ts`: the "boss favours single-target" check was replaced by D16 checks.
+  - `gems.test.ts`: `BASE_MITIGATION` was removed, and `mitigationGain` now takes the valuation.
+  - `optimizer.test.ts`: the perf test now uses the best of 3 runs per input, so parallel test workers do not cause false failures.
+  - No integration test expectations changed.
+
+### 2026-11-18 — S4 Integration (iteration 3)
+
+- **Wiring.**
+  - `src/lib/planner.ts` duplicated `PLANNER_URL`/`plannerUrl`. It now re-exports them from `src/data/wheel/plannerCode.ts`, where `plannerUrl` trims the code.
+  - App passes `character` (`characterOf`), `monsters` (`resolveMonsters`, `monster: null`) and `alternatives: 2`. BuildSwitcher drives the wheel, summary, export and vessels.
+- **Engine fixes found by E2E.**
+  - An alternative could score above the "best" build (up to 106 %). Such a candidate is now promoted to main and the alternatives are recomputed.
+  - Alternatives are sorted by `relativeScore`.
+  - Revelation-focus labels name every revelation at the top stage, so two "Ascetic focus" labels can no longer appear together.
+  - `SpellUsage.share` is restored. It had been dropped, so the UI "% dmg" never showed.
+  - `rationale.hunt` no longer says that single-target spells count for 1 target (D16).
+- **PL review.** The new engine keys were reworded to natural Polish with UI-consistent terms (Hunt, spell na pojedynczy cel, Expowisko). Planner names stay in English (Hit Points, Mitigation Multiplier, Revelation).
+- **E2E tests.** +65 in `src/integration.test.ts` (200 in total).
+  - D16 for 5 vocations × 3 hunt styles.
+  - Planner codes for 30 random inputs, main build plus alternatives: each decodes to the same tile points and gems, and the official WASM `updateByCode` loads identical points and gems.
+  - Alternatives are distinct, labelled and resolve in PL/EN.
+  - Weighted spot: Askarak Demon ↔ Chakoya Windcaller flips fire vs energy.
+  - Character: RP 400 → HP over mitigation; EK 1500 → Mitigation Multiplier.
+  - New URL keys round-trip.
+- **Browser** (T3 preview).
+  - Paladin, level 600, 2 monsters. Alternatives switch, the export code and copy/open buttons render, and PL/boss rationales render.
+  - No console errors.
+- **Gates.**
+  - `tsc -b` 0 errors. `vitest run`: 17 files, 494 tests. Lint 0.
+  - Build: main 724 kB (158 kB gzip, incl. damage JSON and fflate inflate), lazy monsters 699 kB (76 kB gzip).
+- **Docs.** README (character, spots, alternatives, export, TibiaTools/tibiapal attribution, `npm run datamine:damage`), ARCHITECTURE (pipeline, contracts, data flow, gates), `docs/modules/integration.md`, `engine.md`, `ui.md`.
+
 ## In progress / Next
 
 - [x] S1 Data — scraper + monster dataset + search API.
@@ -163,14 +244,14 @@ Roles:
 - [x] Iteration 2 — official planner data extracted (S1), fight context + gems editor + PL/EN UI (S3).
 - [x] Iteration 2 — engine on planner data: context-aware spells, Avatar boss-only, gems & vessels (S2).
 - [x] Iteration 2 — integration: mitigation fix, engine messages i18n, fixtures removed, E2E matrix (S4).
+- [x] Iteration 3 — planner code (S1a), TibiaTools damage model + character formulas (S1b), rotation engine, D16, alternatives (S2), character / spot / alternatives / export UI (S3), integration + E2E (S4).
+- [ ] User acceptance of iteration 3 functionality, then UI polish (postponed per D15).
 
-## Known limitations / Next steps
-
-- Perk values are heuristic; calibrate spell weights and baselines against real damage/healing formulas.
-- Mitigation base per vocation (`BASE_MITIGATION`) is an estimate; verify against in-game Cyclopedia values.
-- Spell `maxTargets` and team target counts (team-lure 5, team-box 9) are approximate; monk spell elements assumed physical.
-- tibiapal reference builds use the legacy code format (slice meanings may have changed); no planner export code is generated.
-- Some legacy monsters lack damage types / max damage on tibiopedia.pl.
-- No DOM/component tests — add jsdom + Testing Library for `App`, `GemsPanel`, `MonsterSearch`, `PointsInput`.
-- Scroll points are not persisted; consider adding them to the URL state.
-- Consider a Web Worker for `optimize()` if the beam width is increased.
+Open issues:
+- Healing formulas are approximate (canary `onGetFormulaValues`); verify against in-game values.
+- Cooldowns of the 2026 spells are approximate (tibiapal rotation presets).
+- Armor is not modelled; base mitigation assumes default equipment per vocation.
+- UI polish postponed (D15); no DOM/component tests (jsdom + Testing Library).
+- No alternatives near a full wheel (no room for a ≥ 10 % different build).
+- Team target counts (team-lure ~5, team-box ~9) are estimates; some legacy monsters lack damage types / max damage.
+- Consider a Web Worker for `optimize()` if the beam width or alternative count grows.

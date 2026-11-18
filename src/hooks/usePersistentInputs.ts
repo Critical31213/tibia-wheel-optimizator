@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getMonsterById, loadMonsterData } from '../lib/api';
-import { DEFAULT_INPUTS, fromQuery, sanitize, toQuery, withKnownMonster } from '../lib/inputState';
+import { DEFAULT_INPUTS, fromQuery, sanitize, toQuery, withKnownMonsters } from '../lib/inputState';
 import type { InputState } from '../lib/inputState';
 
 const STORAGE_KEY = 'wheel-optimizer:inputs:v1';
@@ -23,7 +23,7 @@ function initialState(): InputState {
 }
 
 /**
- * The four optimizer inputs, persisted to localStorage and mirrored into
+ * The optimizer inputs, persisted to localStorage and mirrored into
  * the URL query string (via `history.replaceState`, so no history spam).
  */
 export function usePersistentInputs() {
@@ -45,10 +45,10 @@ export function usePersistentInputs() {
     }
   }, [state]);
 
-  // Once the (lazy) monster dataset is in, drop an unknown monster id from a stale link / storage.
+  // Once the (lazy) monster dataset is in, drop unknown monster ids from a stale link / storage.
   useEffect(() => {
     loadMonsterData()
-      .then(() => setState((s) => withKnownMonster(s, (id) => getMonsterById(id) !== undefined)))
+      .then(() => setState((s) => withKnownMonsters(s, (id) => getMonsterById(id) !== undefined)))
       .catch(() => undefined);
   }, []);
 

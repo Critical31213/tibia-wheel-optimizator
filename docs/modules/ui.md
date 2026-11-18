@@ -2,8 +2,8 @@
 
 ## Purpose
 
-Single-page React UI: the user picks a vocation, promotion points, an optional
-target monster and a DPS ↔ survivability priority; the optimized wheel build is
+Single-page React UI: the user picks a vocation, character level / promotion points / skills, a hunting spot (several
+weighted monsters) and a DPS ↔ survivability priority; the optimized wheel build (plus up to 2 alternatives) is
 recomputed live (no "Calculate" button) and shown as an SVG wheel plus a text
 breakdown. Polish / English UI (switch top-right), dark "Tibian" theme, works from 360 px wide; on `lg`
 screens it is two columns (controls left, results right).
@@ -16,8 +16,12 @@ screens it is two columns (controls left, results right).
 | `src/components/Panel.tsx` | Bordered section card with numbered heading. |
 | `src/components/VocationPicker.tsx` | 5 toggle cards, `radiogroup`. |
 | `src/components/VocationIcon.tsx` | Stroke icon per vocation. |
-| `src/components/PointsInput.tsx` | Points input + "or character level" helper + promotion-scroll points (0–50). |
-| `src/components/MonsterSearch.tsx` | Debounced ARIA combobox + selected `MonsterCard`. |
+| `src/components/CharacterPanel.tsx` | Level (→ points via `pointsForLevel`), scroll points, manual points override, per-vocation skills (empty = "auto"). |
+| `src/components/MonsterSearch.tsx` | Hunting spot: debounced ARIA combobox adding monsters (max 10), weight per monster, remove; `MonsterCard` for one, weighted combined chips for several. |
+| `src/components/BuildSwitcher.tsx` | "Best build · Alt 1 · Alt 2" toggle + alternative label, trade-off, relative score. |
+| `src/components/ExportPanel.tsx` | Planner code of the viewed build: read-only field, Copy code / Copy planner link / Open planner. |
+| `src/lib/monsters.ts` | `resolveMonsters`, `combinedModifiers` (weighted average, missing = 100), `combinedDamageTypes` (tested). |
+| `src/lib/planner.ts` | Re-exports `PLANNER_URL`/`plannerUrl(code)` from `src/data/wheel/plannerCode` (single source); `copyText` (Clipboard API → `execCommand` fallback) (tested). |
 | `src/components/MonsterCard.tsx` | Name, HP/exp, element chips, damage types. |
 | `src/components/PrioritySlider.tsx` | 0–100 range slider. |
 | `src/components/WheelChart.tsx` | SVG wheel, fill-order badges, tooltip, legend. |
@@ -36,7 +40,7 @@ screens it is two columns (controls left, results right).
 | `src/hooks/usePersistentInputs.ts` | Inputs state persisted to localStorage + URL. |
 | `src/lib/api.ts` | UI facade over `src/engine` + lazily loaded `src/data` (`loadMonsterData`, `useMonsterData`). |
 | `src/lib/geometry.ts` | Pure SVG geometry helpers (tested). |
-| `src/lib/inputState.ts` | Input (de)serialisation + validation (tested). |
+| `src/lib/inputState.ts` | Input (de)serialisation + validation, monster-list codec, `characterOf` (tested). |
 | `src/lib/labels.ts` | Labels, colours, `clamp`, `cx`, `modifierKind`, `priorityLabel` (tested). |
 | `src/index.css`, `index.html`, `public/favicon.svg` | Theme, fonts, icon. |
 
@@ -45,14 +49,16 @@ screens it is two columns (controls left, results right).
 ```
 App
 ├─ VocationPicker      value, onChange(vocation)
-├─ PointsInput         value, max (= wheel.totalCapacity), onChange(points)
-├─ MonsterSearch       value: Monster | null, ready (dataset loaded), onChange(monster | null)
+├─ CharacterPanel      vocation, value (points, level, scrolls, skills), max (= wheel.totalCapacity), onChange(patch)
+├─ MonsterSearch       value: WeightedMonster[], ready (dataset loaded), onChange(MonsterEntry[])
 │  └─ MonsterCard      monster
 ├─ FightContextPanel   value: FightContext, onChange(patch)
 ├─ PrioritySlider      value, onChange(priority)
 ├─ GemsPanel           vocation, gems, mods, onChange(updater)
-├─ Panel › WheelChart  wheel, result | null
+├─ Panel › BuildSwitcher alternatives, value (0 = best), onChange   (only when the engine returns alternatives)
+├─ Panel › WheelChart  wheel, result | null   (the *viewed* build: best or alternative)
 ├─ Panel › ResultsPanel wheel, result   (empty-state text when points = 0)
+├─ Panel › ExportPanel  code = viewed build `plannerCode` (empty state when undefined)
 └─ Panel › VesselsPanel vocation, result, mods   (only when result != null)
 ```
 
@@ -62,28 +68,48 @@ Components never import `src/engine` / `src/data` directly — only `src/lib/api
 
 ## State flow
 
-1. `usePersistentInputs()` holds `{ vocation, points, monsterId, priority, mode, huntStyle }`.
+1. `usePersistentInputs()` holds `{ vocation, points, level, scrolls, mainSkill, shielding, magicLevel, monsters, priority, mode, huntStyle }`.
    Initial value = defaults ← localStorage (`wheel-optimizer:inputs:v1`) ← URL query
-   (`?v=druid&p=420&m=demon&prio=75&f=hunt&h=teamLure`; URL wins). Every change is written back to
+   (`?v=druid&p=420&lv=470&ml=110&m=demon_dragon-lord*2&prio=75&f=hunt&h=teamLure`; URL wins; a link with `v` treats
+   absent optional keys as empty). Every change is written back to
    localStorage (try/catch) and to the URL with `history.replaceState`.
    All values are sanitised (`sanitize`) — unknown vocation dropped, points clamped to 0–`MAX_POINTS` (4000 = wheel
-   capacity), priority to 0–100. Once the monster dataset is loaded, an unknown monster id is reset to `null`
-   (`withKnownMonster`).
+   capacity), priority to 0–100. Once the monster dataset is loaded, unknown monster ids are dropped
+   (`withKnownMonsters`). A legacy `monsterId` / single `m=id` becomes a one-monster list.
 2. `App` derives `wheel = getWheel(vocation)` (memo) and clamps points to `wheel.totalCapacity`.
 3. `useDeferredValue(inputs)` keeps the slider/typing responsive; `optimize()` runs in a
-   `useMemo` keyed on the deferred vocation/points/monster/priority/context/gems; `context = contextOf(inputs)`,
+   `useMemo` keyed on the deferred vocation/points/spot/priority/context/gems/character with `monster: null`,
+   `monsters = resolveMonsters(entries, getMonsterById)`, `character = characterOf(inputs)` (only the vocation's skill
+   fields; level falls back to `points + 50`; `undefined` when nothing entered) and `alternatives: 2`; `context = contextOf(inputs)`,
    `gems` from `usePersistentGems(vocation)` (also deferred). `points = 0` → `result = null` → empty state.
+4. A local `view` index (0 = best, i = `result.alternatives[i-1]`) picks the *viewed* build (`BuildResult` =
+   `Omit<OptimizerResult, 'alternatives'>`) shown by the wheel, summary, export and vessels panels; it falls back
+   to 0 when the alternative disappears.
 
 ### Persistence keys
 
 | Key | Where | Content |
 |-----|-------|---------|
-| `wheel-optimizer:inputs:v1` | localStorage | vocation, points, monsterId, priority, mode, huntStyle |
-| `?v= &p= &m= &prio= &f= &h=` | URL query | same inputs (`f` = hunt/boss, `h` = solo/teamLure/teamBox) |
+| `wheel-optimizer:inputs:v1` | localStorage | the whole `InputState` (legacy `monsterId` migrated) |
+| `?v= &p= &lv= &sc= &sk= &sh= &ml= &m= &prio= &f= &h=` | URL query | same inputs (`lv` level, `sc` scrolls, `sk` main skill, `sh` shielding, `ml` magic level; `m` = `id[*weight]` joined by `_`, weight 1 omitted; `f` = hunt/boss, `h` = solo/teamLure/teamBox); empty optional keys omitted |
 | `wheel-optimizer:gems:v1:<vocation>` | localStorage | `OwnedGem[]` JSON, validated by `sanitizeGems` |
 | `wheel-optimizer:lang:v1` | localStorage | `pl` / `en` |
 
 Gems are deliberately **not** in the URL (too long); a shared link carries every other input.
+
+## Character, hunting spot, alternatives, export (iteration 3)
+
+- **Character**: typing a level sets `points = pointsForLevel(level, scrolls)` (clamped to capacity); editing points
+  afterwards is a manual override (help text says "points set manually"). Skill fields per vocation (D13): knight
+  melee + shielding · paladin distance + shielding + magic level · sorcerer/druid magic level · monk fist + magic
+  level; empty = "auto" (engine estimates from level).
+- **Hunting spot**: up to 10 monsters, weight 0.1–100 (default 1, one decimal). One monster → `MonsterCard`;
+  several → weighted-average element chips (`combinedModifiers`) and damage types ordered by weight. Hunt mode shows
+  "Single-target spells are ignored in hunt mode" (D16).
+- **Alternatives**: `BuildSwitcher` (SegmentedControl) appears only when `result.alternatives` is non-empty;
+  label / trade-off rendered with `engineText(labelMsg | tradeoffMsg, fallback)`, score as "% of best".
+- **Export**: `plannerUrl(code)` = `https://www.test.tibia.com/community/?subtopic=wheelofdestinyplanner&code=<encoded>`;
+  copy result announced in a `role="status"` line; empty state when `plannerCode` is undefined.
 
 ## Gem editor
 
@@ -133,7 +159,8 @@ Mod names are looked up in `wheel.mods` by `kind` + `modId`.
 - Vocation: `role="radiogroup"` / `role="radio"` + `aria-checked`, roving tabindex, arrows/Home/End.
 - Monster search: ARIA 1.2 combobox (`aria-expanded`, `aria-controls`, `aria-activedescendant`,
   `role="listbox"`/`option`); ↑/↓ move, Enter selects, Esc closes (second Esc clears text);
-  "Clear" button resets to "No monster (generic build)". Selected card is in an `aria-live` region.
+  "Clear all" empties the spot ("No monster (generic build)"). Each row has a labelled weight input ("Weight of X") and
+  "Remove X" button; the list is in an `aria-live` region.
 - Fight context, hunt style, grade and language toggles are `SegmentedControl` radiogroups (arrow keys).
   Gem selects have `<label>`s (visually hidden where the context is obvious); Remove has "Remove gem N".
 - Slider has `aria-valuetext` ("Balanced (50 of 100)"); the "Balanced" label resets to 50.
@@ -178,3 +205,5 @@ the selected monster resolves. The engine is bundled eagerly (it is small).
   - Engine messages are rendered in PL/EN (`engineText`), with the English string as fallback.
   - Spell share (`% dmg`) and upgrade `gainToMax` (gain to grade IV) are shown.
   - Gem names come from the data, and vessels are labelled `vesselId + 1`.
+- 2026-11-18 — (iteration 3) Character panel (level/scrolls/points override/skills → `character`), multi-monster
+  hunting spot with weights (→ `monsters`), alternatives switcher, planner export; hunt-mode single-target note.

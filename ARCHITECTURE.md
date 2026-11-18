@@ -9,14 +9,16 @@ A static single-page web app that recommends how to spend Wheel of Destiny
 promotion points for a Tibia character, given:
 
 1. the **vocation** (Knight, Paladin, Sorcerer, Druid, Monk),
-2. the **available points**,
-3. an optional **target monster** (its elemental resistances and damage types,
-   sourced from tibiopedia.pl),
+2. the **character** (level → points, scroll points, per-vocation skills),
+3. an optional **hunting spot**: up to 10 monsters with relative weights (elemental
+   resistances and damage types sourced from tibiopedia.pl),
 4. a **priority slider** between maximum DPS (0) and maximum survivability (100),
 5. the **fight context** (hunt solo / team-lure / team-box, or boss),
 6. the **gems the player owns** (placed in vessels; recommendations and upgrades).
 
-Wheel facts come from the official test-server planner (upcoming update) via an offline extraction pipeline.
+It returns the best build plus alternatives, each with an official planner export code (gems included).
+Wheel facts come from the official test-server planner (upcoming update) via an offline extraction pipeline;
+spell damage comes from formulas fitted offline on the TibiaTools damage API (tibiapal calculator).
 
 ```
 OFFLINE (npm scripts; outputs committed)
@@ -26,14 +28,21 @@ OFFLINE (npm scripts; outputs committed)
     of 3 files)           │                          ├──▶ scripts/extract-wheel.mjs ─▶ src/data/wheel/wheel-data.json
   tibiapal.com avg hits ──┴──▶ scripts/.cache/tibiapal/ ┘    (runs WASM in Node,        + src/data/wheel/spells.ts
                                                               asserts every rule)
+  tibiatools.io /damage ─────▶ scripts/datamine-tibiatools.mjs ─▶ src/data/damage/spell-formulas.json
+   (cached, rate-limited)       (+ datamine-damage-meta.mjs: cooldowns, areas, healing)
 
 RUNTIME (static SPA)
-  src/data/wheel ──getWheelData()──▶ src/engine ──getWheel()/optimize()──┐
-  src/data (lazy chunk) ──searchMonsters()───────────────────────────────┤
-                                                                         ▼
-  URL + localStorage (inputs, context) ──▶ src/App ◀──▶ src/lib/api.ts (facade)
-  localStorage per vocation (gems) ──────▶    │  OptimizerInput ▶ / ◀ OptimizerResult
-                                              ▼
+  src/data/wheel ─────getWheelData()────────┐
+  src/data/damage ────spell formulas────────┼─▶ src/engine ──getWheel()/optimize()──┐
+  src/data/character ─HP, skills, mitigation┤        │ encodePlannerCode()          │
+  src/data/wheel/plannerCode ◀──────────────┘────────┘                              │
+  src/data (lazy chunk) ──searchMonsters()/getMonsterById()─────────────────────────┤
+                                                                                    ▼
+  URL + localStorage (vocation, points, lv/sc/sk/sh/ml, m=id*w_…, prio, f, h)
+        ──▶ src/App ── characterOf() → character, resolveMonsters() → monsters ──▶ src/lib/api.ts
+  localStorage per vocation (gems) ──▶ │   OptimizerInput ▶ / ◀ OptimizerResult (+ alternatives, plannerCode)
+                                       ▼
+   BuildSwitcher (best / alt n) → WheelChart, ResultsPanel, ExportPanel (lib/planner → plannerUrl), VesselsPanel
                  components ◀── src/i18n (PL/EN; engine.<key> for EngineMessage)
 ```
 
@@ -55,22 +64,26 @@ RUNTIME (static SPA)
 ├── ARCHITECTURE.md         # this file
 ├── README.md               # user-facing quick start
 ├── assets/icon.svg         # project icon (README)
-├── docs/modules/           # data.md, wheel-data.md, engine.md, ui.md, integration.md
+├── docs/modules/           # data, wheel-data, planner-code, damage-model, character-formulas, engine, ui, integration
 ├── scripts/
 │   ├── scrape-monsters.ts  # offline tibiopedia.pl scraper → src/data/monsters.json
-│   └── extract-wheel.mjs   # planner WASM → src/data/wheel/wheel-data.json
+│   ├── extract-wheel.mjs   # planner WASM → src/data/wheel/wheel-data.json
+│   ├── datamine-tibiatools.mjs  # TibiaTools damage API → src/data/damage/spell-formulas.json
+│   └── datamine-damage-meta.mjs # curated cooldowns / areas / healing formulas
 ├── public/favicon.svg
 ├── index.html
 ├── vite.config.ts          # React + Tailwind plugins, chunk size limit
 └── src/
     ├── types/index.ts      # shared contract (all modules)
     ├── data/               # monsters.json (2006) + search API (lazy-loaded chunk)
-    ├── data/wheel/         # wheel-data.json (planner facts) + spells.ts, getWheelData()
+    ├── data/wheel/         # wheel-data.json (planner facts) + spells.ts, getWheelData(), plannerCode.ts
+    ├── data/damage/        # spell-formulas.json + loader (spellAverageHit, isSingleTarget, …)
+    ├── data/character/     # HP/mana/cap, default skills, mitigationPercent
     ├── engine/             # wheel/build.ts, spells, values, gems, optimizer, messages
     ├── components/         # React UI components
     ├── hooks/              # usePersistentInputs, usePersistentGems, useDebouncedValue
     ├── i18n/               # en/pl dictionaries (UI + engine.<key>), engineText(), provider
-    ├── lib/                # api.ts facade, geometry, inputState, gems, labels (pure, tested)
+    ├── lib/                # api.ts facade, geometry, inputState, gems, labels, monsters, planner (pure, tested)
     ├── integration.test.ts # end-to-end tests (data + engine + input parsing)
     ├── App.tsx             # top-level state and layout
     ├── main.tsx            # entry; starts loading monster data
@@ -85,6 +98,9 @@ All cross-module types live in `src/types/index.ts`.
 |--------|------------|-----------|
 | `src/data` | `MONSTERS`, `searchMonsters(query, limit)`, `getMonsterById(id)` | UI (lazy, via `lib/api.ts`) |
 | `src/data/wheel` | `getWheelData(v)`, `WHEEL_DATA`, `SPELLS`, `getSpell(name)` | Engine; UI `labels.gemName` |
+| `src/data/wheel/plannerCode` | `encodePlannerCode`, `decodePlannerCode`, `plannerUrl`, `plannerVesselIssues`, `gridForSliceId`/`sliceIdForGrid` | Engine (export code); UI via `lib/planner` (`plannerUrl`) |
+| `src/data/damage` | `spellAverageHit`, `healingAverage`, `spellCooldownTurns`, `isSingleTarget`, `defaultTargets`, `recommendedRotation`, `critMultiplier` | Engine |
+| `src/data/character` | `maxHitPoints`, `maxMana`, `capacity`, `defaultCharacterStats`, `resolveCharacterStats`, `mitigationPercent` | Engine |
 | `src/engine` | `getWheel(v)` → `WheelDefinition` (slices, revelations, `vessels`, `mods`); `optimize(OptimizerInput)` → `OptimizerResult`; `pointsForLevel`; `ENGINE_MESSAGES` | UI |
 | `src/i18n` | `useT()`, `translator(lang)`, `engineText(t, EngineMessage, fallback)` | UI |
 
@@ -92,17 +108,19 @@ Key contract types (`src/types/index.ts`):
 
 | Type | Notes |
 |------|-------|
-| `OptimizerInput` | `vocation, points, monster, priority`, optional `context: FightContext`, `gems: OwnedGem[]` |
-| `OptimizerResult` | allocation, path, revelations, convictions, stats, rationale (+`rationaleMsgs`), `vessels` (0-based `vesselId`), `gemRecommendations`, `upgradeRecommendations` (+`gainToMax`), `spells` (+`share`) |
+| `OptimizerInput` | `vocation, points, monster, priority`, optional `context: FightContext`, `gems: OwnedGem[]`, `character: CharacterStats`, `monsters: WeightedMonster[]` (overrides `monster`), `alternatives` (default 2, max 5) |
+| `OptimizerResult` | allocation, path, revelations, convictions, stats, rationale (+`rationaleMsgs`), `vessels` (0-based `vesselId`), `gemRecommendations`, `upgradeRecommendations` (+`gainToMax`), `spells` (+`share` for useful damage spells), `plannerCode`, `alternatives` |
+| `AlternativeBuild` | `label`/`labelMsg`, `tradeoff`/`tradeoffMsg`, `relativeScore` (% of the best build's objective, ≤ 100, sorted desc), `result` (with its own `plannerCode`) |
 | `EngineMessage` | `{ key, params }` → UI looks up `engine.<key>`; English strings remain as fallback |
 | `OwnedGem` / `ModDefinition` | quality lesser/regular/greater → 1/2/3 mods; grades I–IV; supreme `target` |
 
 The UI reaches both modules only through `src/lib/api.ts`, which re-exports the engine and loads
 `src/data` with a dynamic `import()` (separate chunk; `useMonsterData()` signals readiness).
 
-Data flow: UI collects `OptimizerInput` → `optimize()` returns
-`OptimizerResult` (allocation per slice, fill path, activated perks, stat
-summary, rationale) → UI renders the wheel and the summary.
+Data flow: UI collects `OptimizerInput` (`characterOf(inputs)`, `resolveMonsters(inputs.monsters)`,
+`monster: null`, `alternatives: 2`) → `optimize()` returns `OptimizerResult` (allocation per slice, fill
+path, activated perks, stat summary, rationale, vessels, `plannerCode`, `alternatives`) → `BuildSwitcher`
+selects the shown build (best or `alternatives[i].result`) → wheel, summary, export code and vessels render it.
 
 ## 5. Data integration (S1 Data)
 
@@ -126,6 +144,12 @@ summary, rationale) → UI renders the wheel and the summary.
   basic/supreme mods, momentum, Revelation Mastery, decoded tibiapal reference builds). `src/data/wheel/spells.ts`
   holds spell metadata (element, area, tibiapal avg hits, isNew). API: `getWheelData(v)`, `SPELLS`, `getSpell(name)`.
   Details: [`docs/modules/wheel-data.md`](docs/modules/wheel-data.md).
+- **Damage model (iteration 3):** `scripts/datamine-tibiatools.mjs` (`npm run datamine:damage`) fits per-spell
+  formulas offline on the TibiaTools damage API (tibiapal calculator) → `src/data/damage/spell-formulas.json`.
+  Loader: `spellAverageHit`, `spellCooldownTurns`, `isSingleTarget` (D16), `defaultTargets`, `recommendedRotation`,
+  `critMultiplier`, `healingAverage`. Details: [`docs/modules/damage-model.md`](docs/modules/damage-model.md).
+- **Character formulas:** `src/data/character/`: HP/mana/cap by level, default skills 200–1500, `mitigationPercent`
+  (× wheel Mitigation Multiplier). Details: [`docs/modules/character-formulas.md`](docs/modules/character-formulas.md).
 
 ## 6. Wheel model and optimization algorithm (S2 Engine)
 
@@ -139,13 +163,21 @@ Full details: [`docs/modules/engine.md`](docs/modules/engine.md).
 - **Unlock rule**: the planner's directed graph. Slices 14/15/20/21 start unlocked; any other slice needs at least one *full* predecessor.
 - **Valuation** (`spells.ts`, `values.ts`):
   - Every source gives `{off, def, util}`, blended as `(1−p)·off + p·def + 0.1·util` (each weight at least 0.05).
-  - Spell value = share of total damage = weight × expected targets (context: solo = tibiapal average, team-lure 5, team-box 9, boss 1.2, single-target 1) × element multiplier (immune → 0).
-  - Cooldowns are capped at 50 % of base. Avatar has value only in boss mode.
-  - The Mitigation Multiplier (gem mod and dedication) scales an estimated base mitigation per vocation (knight 20 % … mages 6 %). It does not add flat damage reduction.
+  - **Damage:** expected damage per rotation, built on the `src/data/damage` formulas and the character's level and skills (`input.character`; default level = points + 50).
+    - One attack slot per 2 s turn, filled greedily by per-cast damage within cooldowns.
+    - Per cast = hit × targets per context × weighted element modifier over `input.monsters` × crit EV.
+    - Augments, crit, cooldown, the flat bonus, revelation stages and passives are valued as a rotation delta.
+  - **D16:** single-target spells are worth 0 in hunt mode. In boss mode, area spells count 1.2 targets.
+  - **Defense:**
+    - HP is effective HP against monster spikes.
+    - Damage reduction and the Mitigation Multiplier (on the real base mitigation from `src/data/character`) are valued as sustained reduction; HP wins below high level.
+    - Leech is strongly devalued; resistances are weighted by the spot's damage types.
+    - Avatar has value only in boss mode.
+  - **Revelation Mastery** (slices, owned and recommended gems) is valued with look-ahead to the next stage.
 - **Search** (`optimizer.ts`):
-  - Beam search (width 24) over full-slice fills with revelation look-ahead and a partial last slice.
-  - Vessel value = Hungarian placement of owned or recommended gems.
-  - Deterministic, ≤ 10 ms.
+  - Beam search (width 24, allocation-free ranking) over full-slice fills with revelation look-ahead and a partial last slice, plus a refine pass that damps one revelation at a time.
+  - Returns `plannerCode` and `input.alternatives ?? 2` distinct alternatives (revelation focus, Avatar focus, priority shift), each with `relativeScore`, sorted best first. If an alternative search beats the main build on the main objective, it is promoted to main and the alternatives are recomputed (≤ 3 rounds).
+  - Deterministic; at most ~35 ms with alternatives.
 - **Gems** (`gems.ts`):
   - Owned gems are placed with the Hungarian algorithm; active slots = min(gem, vessel) quality.
   - Recommendations are per quality at grade IV. Upgrades are +1 grade for active mods, ranked by gain.
@@ -165,17 +197,20 @@ Iteration 2: fight context (Hunt/Boss + hunt style, in URL), a "My gems" editor 
 vocation in localStorage, passed as `OptimizerInput.gems`), a Vessels & gems results panel
 (vessels, recommended gems, upgrades, spell usage) and a PL/EN switch (`src/i18n/`, typed
 dictionaries, `useT()`; game terms stay English).
+Iteration 3: character panel (level → points, scroll points, manual override, per-vocation skills →
+`OptimizerInput.character`), hunting spot with several weighted monsters (`monsters`, weighted element chips),
+"Best build · Alt 1 · Alt 2" switcher over `result.alternatives`, and a planner export (code, copy, planner link).
 Details: [docs/modules/ui.md](docs/modules/ui.md).
 
 ## 8. Quality gates (S4 Integration)
 
-| Gate | Command | Status (2026-11-18, iteration 2) |
+| Gate | Command | Status (2026-11-18, iteration 3) |
 |------|---------|---------------------|
 | Types | `npm run typecheck` (`tsc -b`, strict) | 0 errors |
-| Tests | `npm test` (Vitest) | 12 files, 353 tests |
+| Tests | `npm test` (Vitest) | 17 files, 494 tests (WASM round-trips run when `scripts/.cache/wod` exists) |
 | Lint | `npm run lint` (oxlint) | 0 warnings |
-| Build | `npm run build` | main 629 kB (138 kB gzip, incl. wheel data) + lazy monster data 699 kB (76 kB gzip) + CSS 26 kB |
-| Smoke | `vite preview` + curl | HTTP 200 for page, deep link, chunks, CSS |
+| Build | `npm run build` | main 724 kB (158 kB gzip, incl. wheel data, damage formulas, fflate inflate) + lazy monster data 699 kB (76 kB gzip) + CSS 27 kB |
+| Smoke | dev server + browser | level 600, 2-monster spot, alternatives, export code / copy buttons, PL/EN; no console errors |
 
 ### Testing strategy
 
@@ -183,13 +218,14 @@ Details: [docs/modules/ui.md](docs/modules/ui.md).
 
   | Area | Files and tests |
   |---|---|
-  | Data | `src/data/index.test.ts` (20), `src/data/wheel/wheel.test.ts` (38: planner facts, graph, vessels, mods, spells) |
-  | Engine | `model.test.ts` (37), `spells.test.ts` (13), `gems.test.ts` (11: Hungarian vs brute force, placement, mitigation model), `optimizer.test.ts` (69: random-path validity, determinism, perf, reference builds) |
-  | UI helpers | `src/lib/*.test.ts` (24) and `src/i18n/i18n.test.ts` (6: PL/EN parity including every engine key, `engineText` fallback) |
+  | Data | `src/data/index.test.ts` (20), `src/data/wheel/wheel.test.ts` (38: planner facts, graph, vessels, mods, spells), `plannerCode.test.ts` (19: fixtures, legacy codes, 200 random builds vs the planner WASM), `damage.test.ts` (17), `character.test.ts` (11) |
+  | Engine | `model.test.ts` (37), `spells.test.ts` (13), `gems.test.ts` (11: Hungarian vs brute force, placement, mitigation model), `optimizer.test.ts` (69: random-path validity, determinism, perf, reference builds), `iteration3.test.ts` (19: character, RM look-ahead, spots, alternatives, planner code) |
+  | UI helpers | `src/lib/*.test.ts` (34) and `src/i18n/i18n.test.ts` (6: PL/EN parity including every engine key, `engineText` fallback) |
 
-- **Integration (`src/integration.test.ts`, 135).** Runs the real data through the UI facade and the real engine.
+- **Integration (`src/integration.test.ts`, 200).** Runs the real data through the UI facade and the real engine.
   - 5 vocations × 4 fight contexts × 5 budgets (100–4000) with owned gems.
   - Checks the directed unlock path, that Avatar is valued only in boss mode, vessel placement and quality, recommendations, and that i18n keys resolve.
+  - Iteration 3: D16 for every vocation × hunt style, planner codes of 30 random inputs (main + alternatives) decode to the same allocation and gems and load identically in the official planner WASM, distinct labelled alternatives, weighted spots, character stats, new URL keys.
   - Also covers levels, priority extremes, real monsters, edge budgets, determinism, URL/localStorage round-trips and untrusted input.
   - Matrix: [`docs/modules/integration.md`](docs/modules/integration.md).
 - **Smoke.** `vite build` + `vite preview`, with the page and every chunk served with HTTP 200.

@@ -1,13 +1,13 @@
 # Engine module (`src/engine`): wheel model, valuation, optimizer, gems
 
-Owner: **S2 Engine** (iteration 2). Every number comes from the official test-server planner data in
+Owner: **S2 Engine** (iteration 3). Every number comes from the official test-server planner data in
 `src/data/wheel` (see [`wheel-data.md`](wheel-data.md)); the engine contains no hand-written wheel tables.
 
 ## Public API (`src/engine/index.ts`)
 
 | Export | Purpose |
 |---|---|
-| `optimize(input): OptimizerResult` | The best allocation, path, revelations, convictions, stats, vessels, gem and upgrade recommendations, and spells. Deterministic; at most about 10 ms at 4000 points. |
+| `optimize(input): OptimizerResult` | The best allocation, path, revelations, convictions, stats, vessels, gem and upgrade recommendations, and spells. Also `plannerCode` and `alternatives`. Deterministic; < 35 ms worst case including alternatives. |
 | `getWheel(vocation): WheelDefinition` | Contract view: 36 slices, 4 revelations, 8 `vessels`, and `mods` (basic and supreme). |
 | `pointsForLevel`, `MIN_LEVEL_FOR_POINTS`, `MAX_SCROLL_POINTS` | Unchanged. |
 | `ENGINE_MESSAGES`, `renderMessage`, `EngineMessageKey` | i18n templates for `rationaleMsgs`, `reasonMsg` and `labelMsg`. |
@@ -23,7 +23,7 @@ src/engine/
   gems.ts         gem valuation, Hungarian placement, recommendations, upgrades
   optimizer.ts    tables, beam search, result assembly, stats, rationale
   messages.ts     ENGINE_MESSAGES key -> English template
-  *.test.ts       model, spells, gems, optimizer
+  *.test.ts       model, spells, gems, optimizer, iteration3
 ```
 
 ## 1. Data model
@@ -51,91 +51,121 @@ src/engine/
 
 ## 2. Valuation (`spells.ts`, `values.ts`)
 
-Every source yields `Parts = { off, def, util }`:
+Every source yields `Parts = { off, def, util }`. They are blended as `score = wOff·off + wDef·def + 0.1·util`, where:
+- `p = priority / 100`;
+- `wOff = max(0.05, 1 − p)`;
+- `wDef = max(0.05, p)`.
 
-| Part | Unit |
+**Character** (`valuationFor`).
+- The engine uses `input.character`. Missing skills are estimated with `defaultCharacterStats` (`src/data/character`).
+- With no character, `level = points + 50`.
+- Level and skills drive HP, mana, base mitigation (`mitigationPercent`) and every spell hit (`src/data/damage` formulas).
+
+### Damage model (`spells.ts`)
+
+`buildSpellModel(vocation, context, monsters, character)` is cached (100 entries). Its spell set is the wheel spells plus the vocation's damage spells; runes are excluded.
+
+- **Per cast:** `perCast = hit(stage) × targets × weighted element × crit EV × passive multipliers`.
+  - **Hit precompute.** `hit` is stored per revelation stage 0..3 as `{base, boost, bf}`.
+    - `boost` is the extra hit from +100 % base damage; the level term is excluded.
+    - `bf` multiplies the flat Damage & Healing bonus.
+  - **Revelation extras:**
+    - Executioner's Throw: the extra replaces the main hit.
+    - Bursts: average of main and extra.
+    - Spiritual Outburst: the extra is added.
+    - Beams: side hits land on the outer targets, and the central hit gets +10/12/14 % per target, capped at 30/36/42 %.
+  - **Passives.** Combat Mastery, Ascetic (harmony spenders) and Lord of Destruction (fire) multiply the spells they affect.
+- **Rotation:** one attack slot per 2 s turn.
+  - Spells are filled greedily by per-cast damage, each capped at 1 / (cooldown / 2 s).
+  - Shared cooldown groups keep only their best spell: Twin Bursts, Hell's Core / Rage of the Skies, Eternal Winter / Wrath of Nature, strong strikes, ultimate strikes.
+  - Auto-attack fills the remaining turns. Weapon vocations use g(L) + 0.5·0.085·skill·attack; mages use g(L).
+  - Paladin auto-attack hits 3 / 4 / 5 targets (solo / team-lure / team-box).
+- **`off` unit:** `100 · ΔT / T0`, where T0 is the rotation with no wheel bonuses and every stage at 0.
+  - All damage perks are valued as a rotation delta (`deltaOff`): augments, crit, cooldown (through rotation share), flat bonus, revelation stages and supreme mods.
+- **Targets:**
+
+  | Spell or context | Targets |
+  |---|---|
+  | single-target spell, hunt (D16) | **unusable**: its share, augments and gem mods are 0 |
+  | single-target spell, boss | 1 |
+  | area spell, boss mode | `min(maxTargets, 1.2)` (adds) |
+  | area spell, solo hunt | `min(maxTargets, avgHitsHunt)` (tibiapal) |
+  | area spell, team-lure / team-box | `min(maxTargets, max(solo, 5 / 9))` |
+
+- **Monsters:**
+  - `input.monsters` takes precedence over `input.monster`. Weights are normalised and non-positive weights are dropped.
+  - The element multiplier is the weighted average over the spot. Immune (0) makes a spell useless.
+  - With no monster, the multiplier is 1.
+- **Healing** (`healPerCast`, `healShare`):
+  - Healing spells use the healing formulas and are valued on the defense side.
+  - Team heals count ×0.5 solo and ×2 in team hunts.
+
+### Defense (`values.ts`)
+
+| Source | Value |
 |---|---|
-| `off` | ≈ % of total damage output |
-| `def` | ≈ % survivability, scaled by `threat = clamp(maxDamage / 1000, 0.6, 1.6)` |
-| `util` | capacity and mana cost |
+| +1 % max HP | `HP_DEF · spikeFactor`, where spikeFactor = clamp(2 · spike / maxHP, 0.25, 1.5) and spike = weighted monster `maxDamage`, else 3 · level |
+| +1 pp damage reduction | `DR_DEF / (1 − mitigation)`: sustained reduction, compounding with existing mitigation |
+| Mitigation Multiplier | multiplies the character's real base mitigation (`mitigationPercent(voc, level, {shielding})`), then valued as damage reduction |
+| resistance | `pct · DR_DEF · incomingShare(element)`; incoming shares are weighted over the spot's damage types |
+| life / mana leech | strongly devalued: life leech 0.15 def per %; mana leech 0.1 off and 0.05 def per % |
 
-**Blend:** `score = wOff·off + wDef·def + 0.1·util`, where `p = priority / 100`, `wOff = max(0.05, 1 − p)` and `wDef = max(0.05, p)`.
+All `def` values are scaled by `threat = clamp(maxDamage / 1000, 0.6, 1.6)`.
 
-**Expected targets** (`expectedTargets`):
+HP acts as effective HP against spikes, so it dominates at low and mid level. Mitigation grows with level and shielding, so it becomes competitive only at high level and high defense priority:
+- EK 1500: about 1 : 1 per dedication point;
+- RP 400: HP is worth about 15× more.
 
-| Spell or context | Targets |
-|---|---|
-| single-target spell | 1 (always) |
-| area spell, boss mode | `min(maxTargets, 1.2)` |
-| area spell, solo hunt | `min(maxTargets, avgHitsHunt)` (tibiapal) |
-| area spell, team-lure / team-box | `min(maxTargets, max(solo, 5 / 9))` |
+The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitigationOverHp`).
 
-- Beams use 0.5 × pool for the central part. The outer part (`avgHitsHuntOuter`, 0.4 × pool in team styles) is weighted separately and is 0 against bosses.
-- Healing spells count 1 target, or the party size for area heals in team hunts.
+**Avatar.** Worth 0 in hunt mode. In boss mode its uptime-scaled damage boost and damage reduction are valued, including its supreme mods and momentum.
 
-**Element.** `elem = monster.elementModifiers[element] / 100`. Immune (0) makes the spell useless, and so are its augments and its gem mods. With no monster, `elem = 1`.
+**Revelations.** The value of stage s is the sum of:
+- the rotation Δ with only that domain at stage s;
+- passive effects (Gift of Life, Combat Mastery, Divine Empowerment, Blessing of the Grove);
+- the flat Damage & Healing bonus.
 
-**Damage share.**
-- `c(spell) = weight × targets × elem`.
-- `share = 100 · c / C`.
-- `C` = the vocation's baseline attacks (auto-attacks or runes; mage area runes count 3/4/6 targets) + all non-revelation damage spells.
-- Revelation spells (Executioner's Throw, Divine Grenade, Ice/Terra Burst, Spiritual Outburst) are added at weight 0.35 × stage multiplier. Twin Bursts share one cooldown.
+**Revelation Mastery** (slice or supreme gem) is valued with look-ahead: `rev(stage(points + x)) − rev(stage(points))`.
+- It is worth 0 unless it reaches the next stage.
+- Owned RM gems count in the search. They are assigned to greater vessels (largest first), and their points are added to the domain as soon as the vessel unlocks.
 
-| Effect | Value |
-|---|---|
-| +X % base damage | `off = X · share / 100` |
-| crit extra damage | ×0.1 |
-| crit chance | ×0.5 |
-| life leech | → `def` |
-| mana leech | → `off` and `def` |
-| cooldown −r s (base cooldown B) | `share · (B / max(B/2, B − r) − 1)`. Cooldowns are **capped at 50 % of base**. |
-| area / shape / jumps | add targets via the target model |
-| healing augments | `def` via a heal share. Team heals count ×0.5 solo and ×2 in team. |
-
-**Avatar.** Worth 0 in hunt mode. In boss mode:
-- `off = 100 · (15 s / 120 s) · ((1 + 0.5 + extra) / (1 + 0.1·0.5) − 1) · min(1, 30 min / cooldown)`
-- `extra` is 5/10/15 % by stage. `def` is the uptime-scaled damage reduction.
-- This applies to the revelation itself and to its supreme mods, momentum included.
-
-**Basic mods.** Resistances are worth `pct × incomingShare(monster, element)`; with no monster, generic shares are used. HP, mana and capacity scale relative to `level ≈ points + 50`.
-
-**Mitigation Multiplier** (basic mod 30: 20/22/24/30 % by grade; dedication 0.075 %/point). The planner says it
-"increases your mitigation multiplicatively", so it scales the character's base mitigation and is not a flat
-damage reduction:
-- extra damage reduction = `BASE_MITIGATION[vocation] × multiplier / 100`, then valued like +1 % reduction on all damage (`K.MIT_DR_DEF = 1`) × threat;
-- `BASE_MITIGATION` (approximate, mid/high level) = knight 20 %, monk 14 %, paladin 10 %, sorcerer 6 %, druid 6 %;
-- in-game mitigation = (defense + shielding) × equipment × wheel multiplier × combat stance, so knights with a shield are highest and mages are lowest;
-- example: a grade IV gem is worth +6 % reduction for a knight and +1.8 % for a mage.
-
-It remains the top defensive `basic1` mod for knights. Offensive mage builds prefer mana.
-
-**Supreme mods.** Damage, crit, cooldown and healing use the spell model. Revelation Mastery is worth Δ(revelation value) for the extra points. Momentum is worth `off = 0.5·m` and `def = 0.2·m`.
+**Gem Vessel slices** are valued as the Hungarian placement gain of the next vessel plus 1 flat bonus.
 
 ## 3. Optimizer (`optimizer.ts`)
 
-1. **Tables.** Precompute Parts and blended scalars for:
-   - dedication per point
-   - each conviction
-   - augment I/II
-   - revelation[domain][stage]
-   - vessel[k]: the marginal value of unlocking vessel k = Hungarian placement of the owned gems over vessels `0..k`, against the grade-I recommended gem, plus 1 flat bonus.
+1. **Tables.** Parts for each dedication point, conviction, augment I/II, revelation[domain][stage] and vessel[k], blended by priority. `blendTables` can rescale revelations for alternatives.
+2. **Beam search.** Width 24 over full-slice fills, deduplicated by allocation key.
+   - Candidates are ranked without allocating (`rankOf` with a precomputed delta). Only the top 24 are materialised, and only the top 8 are greedily completed per level.
+   - Rank = score + revelation-stage look-ahead + greedy-completion estimate. A partial last slice uses the remainder.
+   - A budget ≥ total capacity has only one allocation, so the search returns the full wheel and no alternatives.
+3. **Refine.** For each domain at stage 1–2, damp it (×0.2) and re-run the search. The result replaces the main build only if its exact objective under the main valuation is higher.
+4. **Final pass.** Recompute stages, RM, vessels, stats, recommendations, spells and `plannerCode`.
+5. **Alternatives.** The count is `input.alternatives ?? 2`, clamped to 0..5; none are produced below 100 points. Candidates, in order:
+   - Avatar focus (boss mode; avatar revelation ×8);
+   - top revelation off (×0);
+   - priority shift ±35 (more defensive or more offensive);
+   - top two revelations off;
+   - the opposite shift;
+   - push each other non-maxed revelation (×4).
 
-   Before the search, revelation spells and RM mods assume `min(1000, 0.6 · budget)` revelation points.
-2. **Beam search.**
-   - Width 24, over states that fill one available slice completely. States are deduplicated by allocation key.
-   - Rank = score + 0.6 × (next revelation-stage gain × progress toward it) + greedy-completion estimate.
-   - When the budget cannot fill the next slice, the remainder goes to the best available slice as a partial last slice.
-   - Ties break on the key, so the result is deterministic.
-3. **Final pass.** Recompute the facts from the chosen grid (stages, RM slices, wheel effects), then:
-   - place the owned gems
-   - add the points of placed RM gems
-   - recompute the stages, vessels, stats, recommendations and spells.
-4. **Scores.** Offense and defense are normalised to the full wheel at stage 3 (0–100).
+   Acceptance and scoring:
+   - An alternative is accepted only if it differs by at least `max(50, 0.1 · budget)` points (Σ|Δ| / 2) from the main build and from every alternative already accepted.
+   - `relativeScore = 100 · objective(alt) / objective(main)`, under the main valuation. If any candidate search beats the main build (the beam is heuristic; seen up to 106 %), it is promoted to main and alternatives are recomputed (≤ 3 rounds), so `relativeScore ≤ 100`. Alternatives are sorted by `relativeScore` (desc).
+   - The `alt.revelationFocus` label names every revelation at the alternative's highest stage (`A + B focus`), so two focus alternatives never share a label.
+   - `tradeoffMsg` (`alt.tradeoff`) lists the offense and defense deltas and the revelations.
+6. **Planner code.** `encodePlannerCode` (strict) of the allocation (`gridForSliceId`) plus the vessel gems.
+   - Only slots matching the vessel quality are exported; vessels with `plannerVesselIssues` are skipped.
+   - Tests decode the code, replay `path` against the unlock graph, and load it in the official planner WASM.
+7. **Scores.** Offense and defense are normalised to the full wheel at stage 3 (0–100).
 
-Complexity:
-- Search: `O(steps · W · 36)` with an allocation-free gain function.
-- Hungarian assignment: `O(n²m)`, with n, m ≤ 8.
-- Measured: 0.4 ms at 100 points, 2.4 ms at 1000 points, 10 ms at 4000 points.
+**Measured runtime** (warm, single thread, alternatives included):
+
+| Budget | Time |
+|---|---|
+| 600 points | 3–6 ms |
+| 2500 points | 15–20 ms |
+| worst case (sorcerer, 3200 points) | 31 ms |
+| full wheel | 3 ms |
 
 ## 4. Gems (`gems.ts`)
 
@@ -162,17 +192,19 @@ Complexity:
 
 ## 6. Assumptions
 
-- Spell weights (single 0.6, area 0.5, per-spell overrides), the baseline attacks, and the boss window (120 s fight, 30 min between attempts) are heuristics.
-- `maxTargets` and monk elements are approximate (S1).
-- The level is estimated as points + 50 and is used to scale HP, mana and flat bonuses.
-- The Mitigation Multiplier multiplies an **estimated** base mitigation per vocation (`BASE_MITIGATION`, see §2). Calibrate it against in-game values.
-- Momentum is valued as a flat cooldown proxy.
+- The rotation is a single-slot greedy model, with no mana limits and no movement.
+- The Avatar's boss window is 120 s per 30 min.
+- Expected targets per context, `maxTargets` and monk elements are approximate (S1).
+- Single-target spells are ignored in hunt mode (D16).
+- The defense constants (`K.HP_DEF`, `K.DR_DEF`, spike, leech factors) are heuristics. Base mitigation comes from `src/data/character`.
+- Momentum is valued as a cooldown proxy.
 
 ## 7. Tests
 
 | File | Covers |
 |---|---|
 | `model.test.ts` | Geometry, the directed unlock graph matches `WHEEL_DATA`, twins, vessels and mods, thresholds, messages. |
-| `spells.test.ts` | Targets per context, team-box > solo for area spells, boss favours single-target, immune → useless, Avatar is 0 in hunt and > 0 in boss, cooldown floor, momentum, effect parsing, augment I/II. |
-| `gems.test.ts` | Hungarian vs brute force, active slots, placement respects vessel quality, recommended/locked vessels, recommendations, upgrade ranking. |
-| `optimizer.test.ts` | Directed-path validity on 60 random inputs, RM points and stages, vessel unlock order, augment stacking, determinism, edge budgets, priority, perf < 50 ms, loose check against the planner reference builds. |
+| `spells.test.ts` | Targets per context, team-box > solo, D16 (single-target unusable in hunt, boss targets ≤ 1.2, no Augmented Annihilation in hunt), immune → useless, Avatar, cooldown floor, momentum, effect parsing, augments. |
+| `gems.test.ts` | Hungarian vs brute force, active slots, placement, recommendations, upgrades, Mitigation Multiplier scaling with real base mitigation. |
+| `optimizer.test.ts` | Path validity on random inputs, RM, vessel unlock order, augments, determinism, edge budgets, priority, perf < 50 ms (best of 3 per input), planner reference builds. |
+| `iteration3.test.ts` | Character level and skills, HP > mitigation (RP 400), Mitigation Multiplier for EK 1500 at priority 100, leech devalued, RM look-ahead and owned RM gem, multi-monster weighting, distinct alternatives, planner code decode and unlock path, official planner WASM round-trip (`skipIf` when `scripts/.cache/wod/skillgrid.cjs` is missing). |
