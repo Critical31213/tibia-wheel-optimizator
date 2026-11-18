@@ -64,6 +64,7 @@ export function applyStanceSpells(model: SpellModel, stances: readonly StanceDef
     if (pierce) s.elem = pierced(model.monsters, s, pierce);
     if (harmony && HARMONY_SPENDERS.has(n)) s.mult = (s.mult ?? 1) * (1 + HARMONY_PER_BASE_PCT * harmony);
     if (el && s.element === el.element) {
+      s.stanceShare = 1;
       if (el.baseDamagePct) {
         const k = el.baseDamagePct / 100;
         s.hits = s.hits.map((h) => ({
@@ -76,7 +77,7 @@ export function applyStanceSpells(model: SpellModel, stances: readonly StanceDef
     }
     spells.set(n, s);
   }
-  let out: SpellModel = { ...model, spells, damageMult, base: model.base * damageMult, stances: stances.map((s) => s.name) };
+  let out: SpellModel = { ...model, spells, damageMult, base: model.base * damageMult, stances: stances.map((s) => s.name), stanceElement: el?.element ?? undefined };
   if (el) out = convert(out, el.element, preset, pierce);
   return out;
 }
@@ -101,7 +102,7 @@ function convert(model: SpellModel, element: SpellEval['element'], preset: Rotat
   for (const [n, s] of spells) {
     if (s.kind !== 'damage' || s.element === element) continue;
     const target = pierce ? pierced(model.monsters, { ...s, element }, pierce) : spotElem(model.monsters, element);
-    spells.set(n, { ...s, elem: f * target + (1 - f) * s.elem });
+    spells.set(n, { ...s, elem: f * target + (1 - f) * s.elem, stanceShare: f });
   }
   return { ...model, spells };
 }

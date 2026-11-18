@@ -74,7 +74,7 @@ Every source yields `Parts = { off, def, util }`. They are blended as `score = w
     - Bursts: average of main and extra.
     - Spiritual Outburst: the extra is added.
     - Beams: side hits land on the outer targets, and the central hit gets +10/12/14 % per target, capped at 30/36/42 %.
-  - **Passives.** Combat Mastery, Ascetic (harmony spenders) and Lord of Destruction (fire) multiply the spells they affect.
+  - **Passives.** Combat Mastery and Ascetic (harmony spenders) multiply the spells they affect; Lord of Destruction boosts the damage type of the elemental stance (D24, `LORD_OF_DESTRUCTION`).
 - **Rotation (D20):** one attack slot per 2 s turn. A *plan* is a preset from `getRotationPresets(vocation)` or the greedy plan (`GREEDY_PLAN_ID = 'boss'`).
   - Plan selection: `input.rotationId` (manual), else auto = every preset (plus the greedy plan in boss mode), each searched jointly with the build; the best valid plan wins. `requires.revelation` is valid only when the build reaches that revelation; `requires.shield` switches the knight to a shield (base mitigation).
   - `planFor` resolves `or` alternatives by per-cast damage vs the spot at stage 3, drops revelation-granted spells and merges duplicates.

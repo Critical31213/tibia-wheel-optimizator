@@ -70,8 +70,13 @@ const BEAM_BONUS = { per: [10, 12, 14], cap: [30, 36, 42] };
 const PASSIVE_MULT: Record<string, { mult: number[]; applies: (s: SpellEval) => boolean }> = {
   'Combat Mastery': { mult: [1.0308, 1.0368, 1.045], applies: () => true },
   Ascetic: { mult: [1.0478, 1.0957, 1.1446], applies: (s) => HARMONY_SPENDERS.has(s.name) },
-  'Lord of Destruction': { mult: [1.0148, 1.0222, 1.0296], applies: (s) => s.element === 'fire' },
 };
+/**
+ * Lord of Destruction boosts the damage type of the elemental stance (wheel data): Flames +2/3/4 % fire damage
+ * (TibiaTools probe ×1.0148/1.0222/1.0296), Thunder +2/3/4 pp crit chance, Decay +15/25.5/30 pp crit extra damage.
+ * Applies to spells dealing that type (natural + converted share); nothing without an elemental stance.
+ */
+export const LORD_OF_DESTRUCTION = { name: 'Lord of Destruction', fireMult: [1.0148, 1.0222, 1.0296], critChance: [2, 3, 4], critExtra: [15, 25.5, 30] };
 /** Monk spells that spend Harmony (Ascetic). Approximate. */
 export const HARMONY_SPENDERS = new Set([
   'Greater Flurry of Blows',
@@ -145,6 +150,8 @@ export interface SpellEval {
   critChance?: number;
   critExtra?: number;
   mult?: number;
+  /** Share of casts dealing the elemental stance's damage type (1 natural, conversion share otherwise). */
+  stanceShare?: number;
   /** Hits per stage 0..3: main, extra (null if none). */
   hits: { main: HitPart; extra: HitPart | null }[];
 }
@@ -193,6 +200,8 @@ export interface SpellModel {
   damageMult?: number;
   /** D24: active stances. */
   stances?: string[];
+  /** D24: damage type of the elemental stance (Lord of Destruction). */
+  stanceElement?: Element;
 }
 
 export function elementMultiplier(monster: Monster | null, element: Element | null): number {
@@ -268,7 +277,7 @@ export function buildSpellModel(
   wheel.revelations.forEach((r, d) => {
     r.data.spells.forEach((s) => (revOf.set(s, d), stageOf.set(s, d)));
     r.data.affectsSpells.forEach((s) => stageOf.set(s, d));
-    if (PASSIVE_MULT[r.data.name]) passives.set(r.data.name, d);
+    if (PASSIVE_MULT[r.data.name] || r.data.name === LORD_OF_DESTRUCTION.name) passives.set(r.data.name, d);
   });
 
   const wheelSpells = getWheelSpellNames(vocation);
@@ -433,12 +442,25 @@ export function castDamage(model: SpellModel, s: SpellEval, r: RotationInput, m:
     else if (def?.extra === 'half') dmg = ((val(h.main) + val(h.extra)) / 2) * t;
     else dmg += val(h.extra) * t;
   }
-  let mult = s.elem * (s.mult ?? 1) * (model.damageMult ?? 1) * critEV(m.critChance + (s.critChance ?? 0), m.critExtra + (s.critExtra ?? 0) + (r.critExtra ?? 0));
+  let critChance = m.critChance + (s.critChance ?? 0);
+  let critExtra = m.critExtra + (s.critExtra ?? 0) + (r.critExtra ?? 0);
+  let mult = s.elem * (s.mult ?? 1) * (model.damageMult ?? 1);
   for (const [name, d] of model.passives) {
     const st = r.stages[d] ?? 0;
+    if (st < 1) continue;
+    if (name === LORD_OF_DESTRUCTION.name) {
+      const share = s.stanceShare ?? 0;
+      const lod = LORD_OF_DESTRUCTION;
+      if (!share) continue;
+      if (model.stanceElement === 'fire') mult *= 1 + share * (lod.fireMult[st - 1] - 1);
+      else if (model.stanceElement === 'energy') critChance += share * lod.critChance[st - 1];
+      else if (model.stanceElement === 'death') critExtra += share * lod.critExtra[st - 1];
+      continue;
+    }
     const p = PASSIVE_MULT[name];
-    if (st >= 1 && p.applies(s)) mult *= p.mult[st - 1];
+    if (p.applies(s)) mult *= p.mult[st - 1];
   }
+  mult *= critEV(critChance, critExtra);
   return Math.max(0, dmg * mult);
 }
 

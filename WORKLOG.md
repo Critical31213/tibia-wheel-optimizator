@@ -368,6 +368,10 @@ Numbered badges on the wheel, the tooltip step and the `wheel.step` key were rem
 
 Data `src/data/damage/stances.ts`; engine `src/engine/stances.ts` (character, spell model, defense); `pickStances` in `planSpecs`; result `stances`, rationale `rationale.stances` / `rationale.noStance`; shown in the rotation panel. Tests: `src/engine/stances.test.ts`; two tests updated (elemental conversion makes Energy Wave useful vs energy-immune targets; the energy spot picks Master of Decay since death ≈ energy there). Observed picks at level 600: EK Blood Rage (priority 0–50) / Protector (100); RP Sharpshooter / Divine Defiance (100); MS Decay or Flames + Exposed Weakness (0) / Sapped Strength (50+); ED Elemental Synthesis / Shared Conservation (100); EM Harmony (0) / Sustain (50+).
 
+### 2026-11-18 — Lord of Destruction follows the elemental stance
+
+User: sorcerer 850 points, offense, Master of Decay got Gift of Life instead of Lord of Destruction. Cause: LoD was valued as fire ×1.015–1.030 regardless of stance (only Hell's Core in a death rotation). Per wheel data it boosts the elemental stance type: Flames +2/3/4 % fire damage, Thunder +2/3/4 pp crit chance, Decay +15/25.5/30 pp crit extra damage (applied to natural + converted casts; assumption). LoD stage 1/2/3 with Decay: 0.8/1.6/3.2 → 1.9/3.5/5.4 % damage. 850 points, priority 0 now: Beam Mastery 2 + LoD 2. Tests added.
+
 ## In progress / Next
 
 - [x] S1 Data — scraper + monster dataset + search API.

@@ -56,7 +56,7 @@ The committed fixture `__fixtures__/api-samples.json` (10 API responses) is re-c
   |---|---|
   | Combat Mastery | effective ×1.031 / 1.037 / 1.045 (crit side) |
   | Ascetic | harmony monk spells raw ×1.048 / 1.096 / 1.145 |
-  | Lord of Destruction (with Master of Flames) | fire ×1.015 / 1.022 / 1.030 |
+  | Lord of Destruction | elemental stance type only (D24): Flames fire ×1.015 / 1.022 / 1.030 (probe); Thunder +2/3/4 pp crit chance; Decay +15/25.5/30 pp crit extra damage; natural + converted share; nothing without a stance |
 
   The Master of Flames stance alone gives fire ×1.031.
 - **Targets:** the API per-turn value is per-hit × targets of the rotation entry. Use `defaultTargets`.

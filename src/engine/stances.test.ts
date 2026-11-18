@@ -5,6 +5,8 @@ import { resolveCharacterStats } from '../data/character';
 import { optimize } from '.';
 import { valuationFor } from './optimizer';
 import { stancedCharacter, stanceDefense, stanceElementMl } from './stances';
+import { getEngineWheel } from './wheel/build';
+import { revelationParts } from './values';
 
 const st = (n: string) => getStance(n)!;
 
@@ -55,5 +57,25 @@ describe('D24 stances', () => {
   it('monk presets carry their virtue', () => {
     const r = optimize({ vocation: 'monk', points: 700, monster: null, priority: 0, rotationId: 'em-voj', character: { level: 600 } });
     expect(r.stances).toEqual(['Virtue of Justice']);
+  });
+});
+
+describe('D24 Lord of Destruction follows the elemental stance', () => {
+  const lod = (stances: string[]) => {
+    const v = valuationFor({ vocation: 'sorcerer', points: 850, monster: null }, null, undefined, stances.map(st));
+    const w = getEngineWheel('sorcerer');
+    const r = w.revelations.find((x) => x.data.name === 'Lord of Destruction')!;
+    return revelationParts(v, r, 3).off - revelationParts(v, r, 0).off;
+  };
+  it('worthless without an elemental stance, crit damage with Master of Decay', () => {
+    const none = lod([]);
+    expect(lod(['Master of Decay'])).toBeGreaterThan(none + 1);
+    expect(lod(['Master of Flames'])).toBeGreaterThan(none);
+  });
+  it('850 points, offense: Lord of Destruction instead of Gift of Life', () => {
+    const r = optimize({ vocation: 'sorcerer', points: 850, monster: null, priority: 0 });
+    const names = r.revelations.filter((x) => x.stage > 0).map((x) => x.perk.name);
+    expect(names).toContain('Lord of Destruction');
+    expect(names).not.toContain('Gift of Life');
   });
 });
