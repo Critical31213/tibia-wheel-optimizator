@@ -1,6 +1,6 @@
 /** Serialisation of the user's inputs (URL query string + localStorage). Pure. */
 import { VOCATIONS } from '../types';
-import type { CharacterStats, FightContext, FightMode, HuntStyle, Vocation } from '../types';
+import type { CharacterStats, FightContext, FightMode, Vocation } from '../types';
 import { clamp } from './labels';
 
 export interface MonsterEntry {
@@ -24,11 +24,9 @@ export interface InputState {
   monsters: MonsterEntry[];
   priority: number;
   mode: FightMode;
-  huntStyle: HuntStyle;
 }
 
 export const FIGHT_MODES: readonly FightMode[] = ['hunt', 'boss'];
-export const HUNT_STYLES: readonly HuntStyle[] = ['solo', 'teamLure', 'teamBox'];
 
 export const DEFAULT_INPUTS: InputState = {
   vocation: 'knight',
@@ -41,13 +39,9 @@ export const DEFAULT_INPUTS: InputState = {
   monsters: [],
   priority: 50,
   mode: 'hunt',
-  huntStyle: 'solo',
 };
 
-export const contextOf = (s: Pick<InputState, 'mode' | 'huntStyle'>): FightContext => ({
-  mode: s.mode,
-  huntStyle: s.huntStyle,
-});
+export const contextOf = (s: Pick<InputState, 'mode'>): FightContext => ({ mode: s.mode });
 
 /** Upper bound for point values: total wheel capacity (5 rings, 36 slices, 4000 points) for every vocation. */
 export const MAX_POINTS = 4000;
@@ -128,7 +122,6 @@ export function sanitize(raw: Record<string, unknown>): Partial<InputState> {
   else if (typeof raw.monsterId === 'string' && MONSTER_ID.test(raw.monsterId.trim()))
     out.monsters = [{ id: raw.monsterId.trim(), weight: 1 }];
   if (FIGHT_MODES.includes(raw.mode as FightMode)) out.mode = raw.mode as FightMode;
-  if (HUNT_STYLES.includes(raw.huntStyle as HuntStyle)) out.huntStyle = raw.huntStyle as HuntStyle;
   return out;
 }
 
@@ -161,8 +154,10 @@ const KEYS = {
   monsters: 'm',
   priority: 'prio',
   mode: 'f',
-  huntStyle: 'h',
 } as const;
+
+/** Removed keys (hunt style, D20): ignored on read, dropped on write. */
+const LEGACY_KEYS = ['h'] as const;
 
 export function fromQuery(search: string): Partial<InputState> {
   const q = new URLSearchParams(search);
@@ -182,7 +177,6 @@ export function fromQuery(search: string): Partial<InputState> {
     priority: get('priority'),
     monsters: m === undefined ? undefined : decodeMonsters(m),
     mode: get('mode'),
-    huntStyle: get('huntStyle'),
   });
 }
 
@@ -209,7 +203,7 @@ export function toQuery(state: InputState, search = ''): string {
   opt('magicLevel', state.magicLevel);
   q.set(KEYS.priority, String(state.priority));
   q.set(KEYS.mode, state.mode);
-  q.set(KEYS.huntStyle, state.huntStyle);
+  for (const k of LEGACY_KEYS) q.delete(k);
   opt('monsters', encodeMonsters(state.monsters));
   return `?${q.toString()}`;
 }

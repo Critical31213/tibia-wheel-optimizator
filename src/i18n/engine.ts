@@ -1,5 +1,5 @@
 /** Renders translatable engine messages (`engine.<key>`) with the English engine string as fallback. */
-import type { EngineMessage } from '../types';
+import { GREEDY_ROTATION_ID, type EngineMessage } from '../types';
 import { en } from './en';
 import type { MessageKey } from './en';
 import type { TFunction, Vars } from './lang';
@@ -16,6 +16,7 @@ function translateParams(t: TFunction, params: EngineMessage['params']): Vars | 
   for (const [name, value] of Object.entries(params)) {
     if (typeof value !== 'string') out[name] = value;
     else if (name === 'style' && HUNT_STYLES.has(value)) out[name] = t(`context.${value}` as MessageKey);
+    else if (name === 'rotation' && value === GREEDY_ROTATION_ID) out[name] = t('rotation.boss');
     else if (name === 'element' || name === 'list' || name === 'types') {
       out[name] = value.replace(ELEMENT_IDS, (id) =>
         id === 'unknown' ? t('common.unknown') : t(`element.${id}` as MessageKey).toLowerCase(),

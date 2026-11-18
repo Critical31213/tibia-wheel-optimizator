@@ -1,6 +1,8 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import {
+  getForceableSpells,
   getMonsterById,
+  getRotationPresets,
   getWheel,
   isMonsterDataLoaded,
   loadMonsterData,
@@ -12,7 +14,8 @@ import {
 import { characterOf, contextOf, DEFAULT_INPUTS, fromQuery, MAX_POINTS, sanitize, toQuery, withKnownMonsters } from './lib/inputState';
 import { resolveMonsters } from './lib/monsters';
 import { PLANNER_URL, plannerUrl } from './lib/planner';
-import { getDamageSpell, isSingleTarget, spellElement } from './data/damage';
+import { getDamageSpell, isSingleTarget, revelationSpell, spellElement } from './data/damage';
+import { getEngineWheel } from './engine/wheel/build';
 import { decodePlannerCode, gridForSliceId, plannerVesselIssues, type PlannerVessel } from './data/wheel/plannerCode';
 import { gemsStorageKey, modsForSlot, parseGems, serializeGems } from './lib/gems';
 import { MONSTERS } from './data';
@@ -21,6 +24,7 @@ import { engineText, translator, type MessageKey } from './i18n';
 import { en } from './i18n/en';
 import { pl } from './i18n/pl';
 import {
+  GREEDY_ROTATION_ID,
   VOCATIONS,
   type CharacterStats,
   type Domain,
@@ -194,13 +198,11 @@ describe('integration: input parsing', () => {
 // Iteration 2: fight context × points × vocation, gems & vessels, i18n
 
 const CONTEXTS: FightContext[] = [
-  { mode: 'boss', huntStyle: 'solo' },
-  { mode: 'hunt', huntStyle: 'solo' },
-  { mode: 'hunt', huntStyle: 'teamLure' },
-  { mode: 'hunt', huntStyle: 'teamBox' },
+  { mode: 'boss' },
+  { mode: 'hunt' },
 ];
 const BUDGETS = [100, 500, 1000, 2000, 4000];
-const ctxName = (c: FightContext) => (c.mode === 'boss' ? 'boss' : c.huntStyle);
+const ctxName = (c: FightContext) => c.mode;
 const QUALITY_RANK: Record<GemQuality, number> = { lesser: 0, regular: 1, greater: 2 };
 
 /** Directed unlock rule from the planner graph: a slice needs a full predecessor (or starts unlocked). */
@@ -305,16 +307,16 @@ describe('integration: vocation × fight context × points', () => {
     for (const vocation of VOCATIONS) {
       const d = avatarDomain(vocation);
       const boss = optimize({ vocation, points: 2000, monster: null, priority: 0, context: CONTEXTS[0] });
-      const hunt = optimize({ vocation, points: 2000, monster: null, priority: 0, context: CONTEXTS[3] });
+      const hunt = optimize({ vocation, points: 2000, monster: null, priority: 0, context: CONTEXTS[1] });
       const stage = (r: OptimizerResult) => r.revelations.find((x) => x.perk.domain === d)!.stage;
       expect(stage(boss), vocation).toBeGreaterThanOrEqual(Math.max(1, stage(hunt)));
     }
   });
 
-  it('area spells expect more targets in team-box than solo; bosses ~1', () => {
+  it('area spells expect more targets when hunting than on bosses (~1)', () => {
     const run = (c: FightContext) => optimize({ vocation: 'sorcerer', points: 1000, monster: null, priority: 50, context: c });
     const t = (r: OptimizerResult) => r.spells.find((s) => s.name === 'Great Fire Wave')!.expectedTargets;
-    expect(t(run(CONTEXTS[3]))).toBeGreaterThan(t(run(CONTEXTS[1])));
+    expect(t(run(CONTEXTS[1]))).toBeGreaterThan(t(run(CONTEXTS[0])));
     expect(t(run(CONTEXTS[0]))).toBeLessThanOrEqual(1.2);
   });
 });
@@ -419,7 +421,7 @@ describe('integration: D16 — hunting never values single-target spells', () =>
     for (const vocation of VOCATIONS) {
       const r = optimize({ vocation, points: 1500, monster: null, priority: 30, context: CONTEXTS[0] });
       const single = r.spells.filter((s) => getDamageSpell(s.name) && isSingleTarget(s.name));
-      for (const s of single) expect(['spell.damage', 'spell.lowShare', 'spell.revelationLocked']).toContain(s.reasonMsg?.key);
+      for (const s of single) expect(['spell.damage', 'spell.lowShare', 'spell.revelationLocked', 'spell.notInRotation']).toContain(s.reasonMsg?.key);
       withSingle += single.length ? 1 : 0;
     }
     expect(withSingle).toBeGreaterThanOrEqual(3);
@@ -529,8 +531,10 @@ describe('integration: hunting spot (weighted monsters)', () => {
     { monster: monster('chakoya-windcaller'), weight: energy },
   ];
   const run = (fire: number, energy: number) =>
-    optimize({ vocation: 'sorcerer', points: 1500, monster: null, monsters: spot(fire, energy), priority: 30, context: CONTEXTS[3] });
+    optimize({ vocation: 'sorcerer', points: 1500, monster: null, monsters: spot(fire, energy), priority: 30, context: CONTEXTS[1] });
   const topElement = (r: OptimizerResult) => spellElement(r.spells.find((s) => s.useful && (s.share ?? 0) > 0)!.name);
+  const energyShare = (r: OptimizerResult) =>
+    r.spells.filter((s) => s.useful && spellElement(s.name) === 'energy').reduce((a, s) => a + (s.share ?? 0), 0);
 
   it('weights change the preferred element and the build', () => {
     expect(monster('askarak-demon').elementModifiers.fire).toBeGreaterThan(100);
@@ -538,7 +542,8 @@ describe('integration: hunting spot (weighted monsters)', () => {
     const fire = run(9, 1);
     const energy = run(1, 9);
     expect(topElement(fire)).not.toBe('energy');
-    expect(topElement(energy)).toBe('energy');
+    expect(energyShare(energy)).toBeGreaterThan(energyShare(fire) + 10);
+    expect(energy.rotation?.presetId).not.toBe(fire.rotation?.presetId);
     expect(fire.allocation).not.toEqual(energy.allocation);
     expect(run(18, 2).allocation).toEqual(fire.allocation);
     const spotMsg = fire.rationaleMsgs!.find((m) => m.key === 'rationale.spot');
@@ -568,7 +573,7 @@ describe('integration: character stats', () => {
     const high = optimize({ ...base, character: { level: 1500 } });
     const ratio = (r: OptimizerResult) => Number(r.rationaleMsgs!.find((m) => m.key === 'rationale.hpOverMitigation')?.params?.ratio ?? 0);
     expect(ratio(low)).toBeGreaterThan(ratio(high));
-    expect(high.gemRecommendations.find((g) => g.quality === 'lesser')?.mods[0].name).toBe('Mitigation Multiplier');
+    expect(high.gemRecommendations.find((g) => g.quality === 'lesser')?.mods[0].name).toBe('Hit Points');
     const charMsg = (r: OptimizerResult) => r.rationaleMsgs!.find((m) => m.key === 'rationale.character')!.params!;
     expect(charMsg(low).level).toBe(400);
     expect(Number(charMsg(high).hp)).toBeGreaterThan(Number(charMsg(low).hp));
@@ -614,5 +619,92 @@ describe('integration: URL state (iteration 3 keys)', () => {
     expect(sanitize({ monsterId: 'demon' }).monsters).toEqual([{ id: 'demon', weight: 1 }]);
     expect(withKnownMonsters({ ...DEFAULT_INPUTS, ...fromQuery('?v=knight&m=demon_nope*3') }, known).monsters).toEqual([{ id: 'demon', weight: 1 }]);
     expect(fromQuery('?m=demon*-1_demon*5').monsters).toEqual([{ id: 'demon', weight: 1 }]);
+  });
+});
+
+describe('integration: iteration 4 — EHP gems, rotations, forced spells', () => {
+  const HUNT: FightContext = { mode: 'hunt' };
+  const BOSS: FightContext = { mode: 'boss' };
+  const at = (level: number) => ({ points: pointsForLevel(level), character: { level } });
+  const stageOf = (r: Build, name: string | null) => r.revelations.find((x) => x.perk.name === name)?.stage ?? 0;
+
+  it.each(VOCATIONS)('%s: no capacity or max-mana gem mods (levels 200–1500, both modes, priority 0/50/100)', (vocation) => {
+    for (const level of [200, 600, 1500])
+      for (const context of [HUNT, BOSS])
+        for (const priority of [0, 50, 100]) {
+          const r = optimize({ vocation, ...at(level), monster: null, priority, context });
+          for (const b of allBuilds(r))
+            for (const g of b.gemRecommendations)
+              for (const m of g.mods) expect(m.name, `${level}/${context.mode}/${priority}`).not.toMatch(/\b(Capacity|Mana)\b(?! Drain)/);
+        }
+  });
+
+  it.each([
+    ['paladin', 'Divine Dazzle'],
+    ['monk', 'Mystic Repulse'],
+    ['druid', 'Heal Friend'],
+  ] as const)('%s: forced %s augment is in the allocation (UI list → engine)', (vocation, spell) => {
+    expect(getForceableSpells(vocation)).toContain(spell);
+    const r = optimize({ vocation, ...at(600), monster: null, priority: 50, context: HUNT, forcedSpells: [spell] });
+    const slices = getEngineWheel(vocation).slices.filter((sl) => sl.tile.conviction.augment?.spells.includes(spell));
+    expect(slices.length).toBeGreaterThan(0);
+    expect(slices.some((sl) => (r.allocation[sl.slice.id] ?? 0) >= sl.capacity)).toBe(true);
+    expect(r.rationaleMsgs!.map((m) => m.key)).toContain('rationale.forced');
+    assertValidResult(getWheel(vocation), r, pointsForLevel(600));
+  });
+
+  it.each(VOCATIONS)('%s: every manual preset is honoured (auto=false) for main and alternatives', (vocation) => {
+    for (const p of getRotationPresets(vocation)) {
+      const r = optimize({ vocation, ...at(1000), monster: null, priority: 50, context: HUNT, rotationId: p.id, alternatives: 1 });
+      for (const b of allBuilds(r)) expect(b.rotation, p.id).toMatchObject({ presetId: p.id, auto: false });
+      const msg = r.rationaleMsgs!.find((m) => m.key === 'rationale.rotationManual');
+      expect(msg?.params?.rotation).toBe(p.name);
+    }
+    const auto = optimize({ vocation, ...at(1000), monster: null, priority: 50, context: HUNT });
+    expect(auto.rotation?.auto).toBe(true);
+    expect(getRotationPresets(vocation).map((p) => p.id)).toContain(auto.rotation!.presetId);
+  });
+
+  it.each(VOCATIONS)('%s: revelation spells flagged only while their revelation is active', (vocation) => {
+    for (const level of [300, 800, 1500])
+      for (const priority of [0, 50])
+        for (const context of [HUNT, BOSS]) {
+          const r = optimize({ vocation, ...at(level), monster: null, priority, context, alternatives: 1 });
+          for (const b of allBuilds(r))
+            for (const s of b.rotation!.spells) {
+              const rev = revelationSpell(s.name);
+              expect(Boolean(s.fromRevelation), s.name).toBe(rev !== null);
+              if (rev) expect(stageOf(b, rev), `${s.name} @${level}/${priority}`).toBeGreaterThan(0);
+            }
+        }
+  });
+
+  it.each(VOCATIONS)('%s: avatar in the rotation only in boss mode with the avatar revelation reached', (vocation) => {
+    const avatarName = getEngineWheel(vocation).revelations.find((r) => r.data.isAvatar)!.data.name;
+    let seen = 0;
+    for (const level of [300, 1000, 2000])
+      for (const context of [HUNT, BOSS]) {
+        const r = optimize({ vocation, ...at(level), monster: null, priority: 30, context });
+        const has = r.rotation!.spells.some((s) => s.name === avatarName);
+        expect(has, `${level}/${context.mode}`).toBe(context.mode === 'boss' && stageOf(r, avatarName) > 0);
+        seen += has ? 1 : 0;
+      }
+    expect(seen).toBeGreaterThan(0);
+  });
+
+  it('the greedy boss plan gets a translated label (never the raw id)', () => {
+    const msg: EngineMessage = { key: 'rationale.rotationAuto', params: { rotation: GREEDY_ROTATION_ID } };
+    expect(engineText(translator('en'), msg, '')).toContain(en['rotation.boss']);
+    expect(engineText(translator('pl'), msg, '')).toContain(pl['rotation.boss']);
+    expect(getRotationPresets('paladin').map((p) => p.id)).not.toContain(GREEDY_ROTATION_ID);
+  });
+
+  it('builds with forced spells / manual rotations still produce decodable planner codes', () => {
+    const r = optimize({ vocation: 'paladin', ...at(800), monster: null, priority: 50, context: BOSS, rotationId: 'rp-barrages', forcedSpells: ['Divine Dazzle', 'Salvation'], alternatives: 2 });
+    for (const b of allBuilds(r)) {
+      const d = decodePlannerCode(b.plannerCode!);
+      expect(d.vocation).toBe('paladin');
+      expect(Object.fromEntries(Object.entries(d.points).filter(([, p]) => p > 0))).toEqual(gridPoints('paladin', b.allocation));
+    }
   });
 });

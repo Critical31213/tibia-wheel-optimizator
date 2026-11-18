@@ -145,16 +145,16 @@ describe('mitigation multiplier', () => {
   it('multiplies the vocation base mitigation instead of adding flat %', () => {
     const g = (vocation: (typeof VOCATIONS)[number]) => mitigationGain(env(vocation).v, 30);
     expect(mitigationGain({ mitigation: 20 }, 30)).toBeCloseTo(6);
-    expect(g('sorcerer')).toBeLessThan(g('paladin'));
+    for (const vocation of VOCATIONS) expect(g(vocation)).toBeCloseTo((env(vocation).v.mitigation * 30) / 100);
     expect(g('paladin')).toBeLessThan(g('knight'));
     for (const vocation of VOCATIONS) expect(env(vocation).v.mitigation).toBeLessThan(30);
   });
 
-  it('values grade IV below a flat 30 % damage reduction and scales by vocation', () => {
+  it('values grade IV below a flat 30 % damage reduction and scales with base mitigation', () => {
     const k = mitigationParts(env('knight').v, 30).def;
-    const s = mitigationParts(env('sorcerer').v, 30).def;
+    const p = mitigationParts(env('paladin').v, 30).def;
     expect(k).toBeLessThan(10);
-    expect(s).toBeLessThan(k / 2);
+    expect(p).toBeLessThan(k);
   });
 
   it('does not dominate offensive mage builds', () => {

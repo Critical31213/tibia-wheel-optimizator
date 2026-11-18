@@ -8,37 +8,32 @@
  * D16: in hunt mode single-target spells never enter the rotation (zero value for their augments/gems).
  * Perk values are ΔT / T0 (T0 = rotation without wheel bonuses, no revelation).
  */
-import type { CharacterStats, Element, FightContext, Monster, Vocation, WeightedMonster } from '../types';
+import { GREEDY_ROTATION_ID, type CharacterStats, type Element, type FightContext, type Monster, type RotationPreset, type Vocation, type WeightedMonster } from '../types';
 import { getSpell, getWheelSpellNames, type SpellMeta } from '../data/wheel';
 import {
   getDamageSpell,
   getDamageSpells,
   getHealingSpell,
   healingAverage,
+  revelationSpell,
   levelTerm,
   spellAverageHit,
   spellVariant,
   SPELL_FORMULAS,
   TURN_SECONDS,
+  paladinWeaponFor,
   weaponBracket,
   type DamageSpell,
 } from '../data/damage';
 import { resolveCharacterStats } from '../data/character';
 import { getEngineWheel } from './wheel/build';
 
-export const DEFAULT_CONTEXT: FightContext = { mode: 'hunt', huntStyle: 'solo' };
+export const DEFAULT_CONTEXT: FightContext = { mode: 'hunt' };
 
 /** Area/chain/beam targets in boss mode (summons, adds). */
 export const BOSS_AREA_TARGETS = 1.2;
-/** Monsters available to area spells per hunt style (solo uses tibiapal averages). */
-export const HUNT_POOL: Record<'teamLure' | 'teamBox', number> = { teamLure: 5, teamBox: 9 };
-/** Fraction of the pack a beam's central line reaches; outer tiles (Beam Mastery) add this much more. */
-export const BEAM_CENTRAL_REACH = 0.5;
-export const BEAM_OUTER_REACH = 0.4;
 const SOLO_FALLBACK: Record<SpellMeta['area'], number> = { single: 1, area: 5, chain: 4, beam: 2.4 };
 const MAX_TARGETS_FALLBACK: Record<SpellMeta['area'], number> = { single: 1, area: 20, chain: 6, beam: 7 };
-/** Party size assumed for group heals in team hunts. */
-const PARTY_SIZE = 4;
 /** Cooldown can never drop below this fraction of the base cooldown. */
 export const COOLDOWN_FLOOR = 0.5;
 const BASE_CRIT_CHANCE = SPELL_FORMULAS.critDefaults.critChance;
@@ -97,7 +92,7 @@ const SUPPORT_COOLDOWN: Record<string, number | [number, number, number]> = {
 /** Share of the healing a vocation relies on (fraction). Group heals scale with the context. */
 export const HEAL_SHARE: Record<string, number> = {
   'Fair Wound Cleansing': 0.6,
-  'Intense Wound Cleansing': 0.25,
+  'Intense Wound Cleansing': 0.08,
   Salvation: 0.5,
   'Ultimate Healing': 0.4,
   "Nature's Embrace": 0.3,
@@ -108,14 +103,8 @@ export const HEAL_SHARE: Record<string, number> = {
 };
 export const TEAM_HEALS = new Set(['Heal Friend', 'Mass Healing', 'Mass Spirit Mend']);
 
-/** Auto-attack: avg hit ≈ level term + 0.5 × 0.085 × skill × attack; paladin diamond arrows hit an area while hunting. */
-const AUTO_ATTACK_TARGETS: Record<Vocation, Record<'solo' | 'teamLure' | 'teamBox', number>> = {
-  knight: { solo: 1, teamLure: 1, teamBox: 1 },
-  paladin: { solo: 3, teamLure: 4, teamBox: 5 },
-  sorcerer: { solo: 1, teamLure: 1, teamBox: 1 },
-  druid: { solo: 1, teamLure: 1, teamBox: 1 },
-  monk: { solo: 1, teamLure: 1, teamBox: 1 },
-};
+/** Auto-attack targets while hunting: avg hit ≈ level term + 0.5 × 0.085 × skill × attack; paladin diamond arrows hit an area. */
+const AUTO_ATTACK_TARGETS: Record<Vocation, number> = { knight: 1, paladin: 3, sorcerer: 1, druid: 1, monk: 1 };
 
 interface HitPart {
   /** Raw hit without bonuses. */
@@ -151,8 +140,29 @@ export interface SpellEval {
   hits: { main: HitPart; extra: HitPart | null }[];
 }
 
+/**
+ * Rotation the damage model is based on (D20). `preset` null = greedy schedule over every usable spell
+ * (boss mode / tests). Revelation-granted spells are never preset entries: they are cast on cooldown while active.
+ */
+export interface RotationPlan {
+  id: string;
+  preset: RotationPreset | null;
+  /** Preset spells with `or` alternatives resolved vs the spot. */
+  entries: { name: string; ratio: number }[];
+  /** Requires a shield (knight mitigation uses the shield offhand). */
+  shield: boolean;
+  /** Revelation the preset requires (valid only when reached). */
+  requires: string | null;
+}
+
+export const GREEDY_PLAN_ID = GREEDY_ROTATION_ID;
+const GREEDY_PLAN: RotationPlan = { id: GREEDY_PLAN_ID, preset: null, entries: [], shield: false, requires: null };
+
 export interface SpellModel {
   vocation: Vocation;
+  plan: RotationPlan;
+  /** 100 × (T0 of this plan − reference) / reference: offset vs the common reference rotation. */
+  baseOff: number;
   context: FightContext;
   /** Weighted monsters (weights sum to 1); empty = generic. */
   monsters: { monster: Monster; weight: number }[];
@@ -192,30 +202,21 @@ export function normaliseMonsters(monsters: WeightedMonster[] | undefined, monst
 }
 
 export function expectedTargets(meta: Pick<SpellMeta, 'kind' | 'area' | 'avgHitsHunt' | 'maxTargets'>, ctx: FightContext, maxTargets = meta.maxTargets): number {
-  if (meta.kind === 'healing') {
-    if (meta.area === 'single' || ctx.mode === 'boss' || ctx.huntStyle === 'solo') return 1;
-    return Math.min(maxTargets, PARTY_SIZE);
-  }
-  if (meta.area === 'single' || maxTargets <= 1) return 1;
+  if (meta.kind === 'healing' || meta.area === 'single' || maxTargets <= 1) return 1;
   if (ctx.mode === 'boss') return Math.min(maxTargets, BOSS_AREA_TARGETS);
-  const solo = Math.min(maxTargets, meta.avgHitsHunt ?? SOLO_FALLBACK[meta.area]);
-  if (ctx.huntStyle === 'solo') return solo;
-  const reach = HUNT_POOL[ctx.huntStyle] * (meta.area === 'beam' ? BEAM_CENTRAL_REACH : 1);
-  return Math.min(maxTargets, Math.max(solo, reach));
+  return Math.min(maxTargets, meta.avgHitsHunt ?? SOLO_FALLBACK[meta.area]);
 }
 
 export function outerBeamTargets(meta: Pick<SpellMeta, 'area' | 'avgHitsHuntOuter'>, ctx: FightContext): number {
   if (meta.area !== 'beam' || ctx.mode === 'boss') return 0;
-  const solo = meta.avgHitsHuntOuter ?? 0;
-  if (ctx.huntStyle === 'solo') return solo;
-  return Math.max(solo, HUNT_POOL[ctx.huntStyle] * BEAM_OUTER_REACH);
+  return meta.avgHitsHuntOuter ?? 0;
 }
 
-function hitPart(name: string, char: Required<CharacterStats>, vocation: Vocation, stage: number, part: 'main' | 'extra'): HitPart | null {
+function hitPart(name: string, char: Required<CharacterStats>, vocation: Vocation, mode: FightContext['mode'], stage: number, part: 'main' | 'extra'): HitPart | null {
   const spell = getDamageSpell(name);
   const variant = spell && spellVariant(spell, stage, part);
   if (!variant) return null;
-  const o = { vocation, stage, part };
+  const o = { vocation, stage, part, paladinWeapon: paladinWeaponFor(mode) };
   const base = spellAverageHit(name, char, o);
   return {
     base,
@@ -228,7 +229,7 @@ const modelCache = new Map<string, SpellModel>();
 
 function cacheKey(vocation: Vocation, ctx: FightContext, monsters: { monster: Monster; weight: number }[], c: Required<CharacterStats>) {
   const m = monsters.map((x) => `${x.monster.id}:${x.weight.toFixed(6)}`).join(',');
-  return `${vocation}|${ctx.mode}|${ctx.huntStyle}|${m}|${c.level}|${c.mainSkill}|${c.magicLevel}|${c.shielding}`;
+  return `${vocation}|${ctx.mode}|${m}|${c.level}|${c.mainSkill}|${c.magicLevel}|${c.shielding}`;
 }
 
 export function buildSpellModel(
@@ -272,8 +273,8 @@ export function buildSpellModel(
     const shape = { kind, area, maxTargets, avgHitsHunt: meta?.avgHitsHunt ?? dmg?.avgTargetsHunt ?? undefined };
     const revelation = revOf.get(name) ?? -1;
     const hits = [0, 1, 2, 3].map((st) => ({
-      main: (kind === 'damage' && hitPart(name, char, vocation, st, 'main')) || { base: 0, boost: 0, bf: 0 },
-      extra: kind === 'damage' && st > 0 ? hitPart(name, char, vocation, st, 'extra') : null,
+      main: (kind === 'damage' && hitPart(name, char, vocation, context.mode, st, 'main')) || { base: 0, boost: 0, bf: 0 },
+      extra: kind === 'damage' && st > 0 ? hitPart(name, char, vocation, context.mode, st, 'extra') : null,
     }));
     const isRune = dmg?.spellType === 'rune';
     spells.set(name, {
@@ -296,15 +297,17 @@ export function buildSpellModel(
     });
   }
 
-  const attack = weaponBracket(vocation, char.level).attack;
+  const attack = weaponBracket(vocation, char.level, paladinWeaponFor(context.mode)).attack;
   const autoHit = vocation === 'sorcerer' || vocation === 'druid'
     ? levelTerm(char.level)
     : levelTerm(char.level) + 0.5 * 0.085 * char.mainSkill * attack;
-  const autoTargets = context.mode === 'boss' ? 1 : AUTO_ATTACK_TARGETS[vocation][context.huntStyle];
+  const autoTargets = context.mode === 'boss' ? 1 : AUTO_ATTACK_TARGETS[vocation];
   const base = autoHit * autoTargets * spotElementMultiplier(spot, 'physical') * critEV(0, 0);
 
   const model: SpellModel = {
     vocation,
+    plan: GREEDY_PLAN,
+    baseOff: 0,
     context,
     monsters: spot,
     character: char,
@@ -385,7 +388,7 @@ export function targetsAt(model: SpellModel, s: SpellEval, stage: number, extra 
   if (!extra && !(def?.maxTargets && stage >= 1)) return s.targets;
   const shape = { kind: s.kind, area: s.area, maxTargets: max, avgHitsHunt: s.meta?.avgHitsHunt ?? s.dmg?.avgTargetsHunt ?? undefined };
   const t = expectedTargets(shape, model.context, max);
-  return model.context.mode === 'hunt' && model.context.huntStyle === 'solo' ? Math.min(max, t + extra * 0.5) : t;
+  return model.context.mode === 'hunt' ? Math.min(max, t + extra * 0.5) : t;
 }
 
 /** Average damage of one cast (all targets, element, crit, passives). */
@@ -421,8 +424,68 @@ export interface RotationResult {
   rates: Map<string, { rate: number; perCast: number }>;
 }
 
-/** Greedy single-slot schedule: highest damage per cast first, each capped at 1 / cooldown turns. */
+type Cand = { s: SpellEval; perCast: number; cap: number };
+
+function candidate(model: SpellModel, s: SpellEval, r: RotationInput): Cand | null {
+  const m = r.mods?.get(s.name) ?? NO_MODS;
+  const stage = s.stageDomain >= 0 ? r.stages[s.stageDomain] ?? 0 : 0;
+  const perCast = castDamage(model, s, r, m);
+  if (perCast <= 0 && s.revelation >= 0) return null;
+  const cd = reducedCooldown(spellCooldown(s.name, stage), m.cd);
+  return { s, perCast, cap: 1 / Math.max(1, cd / TURN_SECONDS) };
+}
+
+function dropSharedCooldowns(cands: Cand[]) {
+  for (const group of SHARED_COOLDOWN) {
+    const inGroup = cands.filter((c) => group.includes(c.s.name)).sort((a, b) => b.perCast - a.perCast || a.s.name.localeCompare(b.s.name));
+    for (const c of inGroup.slice(1)) cands.splice(cands.indexOf(c), 1);
+  }
+}
+
+/**
+ * Preset schedule: revelation spells first, on cooldown; preset spells share the remaining turns in their
+ * ratio (water-filling), each capped at 1 / cooldown turns.
+ */
+function presetRotation(model: SpellModel, r: RotationInput): RotationResult {
+  const rates = new Map<string, { rate: number; perCast: number }>();
+  let total = model.base;
+  let left = 1;
+  const rev: Cand[] = [];
+  for (const s of model.spells.values()) {
+    if (!s.usable || s.revelation < 0) continue;
+    const c = candidate(model, s, r);
+    if (c) rev.push(c);
+  }
+  dropSharedCooldowns(rev);
+  rev.sort((a, b) => b.perCast - a.perCast || a.s.name.localeCompare(b.s.name));
+  for (const c of rev) {
+    const rate = Math.min(c.cap, left);
+    if (rate <= 0) break;
+    left -= rate;
+    total += rate * c.perCast;
+    rates.set(c.s.name, { rate, perCast: c.perCast });
+  }
+  const items: (Cand & { ratio: number })[] = [];
+  for (const e of model.plan.entries) {
+    const s = model.spells.get(e.name);
+    const c = s?.usable && s.revelation < 0 ? candidate(model, s, r) : null;
+    if (c && e.ratio > 0) items.push({ ...c, ratio: e.ratio });
+  }
+  items.sort((a, b) => a.cap / a.ratio - b.cap / b.ratio || a.s.name.localeCompare(b.s.name));
+  let ratioSum = items.reduce((a, x) => a + x.ratio, 0);
+  for (const c of items) {
+    const rate = Math.max(0, Math.min(c.cap, (left * c.ratio) / ratioSum));
+    left -= rate;
+    ratioSum -= c.ratio;
+    total += rate * c.perCast;
+    rates.set(c.s.name, { rate, perCast: c.perCast });
+  }
+  return { total, rates };
+}
+
+/** Rotation of the model's plan: preset schedule, or greedy (highest damage per cast first, capped at 1 / cooldown). */
 export function rotation(model: SpellModel, r: RotationInput): RotationResult {
+  if (model.plan.preset) return presetRotation(model, r);
   const cands: { s: SpellEval; perCast: number; cap: number }[] = [];
   for (const s of model.spells.values()) {
     if (!s.usable) continue;
@@ -433,10 +496,7 @@ export function rotation(model: SpellModel, r: RotationInput): RotationResult {
     const cd = reducedCooldown(spellCooldown(s.name, stage), m.cd);
     cands.push({ s, perCast, cap: 1 / Math.max(1, cd / TURN_SECONDS) });
   }
-  for (const group of SHARED_COOLDOWN) {
-    const inGroup = cands.filter((c) => group.includes(c.s.name)).sort((a, b) => b.perCast - a.perCast || a.s.name.localeCompare(b.s.name));
-    for (const c of inGroup.slice(1)) cands.splice(cands.indexOf(c), 1);
-  }
+  dropSharedCooldowns(cands);
   cands.sort((a, b) => b.perCast - a.perCast || a.s.name.localeCompare(b.s.name));
   let left = 1;
   let total = model.base;
@@ -453,6 +513,44 @@ export function rotation(model: SpellModel, r: RotationInput): RotationResult {
 
 export function rotationTotal(model: SpellModel, r: RotationInput): number {
   return rotation(model, r).total;
+}
+
+/** Resolves a preset vs the model's spot: `or` alternatives → best damage per cast; revelation spells dropped (added while active). */
+export function planFor(model: SpellModel, preset: RotationPreset | null): RotationPlan {
+  if (!preset) return GREEDY_PLAN;
+  const at3: RotationInput = { stages: [3, 3, 3, 3] };
+  const dmg = (n: string) => {
+    const s = model.spells.get(n);
+    return s ? castDamage(model, s, at3) : -1;
+  };
+  const entries: RotationPlan['entries'] = [];
+  for (const e of preset.spells) {
+    const opts = [e.name, ...(e.or ?? [])];
+    const best = opts.reduce((a, b) => (dmg(b) > dmg(a) ? b : a));
+    if (revelationSpell(best) || !model.spells.has(best)) continue;
+    const prev = entries.find((x) => x.name === best);
+    if (prev) prev.ratio += e.ratio;
+    else entries.push({ name: best, ratio: e.ratio });
+  }
+  return { id: preset.id, preset, entries, shield: !!preset.requires?.shield, requires: preset.requires?.revelation ?? null };
+}
+
+/**
+ * The model with a rotation plan. `reference` (T0 of a common reference rotation) makes perk values of
+ * different plans comparable: off = ΔT / reference; `baseOff` = (T0 − reference) / reference.
+ */
+export function withPlan(model: SpellModel, preset: RotationPreset | null, reference?: number): SpellModel {
+  const m: SpellModel = { ...model, plan: planFor(model, preset), baseOff: 0 };
+  const t0 = Math.max(1, rotationTotal(m, NO_BONUS));
+  m.total = reference ?? t0;
+  m.baseOff = (100 * (t0 - m.total)) / m.total;
+  m.flatOffPerPoint = (100 * (rotationTotal(m, { ...NO_BONUS, flat: 1 }) - t0)) / m.total;
+  return m;
+}
+
+/** T0 (no wheel bonuses) of a preset on a model. */
+export function planTotal(model: SpellModel, preset: RotationPreset | null): number {
+  return Math.max(1, rotationTotal({ ...model, plan: planFor(model, preset) }, NO_BONUS));
 }
 
 /** Δ% of total damage (relative to T0) between two rotation inputs. */
@@ -477,8 +575,7 @@ export function healShare(model: SpellModel, name: string): number {
   const share = HEAL_SHARE[name] ?? 0.2;
   if (!TEAM_HEALS.has(name)) return share;
   const ctx = model.context;
-  if (ctx.mode === 'boss') return share;
-  return share * (ctx.huntStyle === 'solo' ? 0.5 : 2);
+  return ctx.mode === 'boss' ? share : share * 0.5;
 }
 
 /** Average healing of one cast of `name` (Canary formulas). */

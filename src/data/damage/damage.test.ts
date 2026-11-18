@@ -17,7 +17,13 @@ import {
   spellCooldownTurns,
   spellVariant,
   weaponBracket,
+  BALLISTIC_MASTERY,
+  POSITIONAL_TACTICS,
+  paladinWeaponFor,
+  pierceDamageMod,
+  revelationSpell,
 } from './index';
+import { ROTATION_PRESETS } from './rotations';
 import type { Coefficients } from './types';
 
 interface Sample {
@@ -137,5 +143,60 @@ describe('loader API', () => {
     expect(healingAverage('Intense Wound Cleansing', { level: 1000, magicLevel: 12 })).toBeGreaterThan(1000);
     expect(weaponBracket('knight', 650).attack).toBeGreaterThan(40);
     expect(weaponBracket('paladin', 100).weapon).toBeTruthy();
+  });
+});
+
+describe('iteration 4: rotations, revelation spells, paladin weapons (D20/D21)', () => {
+  it('every rotation spell (incl. `or` alternatives) resolves to a damage formula', () => {
+    for (const r of ROTATION_PRESETS)
+      for (const s of r.spells)
+        for (const n of [s.name, ...(s.or ?? [])]) {
+          expect(getDamageSpell(n), `${r.id}: ${n}`).toBeDefined();
+          expect(getDamageSpell(n)!.vocations).toContain(r.vocation);
+        }
+  });
+
+  it('revelation-unlocked spells are marked', () => {
+    expect(revelationSpell('Divine Grenade')).toBe('Divine Grenade');
+    expect(revelationSpell("executioner's throw")).toBe("Executioner's Throw");
+    expect(revelationSpell('Ice Burst')).toBe('Twin Bursts');
+    expect(revelationSpell('Terra Burst')).toBe('Twin Bursts');
+    expect(revelationSpell('Spiritual Outburst')).toBe('Spiritual Outburst');
+    expect(revelationSpell('Avatar of Light')).toBe('Avatar of Light');
+    expect(revelationSpell('Great Fire Wave')).toBeNull();
+    expect(getDamageSpell('Terra Burst')!.unlockedBy).toBe('Twin Bursts');
+    expect(getDamageSpell('Forked Thorns')!.unlockedBy).toBeUndefined();
+  });
+
+  it('paladin weapon types: bow (hunt) vs crossbow (boss)', () => {
+    expect(paladinWeaponFor('hunt')).toBe('bow');
+    expect(paladinWeaponFor('boss')).toBe('crossbow');
+    expect(weaponBracket('paladin', 800, 'bow').weapon).toBe('Grand Sanguine Bow');
+    expect(weaponBracket('paladin', 800).weapon).toBe('Grand Sanguine Crossbow');
+    expect(weaponBracket('knight', 800, 'bow').weapon).toBe('Grand Sanguine Hatchet');
+    const p = { level: 800, mainSkill: 120, magicLevel: 30 };
+    const b = spellAverageHit('Ethereal Barrage', p, { paladinWeapon: 'bow' });
+    const c = spellAverageHit('Ethereal Barrage', p, { paladinWeapon: 'crossbow' });
+    expect(Math.abs(b - c) / c).toBeLessThan(0.01);
+  });
+
+  it('Positional Tactics deltas: +3 distance / +3 magic level', () => {
+    const p = { level: 800, mainSkill: 120, magicLevel: 30 };
+    expect(spellAverageHit('Ethereal Barrage', p, { skillBonus: 3 })).toBeCloseTo(spellAverageHit('Ethereal Barrage', { ...p, mainSkill: 123 }), 8);
+    expect(spellAverageHit('Divine Caldera', p, { magicLevelBonus: 3 })).toBeCloseTo(spellAverageHit('Divine Caldera', { ...p, magicLevel: 33 }), 8);
+    expect(spellAverageHit('Divine Caldera', p, { magicLevelBonus: 3 }) - spellAverageHit('Divine Caldera', p)).toBeCloseTo(18, 0);
+    expect(POSITIONAL_TACTICS).toEqual({ skillBonus: 3, magicLevelBonus: 3, skillUptime: 0.7 });
+  });
+
+  it('Ballistic Mastery: pierce vs creature modifier (TibiaTools probe) and crossbow crit', () => {
+    expect(BALLISTIC_MASTERY.bow.piercePct).toBe(4);
+    expect(pierceDamageMod(0.7, 4)).toBeCloseTo(0.74, 10);
+    expect(pierceDamageMod(1, 4)).toBeCloseTo(1.02, 10);
+    expect(pierceDamageMod(1.12, 4)).toBeCloseTo(1.14, 10);
+    expect(pierceDamageMod(0.7, 40)).toBeCloseTo(1.05, 10);
+    expect(pierceDamageMod(0, 4)).toBe(0);
+    // probe: Behemoth Divine Caldera 262.30 → 277.29, raw 367 × crit 1.05 × (1 - 2.76 %)
+    expect(367 * 1.05 * pierceDamageMod(0.7, 4) * (1 - 0.0276)).toBeCloseTo(277.29, 0);
+    expect(critMultiplier(10, 50 + BALLISTIC_MASTERY.crossbow.critExtraDamagePct)).toBeCloseTo(1.06, 10);
   });
 });

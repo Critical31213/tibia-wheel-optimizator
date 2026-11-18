@@ -1,5 +1,57 @@
 # Integration & QA (S4 Integration)
 
+## Iteration 4 (2026-11-18)
+
+### Files changed
+
+| File | Change |
+|------|--------|
+| `src/types/index.ts` | `GREEDY_ROTATION_ID = 'boss'`: the `RotationUsage.presetId` of the engine's greedy boss plan. `src/engine/spells.ts` (`GREEDY_PLAN_ID`) reuses it, so the UI does not import engine internals. |
+| `src/components/RotationPanel.tsx` | Shows `rotation.boss` ("Boss: best plan vs one target" / "Boss: najlepszy plan na jeden cel") instead of the raw id `boss`. |
+| `src/i18n/engine.ts` | The `{rotation}` param of `rationale.rotationAuto/Manual` is translated the same way when it is the greedy plan. |
+| `src/i18n/pl.ts` | PL wording of the new keys reviewed: `rotation.used` "Obrażenia liczone z rotacji", "Revelation" capitalised, gender-neutral `rationale.forced` ("Wzięto wymuszone augmenty"), `forcedImpossible` / `forcedNoAugment` / `spell.forced` / `spell.notInRotation` / `rotationManual` / `rotationRequires` reworded. Parity is covered by `i18n.test.ts`. |
+
+Verified, no change needed: `RotationPanel` receives `shown.rotation`, so alternatives show their own rotation; `rotationId` / `forcedSpells` reach `optimize`; old links with `h` load and the key is dropped from the URL.
+
+### Test matrix additions (`src/integration.test.ts`, 165 tests total, +25)
+
+The iteration 3 count (200) dropped when hunt styles were removed (S3 reduced the context matrix to hunt / boss).
+
+| Area | Cases |
+|------|-------|
+| EHP gems (D18) | 5 vocations × levels 200 / 600 / 1500 × hunt / boss × priority 0 / 50 / 100, main build and alternatives: no gem mod contains Capacity or Mana (Mana Drain resistance allowed). |
+| Forced spells (D21) | Paladin Divine Dazzle, monk Mystic Repulse, druid Heal Friend (level 600): the spell is in `getForceableSpells`, a slice with its augment is filled, `rationale.forced` is present and the build is valid. |
+| Manual rotation (D20) | Every preset of every vocation (level 1000): main build and alternative report `presetId` with `auto: false`, and `rationale.rotationManual` names the preset. Without `rotationId`, `auto: true` and a valid preset id. |
+| Revelation spells | 5 vocations × levels 300 / 800 / 1500 × priority 0 / 50 × hunt / boss, main + alternative: `fromRevelation` ⇔ `revelationSpell(name)`, and the revelation is at stage ≥ 1. |
+| Avatar | 5 vocations × levels 300 / 1000 / 2000 × hunt / boss (priority 30): the Avatar is in the rotation exactly when in boss mode with its revelation reached (seen at least once per vocation). |
+| Boss plan label | `rationale.rotationAuto` with the greedy id renders `rotation.boss` in EN and PL; no preset uses the id. |
+| Planner code | Paladin boss, manual rotation + 2 forced spells + 2 alternatives: every code decodes to the allocation. The WASM round-trip (skipIf) still passes. |
+
+### Browser check (dev server, T3 preview)
+
+Paladin, level 600, URL with the legacy `h=solo`; the page loads and drops `h`.
+- Hunt, auto: "Damage based on: Divine Caldera – Ethereal Barrage (picked automatically)", Ethereal Barrage 36 %, Divine Caldera 34 %.
+- Manual "Divine Barrage – Ethereal Barrage" (URL `r=rp-barrages`): the panel and rationale follow it, and Divine Grenade ★ is added by its revelation.
+- Forced Divine Dazzle (URL `fs=Divine+Dazzle`): a chip, `rationale.forced`, and an Augmented Divine Dazzle slice at 100/100.
+- Boss: "Boss: best plan vs one target" in the panel and rationale; in PL "Boss: najlepszy plan na jeden cel". Alt 1 shows its own shares.
+- The preview listed 2 console entries from page load (not inspected), the same before and after the interactions. There was no Vite error overlay.
+
+### Gate results (2026-11-18)
+
+| Gate | Result |
+|------|--------|
+| `npx tsc -b` | 0 errors |
+| `npx vitest run` | 19 files, 485 tests passed (WASM tests ran) |
+| `npm run lint` | 0 warnings / errors |
+| `npm run build` | main 743 kB (163 kB gzip), data 699 kB (76 kB gzip), CSS 27 kB |
+
+### Open issues
+
+- At priority 50, a paladin hunting at levels 500–800 takes Gift of Life instead of the meta Divine Grenade + Divine Empowerment, because 1 % EHP weighs as much as 1 % damage. This waits for the user to decide the offense/defense exchange rate.
+- Paladin mitigation calibration assumes shield defense 50, and the quiver factor (0.877) comes from a single data pair.
+- Rotation preset notes (e.g. "holy vs physical within ~20%") are English data strings, so they are not translated in PL.
+- The greedy boss plan's spells include area spells counted at ~1.2 targets, so its label says "vs one target", not "single-target spells".
+
 ## Iteration 3 (2026-11-18)
 
 ### Files changed

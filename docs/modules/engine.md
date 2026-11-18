@@ -59,7 +59,7 @@ Every source yields `Parts = { off, def, util }`. They are blended as `score = w
 **Character** (`valuationFor`).
 - The engine uses `input.character`. Missing skills are estimated with `defaultCharacterStats` (`src/data/character`).
 - With no character, `level = points + 50`.
-- Level and skills drive HP, mana, base mitigation (`mitigationPercent`) and every spell hit (`src/data/damage` formulas).
+- Level and skills drive HP, base mitigation (`mitigationPercent` with the D19 offhand defaults; the knight uses a shield only when the rotation `requires.shield`) and every spell hit (`src/data/damage` formulas).
 
 ### Damage model (`spells.ts`)
 
@@ -75,12 +75,15 @@ Every source yields `Parts = { off, def, util }`. They are blended as `score = w
     - Spiritual Outburst: the extra is added.
     - Beams: side hits land on the outer targets, and the central hit gets +10/12/14 % per target, capped at 30/36/42 %.
   - **Passives.** Combat Mastery, Ascetic (harmony spenders) and Lord of Destruction (fire) multiply the spells they affect.
-- **Rotation:** one attack slot per 2 s turn.
-  - Spells are filled greedily by per-cast damage, each capped at 1 / (cooldown / 2 s).
-  - Shared cooldown groups keep only their best spell: Twin Bursts, Hell's Core / Rage of the Skies, Eternal Winter / Wrath of Nature, strong strikes, ultimate strikes.
-  - Auto-attack fills the remaining turns. Weapon vocations use g(L) + 0.5·0.085·skill·attack; mages use g(L).
-  - Paladin auto-attack hits 3 / 4 / 5 targets (solo / team-lure / team-box).
-- **`off` unit:** `100 · ΔT / T0`, where T0 is the rotation with no wheel bonuses and every stage at 0.
+- **Rotation (D20):** one attack slot per 2 s turn. A *plan* is a preset from `getRotationPresets(vocation)` or the greedy plan (`GREEDY_PLAN_ID = 'boss'`).
+  - Plan selection: `input.rotationId` (manual), else auto = every preset (plus the greedy plan in boss mode), each searched jointly with the build; the best valid plan wins. `requires.revelation` is valid only when the build reaches that revelation; `requires.shield` switches the knight to a shield (base mitigation).
+  - `planFor` resolves `or` alternatives by per-cast damage vs the spot at stage 3, drops revelation-granted spells and merges duplicates.
+  - Preset rotation: active revelation spells (Divine Grenade, Executioner's Throw, bursts, Spiritual Outburst…) are cast first, on cooldown. The remaining turns are water-filled over the preset ratios, each spell capped at 1 / (cooldown / 2 s). Shared cooldown groups keep only their best spell.
+  - Greedy plan: spells filled by per-cast damage within cooldowns; Avatars count only in boss mode.
+  - Auto-attack fills the remaining turns. Weapon vocations use g(L) + 0.5·0.085·skill·attack; mages use g(L). Paladin auto-attack hits 3 targets in hunt (bow) and 1 in boss (crossbow).
+  - `result.rotation` = `{presetId, auto, spells[{name, ratio (casts/min), share %, fromRevelation}]}` for the main build and each alternative.
+- **`off` unit:** `100 · ΔT / Tref`. Tref is shared by every plan (the best preset without a revelation requirement, no wheel bonuses), so plans are comparable; `model.baseOff` is each plan's own T0 offset vs Tref.
+- **Transit slices:** augments and gem mods of spells outside the rotation are worth 0 (`spell.notInRotation`) unless the spell is forced or a heal. Utility spells (Divine Dazzle) count only when forced (`spell.forced`). Augment damage deltas are clamped at ≥ 0.
   - All damage perks are valued as a rotation delta (`deltaOff`): augments, crit, cooldown (through rotation share), flat bonus, revelation stages and supreme mods.
 - **Targets:**
 
@@ -89,8 +92,8 @@ Every source yields `Parts = { off, def, util }`. They are blended as `score = w
   | single-target spell, hunt (D16) | **unusable**: its share, augments and gem mods are 0 |
   | single-target spell, boss | 1 |
   | area spell, boss mode | `min(maxTargets, 1.2)` (adds) |
-  | area spell, solo hunt | `min(maxTargets, avgHitsHunt)` (tibiapal) |
-  | area spell, team-lure / team-box | `min(maxTargets, max(solo, 5 / 9))` |
+  | area spell, hunt | `min(maxTargets, avgHitsHunt)` (tibiapal averages; `huntStyle` is ignored) |
+  | beam outer tiles, hunt / boss | `avgHitsHuntOuter` / 0 |
 
 - **Monsters:**
   - `input.monsters` takes precedence over `input.monster`. Weights are normalised and non-positive weights are dropped.
@@ -98,25 +101,28 @@ Every source yields `Parts = { off, def, util }`. They are blended as `score = w
   - With no monster, the multiplier is 1.
 - **Healing** (`healPerCast`, `healShare`):
   - Healing spells use the healing formulas and are valued on the defense side.
-  - Team heals count ×0.5 solo and ×2 in team hunts.
+  - Team heals count ×0.5 in hunt and fully in boss mode.
 
 ### Defense (`values.ts`)
 
+`def` is **% effective HP** (D18):
+
 | Source | Value |
 |---|---|
-| +1 % max HP | `HP_DEF · spikeFactor`, where spikeFactor = clamp(2 · spike / maxHP, 0.25, 1.5) and spike = weighted monster `maxDamage`, else 3 · level |
-| +1 pp damage reduction | `DR_DEF / (1 − mitigation)`: sustained reduction, compounding with existing mitigation |
-| Mitigation Multiplier | multiplies the character's real base mitigation (`mitigationPercent(voc, level, {shielding})`), then valued as damage reduction |
-| resistance | `pct · DR_DEF · incomingShare(element)`; incoming shares are weighted over the spot's damage types |
-| life / mana leech | strongly devalued: life leech 0.15 def per %; mana leech 0.1 off and 0.05 def per % |
+| +x max HP | `100 · x / HP` |
+| +pp mitigation or dodge | `100 · pp / (100 − m)` (m = current mitigation) |
+| Mitigation Multiplier | multiplies the real base mitigation, then valued as above |
+| resistance | the same × `incomingShare(element)` (spot damage types; physical when unknown) |
+| capacity, max mana | 0 |
+| healing | healed HP × `HEAL_EHP` (0.5), as % of HP |
+| Avatar damage reduction (boss) | `100 · uptime · r / (1 − r)` |
+| life / mana leech | strongly devalued |
 
-All `def` values are scaled by `threat = clamp(maxDamage / 1000, 0.6, 1.6)`.
-
-HP acts as effective HP against spikes, so it dominates at low and mid level. Mitigation grows with level and shielding, so it becomes competitive only at high level and high defense priority:
-- EK 1500: about 1 : 1 per dedication point;
-- RP 400: HP is worth about 15× more.
+One uniform `threat = clamp(maxDamage / 1000, 0.6, 1.6)` scales all defense; there is no spike factor. HP beats Mitigation Multiplier per dedication point and per gem for every vocation (tested at levels 200–1500).
 
 The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitigationOverHp`).
+
+**Paladin uniques.** Ballistic Mastery: hunt (bow) +4 % pierce via `pierceDamageMod` against the spot's resistances; boss (crossbow) +10 % crit extra damage. Positional Tactics: 70 % of the time +3 distance, otherwise +3 holy and healing magic level. Both are exact rotation deltas.
 
 **Avatar.** Worth 0 in hunt mode. In boss mode its uptime-scaled damage boost and damage reduction are valued, including its supreme mods and momentum.
 
@@ -133,12 +139,13 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 
 ## 3. Optimizer (`optimizer.ts`)
 
+0. **Plans and forced spells.** One prepared valuation per plan (see Rotation). Forced spells (`input.forcedSpells`, D21) are seeded with a Dijkstra over slice capacities to their cheapest stage I augment, and every search starts from that seed. Messages: `rationale.forced`, `rationale.forcedImpossible`, `rationale.forcedNoAugment`.
 1. **Tables.** Parts for each dedication point, conviction, augment I/II, revelation[domain][stage] and vessel[k], blended by priority. `blendTables` can rescale revelations for alternatives.
-2. **Beam search.** Width 24 over full-slice fills, deduplicated by allocation key.
+2. **Beam search.** `FULL_SEARCH` = width 24 with 8 completions; `LIGHT_SEARCH` = 12 with 2. With more than 2 plans, every plan is screened with the light search, then the best plan (and a runner-up within 2 %) gets the full search. Refine and alternatives use the light search. Fills are full slices, deduplicated by allocation key.
    - Candidates are ranked without allocating (`rankOf` with a precomputed delta). Only the top 24 are materialised, and only the top 8 are greedily completed per level.
    - Rank = score + revelation-stage look-ahead + greedy-completion estimate. A partial last slice uses the remainder.
    - A budget ≥ total capacity has only one allocation, so the search returns the full wheel and no alternatives.
-3. **Refine.** For each domain at stage 1–2, damp it (×0.2) and re-run the search. The result replaces the main build only if its exact objective under the main valuation is higher.
+3. **Refine.** For each domain at stage 1–2, damp it (×0.2) and re-run the search. The result replaces the main build only if its exact objective under the main valuation is higher (and, in auto mode, the plan stays valid).
 4. **Final pass.** Recompute stages, RM, vessels, stats, recommendations, spells and `plannerCode`.
 5. **Alternatives.** The count is `input.alternatives ?? 2`, clamped to 0..5; none are produced below 100 points. Candidates, in order:
    - Avatar focus (boss mode; avatar revelation ×8);
@@ -150,6 +157,7 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 
    Acceptance and scoring:
    - An alternative is accepted only if it differs by at least `max(50, 0.1 · budget)` points (Σ|Δ| / 2) from the main build and from every alternative already accepted.
+   - Each alternative picks its own best plan. `rationale.rotationAuto`, `rotationManual` and `rotationRequires` explain the rotation.
    - `relativeScore = 100 · objective(alt) / objective(main)`, under the main valuation. If any candidate search beats the main build (the beam is heuristic; seen up to 106 %), it is promoted to main and alternatives are recomputed (≤ 3 rounds), so `relativeScore ≤ 100`. Alternatives are sorted by `relativeScore` (desc).
    - The `alt.revelationFocus` label names every revelation at the alternative's highest stage (`A + B focus`), so two focus alternatives never share a label.
    - `tradeoffMsg` (`alt.tradeoff`) lists the offense and defense deltas and the revelations.
@@ -162,9 +170,9 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 
 | Budget | Time |
 |---|---|
-| 600 points | 3–6 ms |
-| 2500 points | 15–20 ms |
-| worst case (sorcerer, 3200 points) | 31 ms |
+| 600 points | 9–15 ms |
+| 3200 points, paladin hunt | 34 ms (21 ms without alternatives, 12 ms with a manual rotation) |
+| worst case (perf test, 3200 points) | ~45 ms |
 | full wheel | 3 ms |
 
 ## 4. Gems (`gems.ts`)
@@ -174,7 +182,7 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
   - Unplaced vessels that are unlocked get `source: 'recommended'`: the best gem of that vessel's quality at grade IV, with id `recommended-<quality>`.
   - Locked vessels have `unlocked: false`, `gem: null` and `source: 'empty'`.
 - **`gemRecommendations`.**
-  - Per quality, at grade IV: the best `basic1`, the best distinct `basic2`, and the top-2 supreme variants for greater gems.
+  - Per quality, at grade IV: the best `basic1` (HP or Mitigation Multiplier only), the best distinct `basic2`, and the top-2 supreme variants for greater gems. Only mods with positive value are listed. Healing supreme gems (healing spell augments and cooldowns) are 0 for sorcerer and druid, and valued as EHP for the others.
   - Each has `reason` and `reasonMsg` from the dominant mod (spell share, avatar in boss, RM stage gained, resistance vs monster, and so on), sorted by gain.
 - **`upgradeRecommendations`.**
   - Only owned gems, only active slots, and only +1 grade.
@@ -186,17 +194,17 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 - `rationaleMsgs`, `SpellUsage.reasonMsg`, `GemRecommendation.reasonMsg` and `StatLine.labelMsg` carry `{ key, params }`.
 - Keys are `rationale.*`, `spell.*`, `gem.*` and `stat.*`, and are listed in `ENGINE_MESSAGES` (English templates with `{param}` placeholders).
 - The plain `rationale`, `reason` and `label` strings stay in English.
-- The UI translates `engine.<key>` (PL and EN in `src/i18n/`) and the id params (elements, hunt styles) through `engineText()`.
+- The UI translates `engine.<key>` (PL and EN in `src/i18n/`) and the id params (elements) through `engineText()`.
 - `rationale.threat` and `rationale.threatMax` are separate keys, so no English fragment ends up in a param.
 - `renderMessage` fills placeholders and leaves unknown ones as they are.
 
 ## 6. Assumptions
 
-- The rotation is a single-slot greedy model, with no mana limits and no movement.
+- The rotation is a single-slot model (presets with ratios, or greedy in boss mode), with no mana limits and no movement.
 - The Avatar's boss window is 120 s per 30 min.
-- Expected targets per context, `maxTargets` and monk elements are approximate (S1).
+- Hunt targets (tibiapal averages), `maxTargets` and monk elements are approximate (S1).
 - Single-target spells are ignored in hunt mode (D16).
-- The defense constants (`K.HP_DEF`, `K.DR_DEF`, spike, leech factors) are heuristics. Base mitigation comes from `src/data/character`.
+- 1 % effective HP is weighted like 1 % damage; `HEAL_EHP`, threat and leech factors are heuristics. Base mitigation comes from `src/data/character`.
 - Momentum is valued as a cooldown proxy.
 
 ## 7. Tests
@@ -204,7 +212,8 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 | File | Covers |
 |---|---|
 | `model.test.ts` | Geometry, the directed unlock graph matches `WHEEL_DATA`, twins, vessels and mods, thresholds, messages. |
-| `spells.test.ts` | Targets per context, team-box > solo, D16 (single-target unusable in hunt, boss targets ≤ 1.2, no Augmented Annihilation in hunt), immune → useless, Avatar, cooldown floor, momentum, effect parsing, augments. |
+| `spells.test.ts` | Targets (tibiapal averages, hunt > boss), D16 (single-target unusable in hunt, boss targets ≤ 1.2, no Augmented Annihilation in hunt), immune → useless, Avatar, cooldown floor, momentum, effect parsing, augments. |
 | `gems.test.ts` | Hungarian vs brute force, active slots, placement, recommendations, upgrades, Mitigation Multiplier scaling with real base mitigation. |
 | `optimizer.test.ts` | Path validity on random inputs, RM, vessel unlock order, augments, determinism, edge budgets, priority, perf < 50 ms (best of 3 per input), planner reference builds. |
-| `iteration3.test.ts` | Character level and skills, HP > mitigation (RP 400), Mitigation Multiplier for EK 1500 at priority 100, leech devalued, RM look-ahead and owned RM gem, multi-monster weighting, distinct alternatives, planner code decode and unlock path, official planner WASM round-trip (`skipIf` when `scripts/.cache/wod/skillgrid.cjs` is missing). |
+| `iteration3.test.ts` | Character level and skills, HP > mitigation (RP 400), HP still beats Mitigation Multiplier for EK 1500 at priority 100 (D18), leech devalued, RM look-ahead and owned RM gem, multi-monster weighting, distinct alternatives, planner code decode and unlock path, official planner WASM round-trip (`skipIf` when `scripts/.cache/wod/skillgrid.cjs` is missing). |
+| `iteration4.test.ts` | D18 (RP 600 lesser = HP, no capacity/mana gems, HP > mitigation for all vocations 200–1500, no healing gems for mages); D20 (non-beam rotation for a low-level sorcerer, beams only with Beam Mastery, Wrath of Nature vs an earth-weak spot, Divine Grenade in the rotation iff active, manual rotation); transit augments = 0; forced augment taken or reported impossible. |

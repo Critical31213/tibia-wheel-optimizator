@@ -8,12 +8,23 @@
  * subscribers once the data is ready.
  */
 import { useEffect, useSyncExternalStore } from 'react';
-import type { Monster, OptimizerResult } from '../types';
+import type { Monster, OptimizerResult, Vocation } from '../types';
+import { getWheelData } from '../data/wheel';
 
 /** One build (main or alternative) as shown by the wheel / summary / vessels. */
 export type BuildResult = Omit<OptimizerResult, 'alternatives'>;
 
 export { getWheel, MAX_SCROLL_POINTS, optimize, pointsForLevel } from '../engine';
+export { getRotationPresets } from '../data/damage/rotations';
+
+/** Spells whose augment can be forced (D21): augment slices + supreme-mod spells of the vocation, sorted. */
+export function getForceableSpells(vocation: Vocation): string[] {
+  const w = getWheelData(vocation);
+  const names = new Set<string>();
+  for (const t of w.tiles) for (const s of t.conviction.augment?.spells ?? []) names.add(s);
+  for (const m of w.mods.supreme) if (m.spell) names.add(m.spell);
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
 
 type DataModule = typeof import('../data');
 

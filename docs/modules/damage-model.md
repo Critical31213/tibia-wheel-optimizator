@@ -7,7 +7,7 @@ tibiapal.com/damage-calculator. The app makes no network calls; everything lives
 
 | Function | Returns |
 |---|---|
-| `spellAverageHit(name, character, { vocation?, attack?, shieldDefense?, stage?, part?, baseDamagePct?, flatBonus? })` | Average **raw** damage of one hit on one target, before crit, resistances and mitigation. `part: 'extra'` = revelation extra hit (beam sides, Spiritual Outburst repeat, …). |
+| `spellAverageHit(name, character, { vocation?, attack?, shieldDefense?, stage?, part?, baseDamagePct?, flatBonus?, skillBonus?, magicLevelBonus?, paladinWeapon? })` | Average **raw** damage of one hit on one target, before crit, resistances and mitigation. `part: 'extra'` = revelation extra hit (beam sides, Spiritual Outburst repeat, …). |
 | `spellVariant(spell, stage, part)` | The fitted variant used for that stage/part. |
 | `levelTerm(level)` | Shared level term g(L). |
 | `spellCooldownTurns(name, reductionSeconds?)` | Cooldown in 2 s turns (min 1). |
@@ -16,7 +16,9 @@ tibiapal.com/damage-calculator. The app makes no network calls; everything lives
 | `rotationPresets(voc)`, `recommendedRotation(voc)` | tibiapal rotation presets, ratios normalized to weights. |
 | `critMultiplier(chance%, extra%)` | `1 + chance·extra` (default 10/50 → 1.05). |
 | `healingAverage(name, character, …)` | Healing spells (Canary formulas, approximate). |
-| `weaponBracket(voc, level)` | Representative weapon/attack per level bracket (default `attack`). |
+| `weaponBracket(voc, level, paladinWeapon?)` | Representative weapon/attack per level bracket (default `attack`); paladin bow or crossbow (D21). |
+| `revelationSpell(name)`, `REVELATION_SPELLS` | Unlocking revelation or null (D20). |
+| `pierceDamageMod(mod, pct)`, `BALLISTIC_MASTERY`, `POSITIONAL_TACTICS` | D21 effects (see below). |
 
 Missing character fields are filled by `resolveCharacterStats` (`src/data/character`).
 
@@ -58,6 +60,45 @@ The committed fixture `__fixtures__/api-samples.json` (10 API responses) is re-c
 
   The Master of Flames stance alone gives fire ×1.031.
 - **Targets:** the API per-turn value is per-hit × targets of the rotation entry. Use `defaultTargets`.
+
+## Paladin weapons, Ballistic Mastery, Positional Tactics (D21)
+
+**Weapons**
+- `weaponBracket('paladin', level, 'bow' | 'crossbow')`: by default the hunt uses a bow and the boss uses a
+  crossbow (`paladinWeaponFor(mode)`).
+- Bows: Jungle Bow, Soulbleeder, Sanguine Bow, Grand Sanguine Bow, Moonsilver Bow, Stellar Moonsilver Bow, each with
+  Diamond Arrow (37). Crossbows: the existing brackets with Spectral Bolt (78).
+- Pass `paladinWeapon` in `HitOptions` to choose the weapon.
+- Paladin spells barely depend on weapon attack in the API (Ethereal Barrage ≈ −0.0025/attack). The weapon choice
+  therefore matters only through Ballistic Mastery and auto-attack.
+
+**Ballistic Mastery** (`BALLISTIC_MASTERY`)
+- **Bow: +4 % physical and holy pierce.** A cached TibiaTools probe (`node scripts/probe-pierce.mjs`, 6 API calls)
+  shows how pierce changes the creature damage modifier. Pierce first cancels resistance 1:1 until the modifier
+  reaches neutral 1.0; the remainder adds at half rate. `pierceDamageMod(mod, pct)` implements this.
+  - The probe matched exactly for Behemoth (holy 0.7 → 0.74; with 40 % pierce: 1.05), Dragon Lord (1.0 → 1.02)
+    and Demon (1.12 → 1.14) on Divine Caldera.
+  - Physical spells gain slightly more, because armor reduction interacts with the modifier (Ethereal Barrage on
+    Behemoth: +4.9 % instead of +4.4 %). This is ignored.
+  - Immunities (0) are assumed to stay 0.
+- **Crossbow: +10 % critical extra damage.** Add it to `critExtraPct` of `critMultiplier`.
+
+**Positional Tactics** (`POSITIONAL_TACTICS`)
+- +3 distance for 70 % of the time, otherwise +3 holy/healing magic level.
+- Evaluate it with `HitOptions.skillBonus` / `magicLevelBonus` (also `healingAverage({ magicLevelBonus })`).
+  Example: +3 magic level adds ≈ 18 to Divine Caldera.
+
+## Revelation spells (D20)
+
+- `REVELATION_SPELLS` / `revelationSpell(name)` give the unlocking revelation (wheel-data names):
+  - Divine Grenade
+  - Executioner's Throw
+  - Ice Burst and Terra Burst → Twin Bursts
+  - Spiritual Outburst
+  - Avatar of Steel, Light, Storm, Nature and Balance. These are buffs without a damage formula.
+- Damage spells carry `unlockedBy`.
+- A test checks that every spell in `rotations.ts` resolves to a formula for its vocation, including the `or`
+  alternatives.
 
 ## Single-target spells (D16)
 

@@ -2,7 +2,7 @@
  * Translatable engine messages. The UI looks up `engine.<key>` and fills `{param}` placeholders;
  * the English templates below are the source of truth and the plain-string fallback.
  * Params are numbers, proper names (monsters, spells, revelations) or ids: elements
- * (`physical`, `fire`, …, `unknown`), hunt styles (`solo`, `teamLure`, `teamBox`) and gem qualities.
+ * (`physical`, `fire`, …, `unknown`) and gem qualities.
  */
 import type { EngineMessage } from '../types';
 
@@ -12,9 +12,15 @@ export const ENGINE_MESSAGES = {
   'rationale.character': 'Character level {level}: {hp} base HP, base mitigation ≈ {mitigation}%; spell damage uses your level and skills.',
   'rationale.singleTarget': 'Hunt mode: single-target spells are not valued ({spells}).',
   'rationale.spot': 'Hunting spot: {list}; element and damage-type modifiers are weighted.',
-  'rationale.hpOverMitigation': 'At your level one Hit Points dedication point is worth ~{ratio}× a Mitigation point (HP buffer vs typical spikes).',
-  'rationale.mitigationOverHp': 'At your level one Mitigation point is worth ~{ratio}× a Hit Points point (sustained damage reduction).',
-  'rationale.hunt': 'Hunt ({style}): area spells are valued for about {targets} targets each; single-target spells are ignored.',
+  'rationale.hpOverMitigation': 'At your level one Hit Points dedication point adds ~{ratio}× more effective HP than a Mitigation point.',
+  'rationale.mitigationOverHp': 'At your level one Mitigation point adds ~{ratio}× more effective HP than a Hit Points point.',
+  'rationale.hunt': 'Hunt: area spells are valued for about {targets} targets each (tibiapal averages); single-target spells are ignored.',
+  'rationale.rotationAuto': 'Damage is based on the rotation {rotation} (picked as the best for this build and spot).',
+  'rationale.rotationManual': 'Damage is based on your rotation {rotation}.',
+  'rationale.rotationRequires': 'Your rotation needs the {revelation} revelation, which this build does not reach.',
+  'rationale.forced': 'Augments taken because you forced them: {spells}.',
+  'rationale.forcedImpossible': 'Not enough points to reach the augment of {spells}.',
+  'rationale.forcedNoAugment': '{spells}: no wheel augment; only gem mods can boost it.',
   'rationale.boss': 'Boss fight: every spell counts ~1 target, so single-target damage and Avatar matter most.',
   'rationale.avatarIgnored': '{avatar} is ignored while hunting (valued in boss mode only).',
   'rationale.weak': '{monster} takes {list} damage, so {spells} were favoured.',
@@ -42,6 +48,8 @@ export const ENGINE_MESSAGES = {
   'spell.teamHealing': 'Group healing: valuable in team hunts.',
   'spell.teamHealingSolo': 'Group healing: little value when hunting solo.',
   'spell.support': 'Support spell: valued for its effect and cooldown.',
+  'spell.notInRotation': 'Not in the used rotation: its augments have no value here.',
+  'spell.forced': 'Forced by you: augment taken for its utility.',
 
   // Gems
   'gem.spell': 'Boosts {spell} (~{targets} targets, {share}% of your damage).',

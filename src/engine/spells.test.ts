@@ -14,10 +14,8 @@ import {
 import { augmentParts, avatarParts, flatParts, parseEffects, revelationParts, supremeModParts } from './values';
 import { getEngineWheel, REVELATION_FLAT_BONUS } from './wheel/build';
 
-const HUNT: FightContext = { mode: 'hunt', huntStyle: 'solo' };
-const LURE: FightContext = { mode: 'hunt', huntStyle: 'teamLure' };
-const BOX: FightContext = { mode: 'hunt', huntStyle: 'teamBox' };
-const BOSS: FightContext = { mode: 'boss', huntStyle: 'solo' };
+const HUNT: FightContext = { mode: 'hunt' };
+const BOSS: FightContext = { mode: 'boss' };
 
 const monster = (id: string, mods: Monster['elementModifiers'], damageTypes: Monster['damageTypes'] = ['physical']): Monster => ({
   id,
@@ -32,27 +30,24 @@ describe('expected targets per context', () => {
   const meta = (n: string) => getSpell(n)!;
 
   it('single-target spells always hit 1', () => {
-    for (const ctx of [HUNT, LURE, BOX, BOSS]) {
+    for (const ctx of [HUNT, BOSS]) {
       expect(expectedTargets(meta('Annihilation'), ctx)).toBe(1);
       expect(expectedTargets(meta('Strong Energy Strike'), ctx)).toBe(1);
     }
   });
 
-  it('solo uses tibiapal averages, team styles 5 / 9 capped by maxTargets, boss ~1.2', () => {
+  it('hunt uses the tibiapal averages capped by maxTargets, boss ~1.2', () => {
     const fb = meta('Fierce Berserk');
-    expect(expectedTargets(fb, HUNT)).toBe(fb.avgHitsHunt);
-    expect(expectedTargets(fb, LURE)).toBe(Math.max(fb.avgHitsHunt!, 5));
-    expect(expectedTargets(fb, BOX)).toBe(Math.min(fb.maxTargets, 9));
+    expect(expectedTargets(fb, HUNT)).toBe(Math.min(fb.maxTargets, fb.avgHitsHunt!));
     expect(expectedTargets(fb, BOSS)).toBe(BOSS_AREA_TARGETS);
-    expect(expectedTargets(meta("Executioner's Throw"), BOX)).toBe(5);
+    expect(expectedTargets(fb, { mode: 'hunt', huntStyle: 'teamBox' })).toBe(expectedTargets(fb, HUNT));
   });
 
-  it('team box never values an area spell below solo', () => {
+  it('boss never values an area spell above hunt', () => {
     for (const s of ['knight', 'paladin', 'sorcerer', 'druid', 'monk'] as Vocation[]) {
       for (const name of getWheelSpellNames(s)) {
         const m = getSpell(name);
         if (!m || m.kind !== 'damage') continue;
-        expect(expectedTargets(m, BOX)).toBeGreaterThanOrEqual(expectedTargets(m, HUNT));
         expect(expectedTargets(m, BOSS)).toBeLessThanOrEqual(expectedTargets(m, HUNT));
       }
     }
@@ -62,26 +57,25 @@ describe('expected targets per context', () => {
     const b = meta('Great Energy Beam');
     expect(expectedTargets(b, HUNT)).toBe(b.avgHitsHunt);
     expect(outerBeamTargets(b, HUNT)).toBe(b.avgHitsHuntOuter);
-    expect(expectedTargets(b, BOX)).toBeCloseTo(4.5);
     expect(outerBeamTargets(b, BOSS)).toBe(0);
   });
 });
 
 describe('spell shares', () => {
-  it('team box counts more targets for area spells than solo', () => {
+  it('area spells count more targets while hunting than against a boss', () => {
     for (const [voc, area] of [
       ['knight', 'Fierce Berserk'],
       ['sorcerer', 'Energy Wave'],
     ] as const) {
-      const solo = buildSpellModel(voc, HUNT, null);
-      const box = buildSpellModel(voc, BOX, null);
-      expect(box.spells.get(area)!.targets).toBeGreaterThan(solo.spells.get(area)!.targets);
+      const hunt = buildSpellModel(voc, HUNT, null);
+      const boss = buildSpellModel(voc, BOSS, null);
+      expect(hunt.spells.get(area)!.targets).toBeGreaterThan(boss.spells.get(area)!.targets);
     }
   });
 
   it('D16: single-target spells are worthless while hunting, used against bosses', () => {
     for (const voc of ['knight', 'paladin', 'sorcerer', 'druid', 'monk'] as const) {
-      for (const ctx of [HUNT, BOX]) {
+      for (const ctx of [HUNT]) {
         const hunt = buildSpellModel(voc, ctx, null);
         for (const s of hunt.spells.values()) {
           if (!s.singleTarget) continue;

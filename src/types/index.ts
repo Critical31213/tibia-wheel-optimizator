@@ -139,12 +139,46 @@ export interface WheelDefinition {
 /** 'boss' = single target; only here Avatar spells are valued. */
 export type FightMode = 'hunt' | 'boss';
 
-/** Drives the expected number of monsters hit by area spells. */
+/** @deprecated Ignored since D20 (hunt targets = tibiapal averages); kept for old URLs. */
 export type HuntStyle = 'solo' | 'teamLure' | 'teamBox';
 
 export interface FightContext {
   mode: FightMode;
-  huntStyle: HuntStyle;
+  /** @deprecated Ignored (D20). */
+  huntStyle?: HuntStyle;
+}
+
+// ---------------------------------------------------------------------------
+// Rotations (D20)
+
+export interface RotationSpell {
+  name: string;
+  /** Relative number of casts. */
+  ratio: number;
+  /** Element alternatives; the engine uses the best one vs the spot. */
+  or?: string[];
+}
+
+export interface RotationPreset {
+  id: string;
+  vocation: Vocation;
+  name: string;
+  /** Short hint when the rotation is used (English). */
+  note?: string;
+  /** Only valid when the build reaches this revelation / the player wears a shield. */
+  requires?: { revelation?: string; shield?: boolean };
+  spells: RotationSpell[];
+}
+
+/** `RotationUsage.presetId` of the engine's greedy boss plan (no preset). */
+export const GREEDY_ROTATION_ID = 'boss';
+
+export interface RotationUsage {
+  presetId: string;
+  /** True when the engine picked it (no manual choice). */
+  auto: boolean;
+  /** Spells actually cast incl. revelation-unlocked ones and resolved element alternatives; share in %. */
+  spells: { name: string; ratio: number; share: number; fromRevelation?: boolean }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -290,6 +324,10 @@ export interface OptimizerInput {
   monsters?: WeightedMonster[];
   /** Number of alternative builds to return (default 2). */
   alternatives?: number;
+  /** Rotation preset id; undefined = engine picks the best. */
+  rotationId?: string;
+  /** Spells whose wheel augment must be taken (e.g. utility spells needed at a spot). */
+  forcedSpells?: string[];
 }
 
 export interface StatLine {
@@ -338,6 +376,8 @@ export interface OptimizerResult {
   plannerCode?: string;
   /** Alternative builds (e.g. different revelation focus), best first. */
   alternatives?: AlternativeBuild[];
+  /** Rotation the damage estimate is based on. */
+  rotation?: RotationUsage;
 }
 
 export interface AlternativeBuild {

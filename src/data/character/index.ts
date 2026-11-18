@@ -63,12 +63,12 @@ export const DEFAULT_SKILLS: Record<Vocation, SkillRow> = {
   sorcerer: {
     mainSkill: [0, 0, 0, 0, 0, 0, 0],
     magicLevel: [85, 100, 110, 117, 122, 128, 133],
-    shielding: [25, 28, 30, 32, 33, 35, 36],
+    shielding: [28, 31, 33, 36, 37, 39, 40],
   },
   druid: {
     mainSkill: [0, 0, 0, 0, 0, 0, 0],
     magicLevel: [85, 100, 110, 117, 122, 128, 133],
-    shielding: [25, 28, 30, 32, 33, 35, 36],
+    shielding: [28, 31, 33, 36, 37, 39, 40],
   },
   monk: {
     mainSkill: [95, 105, 111, 116, 120, 124, 128],
@@ -109,57 +109,93 @@ export function resolveCharacterStats(vocation: Vocation, stats: CharacterStats)
 }
 
 // ---------------------------------------------------------------------------
-// Mitigation (% of incoming damage removed)
+// Mitigation (% of incoming damage removed), D19 — no fight modes in the current game.
 //
-// Community-documented composition (TibiaQA #36739; formula not published by CipSoft):
-//   mitigation = (shieldingPart + defensePart) × equipment × wheelMultiplier
-// Combat stances (offensive/balanced/defensive) were removed in 15.25 (June 2026).
-// Constants calibrated on the TibiaQA worked example (117 shielding → 1.24 %) and the user's
-// Royal Paladin (≈ 1 % at mid levels). APPROXIMATE.
+// Structure from Canary PlayerWheel::calculateMitigation:
+//   (shielding × vocFactor + offhandFactor × defense) / 100 × distanceFactor, then × (1 + wheel%/100)
+// Constants re-fitted on the user's in-game Cyclopedia values (they win over Canary):
+//   RP shielding 108 + quiver → shielding part 1.07 %; same RP + shield → 2.50 % total, shield part 1.28 %;
+//   ED level 781 → shielding part 0.40 %, spellbook part 0.87 %.
+// See docs/modules/character-formulas.md (inference + uncertainty).
 
-export const MITIGATION = {
-  /** % per shielding point. */
-  perShielding: 1.24 / 117,
-  /** % per defense point of the best hand item (shield, spellbook, weapon). */
-  perDefense: 0.02,
-} as const;
+export type Offhand = 'shield' | 'spellbook' | 'quiver' | 'none';
 
-export type Wielding = 'shield' | 'twoHanded' | 'bow' | 'crossbow' | 'spellbook' | 'fist';
-
-/** Equipment multiplier (knight two-handed 0.8 per TibiaQA; crossbow bonus approximate). */
-export const EQUIPMENT_MULTIPLIER: Record<Wielding, number> = {
-  shield: 1,
-  twoHanded: 0.8,
-  bow: 1,
-  crossbow: 1.1,
-  spellbook: 1,
-  fist: 1,
+/** % per 100 shielding = Canary vocation multiplier × 0.883 (fitted on RP: 108 × 1.13 % = 1.22 % with a shield). */
+export const MITIGATION_SHIELDING_FACTOR: Record<Vocation, number> = {
+  knight: 1.148,
+  paladin: 1.13,
+  sorcerer: 1.112,
+  druid: 1.112,
+  monk: 1.13,
 };
 
-/** Typical hand setup and defense value per vocation. */
-export const DEFAULT_WIELDING: Record<Vocation, { wielding: Wielding; defense: number }> = {
-  knight: { wielding: 'shield', defense: 50 },
-  paladin: { wielding: 'bow', defense: 0 },
-  sorcerer: { wielding: 'spellbook', defense: 20 },
-  druid: { wielding: 'spellbook', defense: 20 },
-  monk: { wielding: 'fist', defense: 15 },
+/** % per 100 offhand defense, shields and spellbooks alike (RP shield 50 → 1.28 %, ED spellbook 34 → 0.87 %). */
+export const MITIGATION_DEFENSE_FACTOR = 2.56;
+
+/** Whole-term factor with a quiver (1.07 / 1.22; Canary uses 1.2 here — contradicted by the game). */
+export const QUIVER_FACTOR = 0.877;
+
+/** Level brackets of the typical best-in-slot offhand defense (TibiaTools / TibiaWiki item data). */
+export const OFFHAND_LEVELS = [200, 400, 600, 800, 1000, 1250, 1500] as const;
+
+/** Typical offhand defense per OFFHAND_LEVELS (nearest lower bracket). */
+export const OFFHAND_DEFENSE: Record<'shield' | 'spellbook', number[]> = {
+  // Demon Shield 46, Great/Gnome Shield 50, Eldritch Shield 51, Falcon Escutcheon 52, Refined Stag Shield 54, Soulbastion 55
+  shield: [46, 50, 51, 52, 54, 55, 55],
+  // Spellbook of Lost Souls / Umbral Master 32, Stag Spellbook / Eldritch Folio 34, Arboreal Tome / Arcanomancer Folio 36
+  spellbook: [32, 34, 34, 36, 36, 36, 36],
 };
+
+/** D19 defaults: paladin quiver (bow hunt / crossbow boss), mages spellbook, knight and monk none (knight shield only in the shield rotation). */
+export const DEFAULT_OFFHAND: Record<Vocation, Offhand> = {
+  knight: 'none',
+  paladin: 'quiver',
+  sorcerer: 'spellbook',
+  druid: 'spellbook',
+  monk: 'none',
+};
+
+export function defaultOffhandDefense(offhand: Offhand, level: number): number {
+  if (offhand !== 'shield' && offhand !== 'spellbook') return 0;
+  const i = OFFHAND_LEVELS.reduce((acc, l, k) => (level >= l ? k : acc), 0);
+  return OFFHAND_DEFENSE[offhand][i];
+}
 
 export interface MitigationOptions {
   shielding?: number;
-  defense?: number;
-  wielding?: Wielding;
+  offhand?: Offhand;
+  /** Shield/spellbook defense; defaults to the level-bracket typical value. */
+  offhandDefense?: number;
   /** Wheel "Mitigation Multiplier" in % (dedication 0.075 %/point + gem mods). */
   wheelMultiplierPct?: number;
 }
 
+export interface MitigationBreakdown {
+  shielding: number;
+  offhand: number;
+  total: number;
+}
+
+/** Mitigation split as in the Cyclopedia (both parts include the wheel multiplier). */
+export function mitigationBreakdown(vocation: Vocation, level: number, opts: MitigationOptions = {}): MitigationBreakdown {
+  const offhand = opts.offhand ?? DEFAULT_OFFHAND[vocation];
+  const shielding = opts.shielding ?? defaultCharacterStats(vocation, level).shielding;
+  const hasDefense = offhand === 'shield' || offhand === 'spellbook';
+  const defense = hasDefense ? (opts.offhandDefense ?? defaultOffhandDefense(offhand, level)) : 0;
+  const k = (offhand === 'quiver' ? QUIVER_FACTOR : 1) * (1 + (opts.wheelMultiplierPct ?? 0) / 100);
+  const s = (shielding * MITIGATION_SHIELDING_FACTOR[vocation] * k) / 100;
+  const o = (defense * MITIGATION_DEFENSE_FACTOR * k) / 100;
+  return { shielding: s, offhand: o, total: s + o };
+}
+
 /** Character mitigation in % (e.g. 1.0 = 1 % damage reduction). */
 export function mitigationPercent(vocation: Vocation, level: number, opts: MitigationOptions = {}): number {
-  const d = DEFAULT_WIELDING[vocation];
-  const shielding = opts.shielding ?? defaultCharacterStats(vocation, level).shielding;
-  const defense = opts.defense ?? d.defense;
-  const base = shielding * MITIGATION.perShielding + defense * MITIGATION.perDefense;
-  return base * EQUIPMENT_MULTIPLIER[opts.wielding ?? d.wielding] * (1 + (opts.wheelMultiplierPct ?? 0) / 100);
+  return mitigationBreakdown(vocation, level, opts).total;
+}
+
+/** D18: effective HP = HP / (1 − mitigation). */
+export function effectiveHp(hp: number, mitigationPct: number): number {
+  return hp / (1 - Math.min(95, Math.max(0, mitigationPct)) / 100);
 }
 
 /**

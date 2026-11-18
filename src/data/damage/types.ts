@@ -67,6 +67,8 @@ export interface DamageSpell {
   /** TibiaTools perk ids of the spell's augment-able effects. */
   perkIds: { baseDamage?: number; critDamage?: number; critChance?: number } | null;
   variants: DamageVariant[];
+  /** Wheel revelation that unlocks the spell (D20); absent = always available. */
+  unlockedBy?: string;
 }
 
 export interface HealingSpell {

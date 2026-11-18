@@ -33,7 +33,7 @@ describe('engine messages', () => {
     expect(engineText(tpl, { key: 'spell.immune', params: { monster: 'Demon', element: 'fire' } }, 'x')).toBe(
       'Demon jest niewrażliwy na ogień.',
     );
-    expect(engineText(tpl, { key: 'rationale.hunt', params: { style: 'teamBox', targets: 9 } }, 'x')).toContain('Drużyna');
+    expect(engineText(tpl, { key: 'rationale.hunt', params: { targets: 9 } }, 'x')).toContain('ok. 9 celów');
     expect(engineText(tpl, { key: 'no.such.key' }, 'fallback')).toBe('fallback');
     expect(engineText(tpl, undefined, 'fallback')).toBe('fallback');
     expect(engineText(translator('en'), { key: 'stat.mana' }, 'x')).toBe('Mana');

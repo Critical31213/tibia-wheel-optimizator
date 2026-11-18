@@ -47,11 +47,17 @@ describe('inputState', () => {
   });
 
   it('persists the fight context', () => {
-    const state = { ...DEFAULT_INPUTS, mode: 'boss' as const, huntStyle: 'teamBox' as const };
+    const state = { ...DEFAULT_INPUTS, mode: 'boss' as const };
     expect(new URLSearchParams(toQuery(state)).get('f')).toBe('boss');
-    expect(fromQuery(toQuery(state))).toMatchObject({ mode: 'boss', huntStyle: 'teamBox' });
+    expect(fromQuery(toQuery(state))).toMatchObject({ mode: 'boss' });
     expect(fromQuery('?f=raid&h=duo')).toEqual({});
-    expect(contextOf(DEFAULT_INPUTS)).toEqual({ mode: 'hunt', huntStyle: 'solo' });
+    expect(contextOf(DEFAULT_INPUTS)).toEqual({ mode: 'hunt' });
+  });
+
+  it('ignores the removed hunt style (h) and drops it from links', () => {
+    expect(fromQuery('?f=boss&h=teamBox')).toEqual({ mode: 'boss' });
+    expect(sanitize({ huntStyle: 'teamLure' })).toEqual({});
+    expect(new URLSearchParams(toQuery(DEFAULT_INPUTS, '?h=solo&x=1')).has('h')).toBe(false);
   });
 });
 

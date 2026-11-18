@@ -5,7 +5,11 @@ import {
   defaultCharacterStats,
   maxHitPoints,
   maxMana,
+  DEFAULT_OFFHAND,
+  defaultOffhandDefense,
+  effectiveHp,
   mitigationBreakEvenPercent,
+  mitigationBreakdown,
   mitigationPercent,
   resolveCharacterStats,
 } from './index';
@@ -38,33 +42,57 @@ describe('character formulas', () => {
   });
 });
 
-describe('mitigation calibration', () => {
-  it('Royal Paladin around mid levels is about 1 %', () => {
-    for (const l of [500, 700, 900]) {
-      const m = mitigationPercent('paladin', l);
-      expect(m).toBeGreaterThan(0.7);
-      expect(m).toBeLessThan(1.3);
-    }
+describe('mitigation (D19, calibrated on in-game Cyclopedia values)', () => {
+  const near = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThanOrEqual(0.05);
+
+  it('Royal Paladin shielding 108: quiver 1.07 %; with a shield 2.50 % total, shield part 1.28 %', () => {
+    near(mitigationBreakdown('paladin', 700, { shielding: 108, offhand: 'quiver' }).shielding, 1.07);
+    const s = mitigationBreakdown('paladin', 700, { shielding: 108, offhand: 'shield', offhandDefense: 50 });
+    near(s.offhand, 1.28);
+    near(s.total, 2.5);
   });
 
-  it('knights are highest, mages lowest; grows slowly with level', () => {
-    for (const l of [200, 800, 1500]) {
-      expect(mitigationPercent('knight', l)).toBeGreaterThan(mitigationPercent('paladin', l));
-      expect(mitigationPercent('paladin', l)).toBeGreaterThan(mitigationPercent('sorcerer', l));
-    }
+  it('Elder Druid level 781 (defaults): shielding 0.40 %, spellbook 0.87 %', () => {
+    const d = mitigationBreakdown('druid', 781);
+    near(d.shielding, 0.4);
+    near(d.offhand, 0.87);
+    expect(mitigationPercent('druid', 781)).toBeCloseTo(d.shielding + d.offhand, 10);
+  });
+
+  it('defaults: paladin quiver, mages spellbook, knight/monk none; bracket offhand defense', () => {
+    expect(DEFAULT_OFFHAND).toEqual({ knight: 'none', paladin: 'quiver', sorcerer: 'spellbook', druid: 'spellbook', monk: 'none' });
+    expect(mitigationBreakdown('knight', 800).offhand).toBe(0);
+    expect(mitigationBreakdown('paladin', 800).offhand).toBe(0);
+    expect(mitigationBreakdown('sorcerer', 800).offhand).toBeGreaterThan(0.8);
+    expect(defaultOffhandDefense('shield', 150)).toBe(46);
+    expect(defaultOffhandDefense('shield', 1500)).toBe(55);
+    expect(defaultOffhandDefense('spellbook', 799)).toBe(34);
+    expect(defaultOffhandDefense('quiver', 800)).toBe(0);
+    expect(mitigationPercent('knight', 1000, { offhand: 'shield' })).toBeGreaterThan(mitigationPercent('knight', 1000) + 1);
+  });
+
+  it('small at 200-1500 and grows slowly with level', () => {
+    for (const v of VOCATIONS)
+      for (const l of [200, 800, 1500]) {
+        expect(mitigationPercent(v, l)).toBeGreaterThan(0.2);
+        expect(mitigationPercent(v, l, { offhand: 'shield' })).toBeLessThan(4);
+      }
     expect(mitigationPercent('knight', 1500)).toBeGreaterThan(mitigationPercent('knight', 200));
-    expect(mitigationPercent('knight', 1200)).toBeLessThan(4);
   });
 
-  it('wheel multiplier is multiplicative; two-handed knights get less', () => {
+  it('wheel multiplier is multiplicative', () => {
     const base = mitigationPercent('knight', 1000);
     expect(mitigationPercent('knight', 1000, { wheelMultiplierPct: 30 })).toBeCloseTo(base * 1.3);
-    expect(mitigationPercent('knight', 1000, { wielding: 'twoHanded' })).toBeLessThan(base);
+  });
+
+  it('effectiveHp = HP / (1 - mitigation)', () => {
+    expect(effectiveHp(10000, 0)).toBe(10000);
+    expect(effectiveHp(10000, 2)).toBeCloseTo(10000 / 0.98, 8);
   });
 
   it('as pure effective HP a Mitigation point never beats an HP point at 200-1500', () => {
     for (const l of [200, 800, 1200, 1500]) {
-      expect(mitigationBreakEvenPercent('knight', l, 3)).toBeGreaterThan(mitigationPercent('knight', l, { wheelMultiplierPct: 30 }));
+      expect(mitigationBreakEvenPercent('knight', l, 3)).toBeGreaterThan(mitigationPercent('knight', l, { offhand: 'shield', wheelMultiplierPct: 30 }));
       expect(mitigationBreakEvenPercent('paladin', l, 2)).toBeGreaterThan(mitigationPercent('paladin', l, { wheelMultiplierPct: 30 }));
     }
   });

@@ -34,6 +34,10 @@ Roles:
 | D15 | 2026-11-18 | Multiple monsters per hunting spot with weights; best build + 2 alternatives; export-only planner code (incl. gems); gem/upgrade ranking by gain only (no cost). UI polishing postponed until functionality is accepted. | User answers. |
 | D16 | 2026-11-18 | **Hunt mode (AoE hunting) never values single-target spells** (all hunt styles); single-target spells count only in Boss mode. | User rule. |
 | D17 | 2026-11-18 | Damage model calibrated on the public TibiaTools damage API used by tibiapal.com (`https://tibiatools.io/api/v1`: `GET /meta/{vocations,stances,weapons,ammo,shields,perks,spells,creatures,charms}`, `POST /damage`). Datamined **offline** (polite: low rate, cached) into fitted per-spell formulas + perk effects committed as static data; no runtime dependency. | User: tibiapal estimates are very good; avoid hammering a third-party API on every slider move. |
+| D18 | 2026-11-18 | Defense valued as effective HP (EHP = HP / (1 − mitigation)); the arbitrary "spike" factor is removed. Gem slot 1 offers only Hit Points or Mitigation Multiplier; capacity and max mana have no value (potions + mana-leech imbuement assumed). Default resistance: physical unless the spot's monsters favour another. | User discussion; mitigation never beats HP on 200–1500 with real values. |
+| D19 | 2026-11-18 | Real mitigation formula (no fight modes in the current game): ≈ shielding/100 % + shield/spellbook/quiver defense × vocation factor; calibration points: RP shielding 108 → 1.07 %; RP + shield 2.5 % total (shield part 1.28 %); ED 781 → 0.4 % shielding + 0.87 % spellbook. RP: quiver (hunt, bow) / crossbow (boss); mages: spellbook; EK: shield only in the shield rotation. | User data + Canary source. |
+| D20 | 2026-11-18 | Hunt styles removed (hunt targets = tibiapal averages; boss = 1). Damage based on rotation presets (`src/data/damage/rotations.ts`): engine auto-picks the best preset for the spot/build (user may override); revelation-unlocked spells (Divine Grenade, Executioner's Throw, Ice/Terra Burst, Spiritual Outburst; Avatars in boss) are added when the revelation is active; druid ultimate area spell (Eternal Winter / Wrath of Nature) chosen by resistance. Augments of spells outside the rotation (transit slices) have no value. | User guidance. |
+| D21 | 2026-11-18 | Forced spells: the user can force wheel augments of chosen spells (utility, e.g. Divine Dazzle, Mystic Repulse, Heal Friend). Healing gems excluded for ED/MS; for RP/EK/Monk valued on the defense side. Ballistic Mastery (bow: +4 % physical/holy pierce; crossbow: +10 % crit extra damage) and Positional Tactics (+3 distance 70 % of the time, else +3 holy/healing mlvl) valued exactly. | User guidance + planner texts. |
 
 ---
 
@@ -239,6 +243,86 @@ Roles:
 
 Max mana was scored as offense, so at DPS-leaning priority lesser gems for every vocation recommended Mana over Hit Points. A bigger mana pool does not raise damage: mana is now utility only (`K.MANA_UTIL`), HP gets a small utility tie-break (`K.HP_UTIL`). Test added in `iteration3.test.ts`; RM look-ahead test now checks the objective instead of the sum of stages.
 
+### 2026-11-18 — S3 UI (iteration 4)
+
+- Hunt style control removed (Hunt/Boss kept); `InputState.huntStyle` dropped, `context = { mode }`; legacy URL key `h` ignored and removed from links.
+- New `RotationPanel` (right column): "Auto (best)" + `getRotationPresets(vocation)` with note / requirements; shows the viewed build's `rotation` (share %, ★ revelation spells, auto-picked); "Force augment for spell" select + chips from `getForceableSpells(vocation)` (augment slices + supreme-mod spells, `src/lib/api.ts`). Passes `rotationId` / `forcedSpells` to `optimize`.
+- Persistence: `usePersistentSpellPrefs` + `src/lib/spellPrefs.ts` — localStorage `wheel-optimizer:spells:v1:<vocation>`, URL `r` / `fs`; unknown ids → auto; max 8 forced spells (tests in `spellPrefs.test.ts`).
+- Tests: integration contexts reduced to boss / hunt; `docs/modules/ui.md` updated.
+
+### 2026-11-18 — S1 Data (iteration 4)
+- **Mitigation (D19)** in `src/data/character`:
+  - Formula: `(shielding × vocFactor + 2.56 × offhandDefense)/100 × (quiver 0.877) × (1 + wheel%)`. vocFactor is K 1.148, P/M 1.13, S/D 1.112 (the Canary multiplier × 0.883).
+  - It reproduces the user's in-game values exactly: RP 108 shielding with quiver → 1.07 %; RP with a shield → 2.50 % total, of which the shield is 1.28 % (assumed defense 50); ED level 781 → 0.40 % shielding + 0.87 % spellbook. The ED values use the defaults: shielding 36 and spellbook defense 34.
+  - Canary's own constants do not fit these values.
+  - Defaults: paladin quiver, mages spellbook, knight and monk none. Typical shield and spellbook defense per level bracket comes from TibiaTools item meta, because tibiopedia.pl cannot be scraped.
+  - New: `mitigationBreakdown` and `effectiveHp`.
+  - Changed: the default mage shielding is now 28→40, and the `wielding`/`defense` options were removed.
+- **Paladin weapons (D21)** in `src/data/damage`:
+  - `weaponBracket(voc, level, 'bow' | 'crossbow')`. Bow brackets use Diamond Arrow; use `paladinWeaponFor(mode)` to pick the weapon for a mode.
+  - `HitOptions.skillBonus`, `magicLevelBonus` and `paladinWeapon` evaluate Positional Tactics (`POSITIONAL_TACTICS`).
+  - `BALLISTIC_MASTERY` holds the bow pierce 4 % and the crossbow +10 % crit extra damage.
+  - `pierceDamageMod(mod, pct)`: pierce cancels resistance 1:1 up to a modifier of 1.0, then adds at half rate. This was probed with 6 TibiaTools calls (`scripts/probe-pierce.mjs`, cached) and matched exactly.
+- **Revelation spells (D20):** `REVELATION_SPELLS` / `revelationSpell(name)`, plus `unlockedBy` on damage spells. A test checks that every spell in `rotations.ts`, including the `or` alternatives, resolves to a formula.
+- Docs: `character-formulas.md` and `damage-model.md` updated.
+
+### 2026-11-18 — S2 Engine (iteration 4)
+- **Hunt styles removed:** hunt targets are tibiapal averages, and boss mode counts 1 target (area spells 1.2). `huntStyle` is optional and ignored.
+- **Defense = % effective HP (D18):**
+  - HP +x → x/HP; mitigation or dodge → pp/(100−m); resistance → the same × incoming share.
+  - The spike factor and the HP/mana/capacity utility hacks were removed; capacity and max mana are worth 0.
+  - Gem slot 1 offers only HP or Mitigation Multiplier.
+  - Base mitigation uses the D19 offhand defaults; the knight uses a shield only for `requires.shield` rotations.
+  - Result: the lesser gem is Hit Points for every vocation, levels 200–1500.
+- **Rotations (D20):**
+  - Uses `input.rotationId`, or auto picks the best valid preset jointly with the build. In boss mode a greedy plan (`presetId: 'boss'`) also competes.
+  - Revelation spells are cast on cooldown; `or` alternatives are resolved by element vs the spot.
+  - One shared damage reference across plans keeps them comparable.
+  - `result.rotation` is reported for the main build and for each alternative.
+  - Perf: light screening search per plan, full search for the finalists. Worst case ~45 ms.
+- **Transit and forced spells (D21):**
+  - Augments of spells outside the rotation are worth 0 (`spell.notInRotation`).
+  - Forced spells are seeded via the cheapest path to their stage I augment (`rationale.forced` / `forcedImpossible` / `forcedNoAugment`).
+- **Gems:**
+  - Healing supremes are 0 for sorcerer and druid (including Nature's Embrace cooldown), and valued as EHP for the others.
+  - Ballistic Mastery and Positional Tactics are valued as exact damage deltas.
+  - Only mods with positive value are recommended.
+- **Messages:** new EN and PL keys.
+- **Tests:** new `iteration4.test.ts`.
+- **Test expectations changed:**
+  - EK 1500 lesser gem → Hit Points (D18), in the iteration 3 and integration tests.
+  - Hunt-style target tests rewritten.
+  - Mitigation Multiplier per-vocation test: it now follows base mitigation (mages have a spellbook).
+  - Weighted energy-weak sorcerer spot: the preset rotation keeps Death Echo on top; the test now checks the energy share and the rotation change.
+  - Boss single-target spells may be `spell.notInRotation`.
+  - i18n `rationale.hunt` no longer takes `{style}` (UI test).
+- **Known:** at priority 50 the RP 500–800 hunt build takes Gift of Life 2, because 1 % EHP is weighted like 1 % damage. Divine Grenade (+ Divine Empowerment) wins at priority ≤ 20–35.
+- **For the UI:** the greedy boss plan id `boss` needs a label.
+
+### 2026-11-18 — S4 Integration (iteration 4)
+- **Wiring:**
+  - The greedy boss plan id `boss` is now `GREEDY_ROTATION_ID` in `src/types` (the engine reuses it). The UI labels it `rotation.boss` ("Boss: best plan vs one target" / "Boss: najlepszy plan na jeden cel"), both in `RotationPanel` and in the rationale `{rotation}` param.
+  - Verified with no change needed: alternatives show their own `rotation`, `rotationId` / `forcedSpells` reach `optimize`, and legacy `h` links load.
+- **PL review:** the new `rotation.*` and `engine.rationale/spell.*` keys were reworded (gender-neutral "Wzięto wymuszone augmenty", "Obrażenia liczone z rotacji", "Revelation" capitalised).
+- **E2E (+25, `src/integration.test.ts` 165):**
+  - No Capacity or Mana gem mods for any vocation, level, mode or priority.
+  - Forced Divine Dazzle, Mystic Repulse and Heal Friend reach the allocation.
+  - Every manual preset is honoured (`auto=false`, alternatives too).
+  - `fromRevelation` is set only while the revelation is active.
+  - The Avatar is in the rotation only in boss mode with its revelation.
+  - The boss label is translated.
+  - Planner codes work with forced spells.
+- **Browser (RP 600):**
+  - Auto rotation with shares, then a manual preset with Divine Grenade ★.
+  - Forced Divine Dazzle: the slice is filled.
+  - Boss label shown in EN and PL; alternatives work.
+  - No Vite error overlay. The 2 console entries from page load were not inspected.
+- **Gates:** tsc 0, vitest 19 files / 485 passed, lint 0, build OK (main 743 kB / 163 kB gzip).
+- **Docs:**
+  - README: rotations, forced spells, EHP defense and the real mitigation formula; hunt styles removed.
+  - ARCHITECTURE: contracts, gates and tests.
+  - `docs/modules/integration.md`.
+
 ## In progress / Next
 
 - [x] S1 Data — scraper + monster dataset + search API.
@@ -249,7 +333,8 @@ Max mana was scored as offense, so at DPS-leaning priority lesser gems for every
 - [x] Iteration 2 — engine on planner data: context-aware spells, Avatar boss-only, gems & vessels (S2).
 - [x] Iteration 2 — integration: mitigation fix, engine messages i18n, fixtures removed, E2E matrix (S4).
 - [x] Iteration 3 — planner code (S1a), TibiaTools damage model + character formulas (S1b), rotation engine, D16, alternatives (S2), character / spot / alternatives / export UI (S3), integration + E2E (S4).
-- [ ] User acceptance of iteration 3 functionality, then UI polish (postponed per D15).
+- [x] Iteration 4 — D18–D21: EHP defense, real mitigation, rotation presets, forced spells, hunt styles removed (S1–S4).
+- [ ] User acceptance of iteration 4 functionality, then UI polish (postponed per D15).
 
 Open issues:
 - Healing formulas are approximate (canary `onGetFormulaValues`); verify against in-game values.
@@ -257,5 +342,8 @@ Open issues:
 - Armor is not modelled; base mitigation assumes default equipment per vocation.
 - UI polish postponed (D15); no DOM/component tests (jsdom + Testing Library).
 - No alternatives near a full wheel (no room for a ≥ 10 % different build).
-- Team target counts (team-lure ~5, team-box ~9) are estimates; some legacy monsters lack damage types / max damage.
+- Some legacy monsters lack damage types / max damage.
+- **Pending user decision:** at priority 50, the RP 500–800 hunt build picks Gift of Life instead of the meta Divine Grenade + Divine Empowerment. The cause is that 1 % EHP is weighted like 1 % damage, and the offense/defense exchange rate is not decided yet. Divine Grenade wins at priority ≤ 20–35.
+- Paladin mitigation calibration assumes shield defense 50, and the quiver factor (0.877) comes from a single data pair.
+- Rotation preset notes are English-only data strings (not translated in PL).
 - Consider a Web Worker for `optimize()` if the beam width or alternative count grows.

@@ -5,10 +5,8 @@ import { optimize } from './index';
 import { DOMAIN_ORDER, getEngineWheel, RM_SLICE_POINTS, stageFor } from './wheel/build';
 
 const CONTEXTS: FightContext[] = [
-  { mode: 'hunt', huntStyle: 'solo' },
-  { mode: 'hunt', huntStyle: 'teamLure' },
-  { mode: 'hunt', huntStyle: 'teamBox' },
-  { mode: 'boss', huntStyle: 'solo' },
+  { mode: 'hunt' },
+  { mode: 'boss' },
 ];
 
 /** Deterministic PRNG (mulberry32). */
@@ -137,7 +135,7 @@ describe('behaviour', () => {
   });
 
   it('fills rationale with translatable messages', () => {
-    const res = optimize({ vocation: 'paladin', points: 900, monster: null, priority: 30, context: CONTEXTS[3] });
+    const res = optimize({ vocation: 'paladin', points: 900, monster: null, priority: 30, context: CONTEXTS[1] });
     expect(res.rationale.length).toBeGreaterThan(0);
     expect(res.rationaleMsgs).toHaveLength(res.rationale.length);
     expect(res.rationaleMsgs!.map((m) => m.key)).toContain('rationale.boss');
@@ -146,7 +144,7 @@ describe('behaviour', () => {
 
   it('runs well under 50 ms (warm)', () => {
     const inputs = VOCATIONS.flatMap((vocation) =>
-      [100, 1000, 2500, 4000].map((points) => ({ vocation, points, monster: null, priority: 50, context: CONTEXTS[1] })),
+      [100, 1000, 2500, 4000].map((points) => ({ vocation, points, monster: null, priority: 50, context: CONTEXTS[0] })),
     );
     for (const i of inputs) optimize(i);
     let worst = 0;

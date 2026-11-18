@@ -23,6 +23,8 @@ import {
   add,
   basicModParts,
   type BuildFacts,
+  EFFECT_HP,
+  EFFECT_MITIGATION,
   incomingShare,
   type Parts,
   RESIST_EFFECT,
@@ -133,7 +135,8 @@ export function assign(weights: number[][]): number[] {
 /** Places owned gems into the first `unlocked` vessels maximising the blended value. */
 export function placeGems(env: GemEnv, gems: OwnedGem[], unlocked: number): (OwnedGem | null)[] {
   const vessels = env.wheel.definition.vessels.slice(0, unlocked);
-  const w = vessels.map((vs) => gems.map((g) => env.blend(gemParts(env, g, vs.quality))));
+  // +ε: an owned gem worth 0 here (e.g. a resistance the spot does not need) still beats an empty vessel.
+  const w = vessels.map((vs) => gems.map((g) => env.blend(gemParts(env, g, vs.quality)) + 1e-6));
   const cols = assign(w);
   return vessels.map((_, i) => (cols[i] >= 0 ? gems[cols[i]] : null));
 }
@@ -150,10 +153,13 @@ interface ModPick {
   score: number;
 }
 
+/** D18: basic slot 1 recommendations are only Hit Points or Mitigation Multiplier. */
+const SLOT1_EFFECTS = new Set([EFFECT_HP, EFFECT_MITIGATION]);
+
 function rankBasic(env: GemEnv, slotNo: 1 | 2, grade: number): ModPick[] {
   const slot: GemSlot = slotNo === 1 ? 'basic1' : 'basic2';
   return env.wheel.basicMods
-    .filter((m) => m.slots.includes(slotNo))
+    .filter((m) => m.slots.includes(slotNo) && (slotNo === 2 || m.effects.every((e) => SLOT1_EFFECTS.has(e.effectId))))
     .map((m) => {
       const parts = basicModParts(env.v, m, grade);
       return { slot, kind: 'basic' as const, id: m.id, name: m.name, parts, score: env.blend(parts) };
@@ -185,15 +191,14 @@ function gemFromPicks(quality: GemQuality, picks: ModPick[]): BestGem {
 /** Best gem(s) of a quality at `grade`; greater returns `alternatives` supreme variants. */
 export function bestGems(env: GemEnv, quality: GemQuality, grade: number, alternatives = 1): BestGem[] {
   const b1 = rankBasic(env, 1, grade)[0];
-  const picks: ModPick[] = b1 ? [b1] : [];
+  const picks: ModPick[] = b1 && b1.score > 0 ? [b1] : [];
   if (quality !== 'lesser') {
     const b2 = rankBasic(env, 2, grade).find((m) => m.id !== b1?.id);
-    if (b2) picks.push(b2);
+    if (b2 && b2.score > 0) picks.push(b2);
   }
   if (quality !== 'greater') return [gemFromPicks(quality, picks)];
-  return rankSupreme(env, grade)
-    .slice(0, alternatives)
-    .map((s) => gemFromPicks(quality, [...picks, s]));
+  const sup = rankSupreme(env, grade).filter((s) => s.score > 0).slice(0, alternatives);
+  return sup.length ? sup.map((s) => gemFromPicks(quality, [...picks, s])) : [gemFromPicks(quality, picks)];
 }
 
 export function toOwnedGem(id: string, g: BestGem, grade: ModGrade): OwnedGem {

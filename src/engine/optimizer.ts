@@ -6,19 +6,25 @@
 import type {
   ActivatedRevelation,
   AlternativeBuild,
+  CharacterStats,
   Domain,
   EngineMessage,
   Element,
+  FightContext,
   OptimizerInput,
   OptimizerResult,
   OwnedGem,
   Perk,
+  RotationPreset,
+  RotationUsage,
   SpellUsage,
   StatLine,
   VesselAssignment,
 } from '../types';
 import { encodePlannerCode, gridForSliceId, plannerVesselIssues, type PlannerVessel } from '../data/wheel/plannerCode';
 import { resolveCharacterStats } from '../data/character';
+import { BALLISTIC_MASTERY, healingAverage, pierceDamageMod, POSITIONAL_TACTICS } from '../data/damage';
+import { getRotationPresets } from '../data/damage/rotations';
 import {
   activeSlots,
   bestGems,
@@ -32,10 +38,23 @@ import {
   vesselAssignments,
 } from './gems';
 import { type EngineMessageKey, text } from './messages';
-import { buildSpellModel, DEFAULT_CONTEXT, normaliseMonsters, rotation, TEAM_HEALS } from './spells';
+import {
+  buildSpellModel,
+  elementMultiplier,
+  healShare,
+  NO_STAGES,
+  normaliseMonsters,
+  planTotal,
+  rotation,
+  rotationTotal,
+  type SpellModel,
+  TEAM_HEALS,
+  withPlan,
+} from './spells';
 import {
   add,
   augmentParts,
+  avatarParts,
   type BuildFacts,
   characterFacts,
   convictionParts,
@@ -43,15 +62,16 @@ import {
   flatParts,
   hpParts,
   incomingShares,
+  K,
   mitigationParts,
   type Parts,
   parseEffects,
   revelationIndex,
   revelationParts,
   type SpellEffect,
-  spikeFactor,
   spotMonster,
   threatOf,
+  UTILITY_SPELLS,
   type ValuationContext,
   ZERO,
 } from './values';
@@ -69,6 +89,14 @@ import {
 export const BEAM_WIDTH = 24;
 /** Beam states greedily completed per level (best-so-far candidates). */
 const COMPLETE_TOP = 8;
+
+/** Beam width / completed states per level. Light: rotation screening, refine and alternatives (perf). */
+export interface SearchOpts {
+  width: number;
+  complete: number;
+}
+export const FULL_SEARCH: SearchOpts = { width: BEAM_WIDTH, complete: COMPLETE_TOP };
+export const LIGHT_SEARCH: SearchOpts = { width: 12, complete: 2 };
 /** Fraction of the next revelation stage credited proportionally to progress (ranking only). */
 const LOOKAHEAD_WEIGHT = 0.6;
 const UTIL_WEIGHT = 0.1;
@@ -102,6 +130,8 @@ interface PartTables {
   revP: Parts[][];
   /** Value of unlocking vessel k (incl. its +1 flat bonus). */
   vesselP: Parts[];
+  /** Constant of the rotation plan vs the reference rotation (damage of its T0, EHP of its offhand). */
+  baseP: Parts;
 }
 
 /** Blended scalars used by the search. */
@@ -242,7 +272,7 @@ function complete(s: Search, start: State): State {
   }
 }
 
-function search(wheel: EngineWheel, t: Tables, budget: number, gemRm: number[][]): State {
+function search(wheel: EngineWheel, t: Tables, budget: number, gemRm: number[][], seed: readonly number[] = [], opts = FULL_SEARCH): State {
   const n = wheel.slices.length;
   let density = 0;
   wheel.slices.forEach((sl, i) => {
@@ -252,7 +282,7 @@ function search(wheel: EngineWheel, t: Tables, budget: number, gemRm: number[][]
   });
   density /= n;
   const s: Search = { wheel, t, budget, density, gemRm };
-  const empty: State = {
+  let empty: State = {
     alloc: new Int32Array(n),
     used: 0,
     domainPts: [0, 0, 0, 0],
@@ -263,6 +293,8 @@ function search(wheel: EngineWheel, t: Tables, budget: number, gemRm: number[][]
     key: 0,
     rank: 0,
   };
+  // D21: forced augment paths are filled first.
+  for (const i of seed) empty = extend(s, empty, i, wheel.slices[i].capacity);
   let best = complete(s, empty);
   // A full wheel has one allocation; only the fill order differs.
   if (budget >= wheel.definition.totalCapacity) return best;
@@ -283,9 +315,9 @@ function search(wheel: EngineWheel, t: Tables, budget: number, gemRm: number[][]
     }
     beam = [...next.values()]
       .sort((a, b) => b.rank - a.rank || a.key - b.key)
-      .slice(0, BEAM_WIDTH)
+      .slice(0, opts.width)
       .map((c) => extend(s, c.st, c.i, wheel.slices[c.i].capacity, c.delta));
-    for (const st of beam.slice(0, COMPLETE_TOP)) {
+    for (const st of beam.slice(0, opts.complete)) {
       const done = complete(s, st);
       if (done.score > best.score + 1e-9) best = done;
     }
@@ -346,6 +378,11 @@ function partTables(wheel: EngineWheel, v: ValuationContext, vesselP: Parts[]): 
     aug2P: augs.map((a) => a[1]),
     revP: wheel.revelations.map((r) => [0, 1, 2, 3].map((st) => revelationParts(v, r, st))),
     vesselP,
+    baseP: {
+      off: v.model.baseOff,
+      def: 100 * ((100 - v.mitigationRef) / Math.max(50, 100 - v.mitigation) - 1) * v.threat,
+      util: 0,
+    },
   };
 }
 
@@ -363,8 +400,8 @@ function blendTables(p: PartTables, blend: (p: Parts) => number, revScale: numbe
 }
 
 /** Raw (unblended) value of a build. */
-function rawTotals(wheel: EngineWheel, t: PartTables, alloc: ArrayLike<number>, stages: number[]): Parts {
-  let total = ZERO;
+function rawTotals(wheel: EngineWheel, t: PartTables, alloc: ArrayLike<number>, stages: number[], withBase = true): Parts {
+  let total = withBase ? t.baseP : ZERO;
   let vessels = 0;
   for (const sl of wheel.slices) {
     const i = sl.idx;
@@ -537,6 +574,10 @@ function spellUsages(v: ValuationContext, stages: number[], wheel: EngineWheel):
       } else if (s.revelation >= 0 && stage < 1) {
         useful = false;
         r = text('spell.revelationLocked', { revelation: wheel.revelations[s.revelation].data.name });
+      } else if (!x) {
+        // D20: transit slice, the spell is not cast in this rotation
+        useful = false;
+        r = text('spell.notInRotation');
       } else {
         useful = share >= USEFUL_SHARE;
         const params = { targets: round1(targets), element, modifier, share: Math.round(share) };
@@ -544,14 +585,47 @@ function spellUsages(v: ValuationContext, stages: number[], wheel: EngineWheel):
       }
     } else if (s.kind === 'healing') {
       if (TEAM_HEALS.has(s.name)) {
-        useful = !(model.context.mode === 'hunt' && model.context.huntStyle === 'solo');
+        useful = model.context.mode === 'boss' || v.forced.has(s.name);
         r = text(useful ? 'spell.teamHealing' : 'spell.teamHealingSolo');
       } else r = text('spell.healing');
+    } else if (v.forced.has(s.name)) r = text('spell.forced');
+    else if (UTILITY_SPELLS.has(s.name)) {
+      useful = false;
+      r = text('spell.notInRotation');
     } else r = text('spell.support');
     out.push({ name: s.name, expectedTargets: round1(Math.max(1, targets)), useful, reason: r.text, reasonMsg: r.msg, share });
   }
   out.sort((a, b) => Number(b.useful) - Number(a.useful) || b.share - a.share || a.name.localeCompare(b.name));
   return out.map(({ share, ...u }) => (share > 0 && u.useful ? { ...u, share: round1(share) } : u));
+}
+
+/** Casts per minute (30 combat turns). */
+const PER_MINUTE = 60 / 2;
+
+function rotationUsage(p: Prepared, stages: number[]): RotationUsage {
+  const { v, wheel } = p;
+  const rot = rotation(v.model, { stages });
+  const spells: RotationUsage['spells'] = [];
+  for (const [name, x] of rot.rates) {
+    if (x.rate <= 0) continue;
+    const s = v.model.spells.get(name);
+    spells.push({
+      name,
+      ratio: round1(x.rate * PER_MINUTE),
+      share: round1((100 * x.rate * x.perCast) / rot.total),
+      ...(s && s.revelation >= 0 ? { fromRevelation: true } : {}),
+    });
+  }
+  if (v.context.mode === 'boss') {
+    wheel.revelations.forEach((r, d) => {
+      if (!r.data.isAvatar || stages[d] < 1) return;
+      const off = avatarParts(v, stages[d]).off;
+      const name = r.data.spells[0] ?? r.data.name;
+      spells.push({ name, ratio: 0, share: round1((100 * off) / (100 + off)), fromRevelation: true });
+    });
+  }
+  spells.sort((a, b) => b.share - a.share || a.name.localeCompare(b.name));
+  return { presetId: v.model.plan.id, auto: p.auto, spells };
 }
 
 type Msg = { msg: EngineMessage; text: string };
@@ -572,12 +646,20 @@ function rationale(p: Prepared, best: State, stages: number[], revPoints: number
   else {
     const area = damage.filter((s) => !s.singleTarget);
     const avg = area.length ? area.reduce((a, s) => a + s.targets, 0) / area.length : 1;
-    out.push(text('rationale.hunt', { style: ctx.huntStyle, targets: round1(avg) }));
+    out.push(text('rationale.hunt', { targets: round1(avg) }));
     const single = damage.filter((s) => s.singleTarget).map((s) => s.name).sort();
     if (single.length) out.push(text('rationale.singleTarget', { spells: single.join(', ') }));
     const avatar = wheel.revelations.find((r) => r.data.isAvatar);
     if (avatar) out.push(text('rationale.avatarIgnored', { avatar: avatar.data.name }));
   }
+  const plan = model.plan;
+  const rotName = plan.preset?.name ?? plan.id;
+  out.push(text(p.auto ? 'rationale.rotationAuto' : 'rationale.rotationManual', { rotation: rotName }));
+  if (!p.auto && plan.requires && !planValid(p, stages)) out.push(text('rationale.rotationRequires', { revelation: plan.requires }));
+  const f = p.forced;
+  if (f.taken.length) out.push(text('rationale.forced', { spells: f.taken.join(', ') }));
+  if (f.impossible.length) out.push(text('rationale.forcedImpossible', { spells: f.impossible.join(', ') }));
+  if (f.noAugment.length) out.push(text('rationale.forcedNoAugment', { spells: f.noAugment.join(', ') }));
 
   if (model.monsters.length > 1) {
     const list = [...model.monsters]
@@ -652,7 +734,8 @@ function rationale(p: Prepared, best: State, stages: number[], revPoints: number
 const pointsOf = (input: Pick<OptimizerInput, 'points'>) =>
   Math.max(0, Math.floor(Number.isFinite(input.points) ? input.points : 0));
 
-type ValuationInput = Pick<OptimizerInput, 'vocation' | 'points' | 'monster' | 'context' | 'character' | 'monsters'>;
+type ValuationInput = Pick<OptimizerInput, 'vocation' | 'points' | 'monster' | 'context' | 'character' | 'monsters'> &
+  Partial<Pick<OptimizerInput, 'rotationId' | 'forcedSpells'>>;
 
 /** Level used for valuation: `character.level`, else points + 50. */
 export function levelFor(input: Pick<OptimizerInput, 'points' | 'character'>): number {
@@ -660,9 +743,14 @@ export function levelFor(input: Pick<OptimizerInput, 'points' | 'character'>): n
   return Math.round(Math.max(8, Number.isFinite(l) && l! > 0 ? l! : Math.max(60, pointsOf(input) + 50)));
 }
 
-/** Valuation context for an input (character stats estimated where missing). */
-export function valuationFor(input: ValuationInput): ValuationContext {
-  const context = input.context ?? DEFAULT_CONTEXT;
+/** Rotation preset of the vocation with this id, else null. */
+export function presetById(vocation: OptimizerInput['vocation'], id: string | undefined): RotationPreset | null {
+  return id ? (getRotationPresets(vocation).find((p) => p.id === id) ?? null) : null;
+}
+
+/** Context (hunt style ignored, D20), character with estimated gaps, normalised spot and the plain spell model. */
+function modelInputs(input: ValuationInput) {
+  const context: FightContext = { mode: input.context?.mode === 'boss' ? 'boss' : 'hunt' };
   const level = levelFor(input);
   const clean = (x: number | undefined) => (Number.isFinite(x) && x! >= 0 ? x : undefined);
   const character = resolveCharacterStats(input.vocation, {
@@ -673,23 +761,152 @@ export function valuationFor(input: ValuationInput): ValuationContext {
   });
   const monsters = normaliseMonsters(input.monsters, input.monster ?? null);
   const model = buildSpellModel(input.vocation, context, monsters, character);
+  return { context, level, character, monsters, model };
+}
+
+/**
+ * D21: Positional Tactics (+3 distance 70 % of the time, else +3 holy & healing magic level) and Ballistic Mastery
+ * (hunt/bow: +4 % physical & holy pierce; boss/crossbow: +10 % critical extra damage) as exact rotation deltas.
+ */
+function paladinUniques(mi: ReturnType<typeof modelInputs>, model: SpellModel, preset: RotationPreset | null, threat: number): Partial<Record<string, Parts>> {
+  const { context, monsters, character } = mi;
+  const t0 = planTotal(mi.model, preset);
+  const norm = (t: number) => (100 * (t - t0)) / model.total;
+  const at = (c: CharacterStats) => buildSpellModel('paladin', context, monsters, c);
+  const pt = POSITIONAL_TACTICS;
+  const skill = planTotal(at({ ...character, mainSkill: character.mainSkill + pt.skillBonus }), preset);
+  const ml = at({ ...character, magicLevel: character.magicLevel + pt.magicLevelBonus });
+  const holySpells = new Map([...mi.model.spells].map(([n, s]) => [n, s.element === 'holy' ? ml.spells.get(n) ?? s : s]));
+  const holy = planTotal({ ...mi.model, spells: holySpells }, preset);
+  let heal = 0;
+  for (const s of model.spells.values()) {
+    if (s.kind !== 'healing') continue;
+    const h0 = healingAverage(s.name, character, { vocation: 'paladin' });
+    const h1 = healingAverage(s.name, character, { vocation: 'paladin', magicLevelBonus: pt.magicLevelBonus });
+    if (h0 > 0) heal += (100 * (h1 / h0 - 1)) * healShare(model, s.name) * K.HEAL_EHP;
+  }
+  const positional: Parts = {
+    off: pt.skillUptime * norm(skill) + (1 - pt.skillUptime) * norm(holy),
+    def: (1 - pt.skillUptime) * heal * threat,
+    util: 0,
+  };
+  let ballistic: number;
+  if (context.mode === 'hunt') {
+    const bm = BALLISTIC_MASTERY.bow;
+    const pierced = (e: Element | null) => {
+      if (!e || !(bm.elements as readonly Element[]).includes(e)) return null;
+      if (!monsters.length) return pierceDamageMod(1, bm.piercePct);
+      return monsters.reduce((a, m) => a + m.weight * pierceDamageMod(elementMultiplier(m.monster, e), bm.piercePct), 0);
+    };
+    const spells = new Map([...mi.model.spells].map(([n, s]) => {
+      const e = s.kind === 'damage' ? pierced(s.element) : null;
+      return [n, e === null ? s : { ...s, elem: e }];
+    }));
+    const phys = mi.model.spells.size ? pierced('physical')! : 1;
+    const physNow = monsters.length ? monsters.reduce((a, m) => a + m.weight * elementMultiplier(m.monster, 'physical'), 0) : 1;
+    const base = physNow > 0 ? (mi.model.base * phys) / physNow : mi.model.base;
+    ballistic = norm(planTotal({ ...mi.model, spells, base }, preset));
+  } else {
+    const m = { ...mi.model, plan: withPlan(mi.model, preset).plan };
+    ballistic = norm(rotationTotal(m, { stages: NO_STAGES, critExtra: BALLISTIC_MASTERY.crossbow.critExtraDamagePct }));
+  }
+  return { 'Positional Tactics': positional, 'Ballistic Mastery': { off: ballistic, def: 0, util: 0 } };
+}
+
+/**
+ * Valuation context for an input and rotation preset (default: `input.rotationId`, else greedy).
+ * `reference` = common T0 so values of different presets are comparable (default: the preset's own T0).
+ */
+export function valuationFor(
+  input: ValuationInput,
+  preset: RotationPreset | null = presetById(input.vocation, input.rotationId),
+  reference?: number,
+): ValuationContext {
+  const mi = modelInputs(input);
+  const { context, level, character, monsters } = mi;
+  const model = withPlan(mi.model, preset, reference);
+  const t0 = planTotal(mi.model, preset);
   const mage = input.vocation === 'sorcerer' || input.vocation === 'druid';
   const boosted = mage ? { ...character, magicLevel: character.magicLevel + 1 } : { ...character, mainSkill: character.mainSkill + 1 };
-  const skillOff = (100 * (buildSpellModel(input.vocation, context, monsters, boosted).total - model.total)) / model.total;
+  const skillOff = (100 * (planTotal(buildSpellModel(input.vocation, context, monsters, boosted), preset) - t0)) / model.total;
   const monster = spotMonster(monsters);
-  const facts = characterFacts(input.vocation, level, character.shielding);
+  const threat = threatOf(monster);
+  const facts = characterFacts(input.vocation, level, character.shielding, model.plan.shield ? 'shield' : undefined);
   return {
     vocation: input.vocation,
     context,
     monster,
     model,
     level,
-    threat: threatOf(monster),
+    threat,
     ...facts,
-    spikeFactor: spikeFactor(input.vocation, level, monsters),
     incoming: incomingShares(monsters),
     skillOff: Math.max(0, skillOff),
+    forced: new Set(input.forcedSpells ?? []),
+    unique: input.vocation === 'paladin' ? paladinUniques(mi, model, preset, threat) : {},
   };
+}
+
+// ---------------------------------------------------------------------------
+// Forced spells (D21)
+
+interface ForcedInfo {
+  /** Slices to fill first (unlock order). */
+  seed: number[];
+  taken: string[];
+  impossible: string[];
+  noAugment: string[];
+}
+
+/** Cheapest unlock path (Dijkstra over slice capacities) to an augment slice of each forced spell. */
+function forcedSeed(wheel: EngineWheel, spells: readonly string[], budget: number): ForcedInfo {
+  const out: ForcedInfo = { seed: [], taken: [], impossible: [], noAugment: [] };
+  const n = wheel.slices.length;
+  const next: number[][] = wheel.slices.map(() => []);
+  wheel.slices.forEach((s) => s.unlockedBy.forEach((j) => next[j].push(s.idx)));
+  const full = new Set<number>();
+  let used = 0;
+  for (const spell of [...new Set(spells)]) {
+    const targets = wheel.slices.filter((s) => s.kind === 'augment' && s.tile.conviction.augment?.spells.includes(spell)).map((s) => s.idx);
+    if (!targets.length) {
+      out.noAugment.push(spell);
+      continue;
+    }
+    if (targets.some((t) => full.has(t))) {
+      out.taken.push(spell);
+      continue;
+    }
+    const cost = (i: number) => (full.has(i) ? 0 : wheel.slices[i].capacity);
+    const dist = new Array<number>(n).fill(Infinity);
+    const prev = new Array<number>(n).fill(-1);
+    const done = new Array<boolean>(n).fill(false);
+    wheel.slices.forEach((s) => s.initiallyUnlocked && (dist[s.idx] = cost(s.idx)));
+    for (;;) {
+      let u = -1;
+      for (let i = 0; i < n; i++) if (!done[i] && dist[i] < Infinity && (u < 0 || dist[i] < dist[u])) u = i;
+      if (u < 0) break;
+      done[u] = true;
+      for (const j of next[u]) {
+        const d = dist[u] + cost(j);
+        if (d < dist[j]) {
+          dist[j] = d;
+          prev[j] = u;
+        }
+      }
+    }
+    const target = targets.reduce((a, b) => (dist[b] < dist[a] ? b : a));
+    if (!(dist[target] < Infinity) || used + dist[target] > budget) {
+      out.impossible.push(spell);
+      continue;
+    }
+    const path: number[] = [];
+    for (let i = target; i >= 0; i = prev[i]) if (!full.has(i)) path.unshift(i);
+    path.forEach((i) => full.add(i));
+    out.seed.push(...path);
+    used += dist[target];
+    out.taken.push(spell);
+  }
+  return out;
 }
 
 interface Prepared {
@@ -702,11 +919,21 @@ interface Prepared {
   parts: PartTables;
   blend: (p: Parts) => number;
   tables: Tables;
+  forced: ForcedInfo;
+  /** Rotation picked by the engine (no manual preset). */
+  auto: boolean;
 }
 
-function prepare(input: OptimizerInput, priority = input.priority, base?: Prepared): Prepared {
+interface PlanSpec {
+  preset: RotationPreset | null;
+  reference: number;
+  auto: boolean;
+  forced: ForcedInfo;
+}
+
+function prepare(input: OptimizerInput, priority = input.priority, base?: Prepared, spec?: PlanSpec): Prepared {
   const wheel = getEngineWheel(input.vocation);
-  const v = base?.v ?? valuationFor(input);
+  const v = base?.v ?? valuationFor(input, spec?.preset ?? null, spec?.reference);
   const budget = Math.min(wheel.definition.totalCapacity, pointsOf(input));
   const gems = input.gems ?? [];
   const blend = blendWith(weightsFor(priority));
@@ -715,13 +942,35 @@ function prepare(input: OptimizerInput, priority = input.priority, base?: Prepar
   const preEnv: GemEnv = { v, wheel, blend, facts: factsFor([1e9, 1e9, 1e9, 1e9], new Map(), [assumed, assumed, assumed, assumed]) };
   const vesselP = vesselTable(preEnv, gems);
   const parts = base ? { ...base.parts, vesselP } : partTables(wheel, v, vesselP);
-  return { input, wheel, v, budget, gems, gemRm: base?.gemRm ?? ownedRmOffsets(wheel, gems), parts, blend, tables: blendTables(parts, blend) };
+  return {
+    input,
+    wheel,
+    v,
+    budget,
+    gems,
+    gemRm: base?.gemRm ?? ownedRmOffsets(wheel, gems),
+    parts,
+    blend,
+    tables: blendTables(parts, blend),
+    forced: base?.forced ?? spec?.forced ?? forcedSeed(wheel, input.forcedSpells ?? [], budget),
+    auto: base?.auto ?? spec?.auto ?? false,
+  };
 }
 
 const gridStages = (p: Prepared, st: State) => DOMAIN_ORDER.map((_, d) => stageFor(st.domainPts[d] + RM_SLICE_POINTS * st.rmFull[d] + p.gemRm[st.vessels][d]));
 
 /** Objective of a state under the main build's valuation. */
 const objective = (p: Prepared, st: State) => p.blend(rawTotals(p.wheel, p.parts, st.alloc, gridStages(p, st)));
+
+/** D20: a preset requiring a revelation is valid only when the build reaches it. */
+function planValid(p: Prepared, stages: number[]): boolean {
+  const req = p.v.model.plan.requires;
+  if (!req) return true;
+  const d = revelationIndex(p.wheel.revelations, req);
+  return d >= 0 && stages[d] >= 1;
+}
+
+const runSearch = (p: Prepared, tables = p.tables, opts = FULL_SEARCH) => search(p.wheel, tables, p.budget, p.gemRm, p.forced.seed, opts);
 
 type BuildResult = Omit<OptimizerResult, 'alternatives'>;
 
@@ -750,8 +999,8 @@ function assemble(p: Prepared, best: State): BuildResult {
   DOMAIN_ORDER.forEach((d, i) => (domainPoints[d] = best.domainPts[i]));
   const revelations: ActivatedRevelation[] = wheel.revelations.map((r, d) => ({ perk: r.perk, stage: stages[d], domainPoints: finalRev[d] }));
 
-  const got = rawTotals(wheel, p.parts, best.alloc, stages);
-  const max = rawTotals(wheel, p.parts, wheel.slices.map((s) => s.capacity), [3, 3, 3, 3]);
+  const got = rawTotals(wheel, p.parts, best.alloc, stages, false);
+  const max = rawTotals(wheel, p.parts, wheel.slices.map((s) => s.capacity), [3, 3, 3, 3], false);
   const norm = (a: number, b: number) => (b > 0 ? Math.max(0, Math.min(100, Math.round((a / b) * 100))) : 0);
   const why = rationale(p, best, stages, finalRev, unlocked, vesselSlices);
 
@@ -773,6 +1022,7 @@ function assemble(p: Prepared, best: State): BuildResult {
     upgradeRecommendations: upgrades(env, vessels),
     spells: spellUsages(v, stages, wheel),
     plannerCode: plannerCodeFor(input.vocation, allocation, vessels),
+    rotation: rotationUsage(p, stages),
   };
 }
 
@@ -823,8 +1073,25 @@ function allocDistance(a: Int32Array, b: Int32Array): number {
 
 const signed = (x: number) => (x > 0 ? `+${x}` : `${x}`);
 
+/** Best valid rotation plan for a state (auto mode: every prepared plan; manual: the chosen one). */
+function bestPlan(plans: Prepared[], st: State): { p: Prepared; obj: number } {
+  let best: { p: Prepared; obj: number } | null = null;
+  for (const q of plans) {
+    if (plans.length > 1 && !planValid(q, gridStages(q, st))) continue;
+    const obj = objective(q, st);
+    if (!best || obj > best.obj + 1e-9) best = { p: q, obj };
+  }
+  return best ?? { p: plans[0], obj: objective(plans[0], st) };
+}
+
 /** Alternatives to `main`; returns `better` instead when a candidate beats the main build on the main objective. */
-function alternatives(p: Prepared, main: State, mainResult: BuildResult, count: number): { alts: AlternativeBuild[]; better?: State } {
+function alternatives(
+  p: Prepared,
+  plans: Prepared[],
+  main: State,
+  mainResult: BuildResult,
+  count: number,
+): { alts: AlternativeBuild[]; better?: { st: State; p: Prepared } } {
   if (count <= 0 || p.budget < 100) return { alts: [] };
   const prio = clampPriority(p.input.priority);
   const stages = gridStages(p, main);
@@ -855,11 +1122,13 @@ function alternatives(p: Prepared, main: State, mainResult: BuildResult, count: 
     if (out.length >= count) break;
     const q = c.priority === prio ? p : prepare(p.input, c.priority, p);
     const tables = c.revScale.every((x) => x === 1) ? q.tables : blendTables(q.parts, q.blend, c.revScale);
-    const st = search(p.wheel, tables, p.budget, p.gemRm);
-    if (objective(p, st) > mainObj + 1e-9) return { alts: [], better: st };
+    const st = runSearch(p, tables, LIGHT_SEARCH);
+    const plan = bestPlan(plans, st);
+    if (plan.obj > mainObj + 1e-9) return { alts: [], better: { st, p: plan.p } };
     if (accepted.some((a) => allocDistance(a.alloc, st.alloc) < minDiff)) continue;
     accepted.push(st);
-    const result = assemble(q, st);
+    const qa = c.priority === prio ? plan.p : prepare(p.input, c.priority, plan.p);
+    const result = assemble(qa, st);
     const altStages = gridStages(p, st);
     const altTop = topDomain(altStages, DOMAIN_ORDER.map((_, d) => st.domainPts[d]));
     // All revelations at the alternative's highest stage, so e.g. 'A + B focus' and 'B focus' stay distinguishable.
@@ -872,7 +1141,7 @@ function alternatives(p: Prepared, main: State, mainResult: BuildResult, count: 
         : c.kind === 'revelationFocus'
           ? text('alt.revelationFocus', { revelation: revName })
           : text(c.kind === 'defensive' ? 'alt.defensive' : 'alt.offensive');
-    const relativeScore = mainObj > 0 ? Math.round((1000 * objective(p, st)) / mainObj) / 10 : 100;
+    const relativeScore = mainObj > 0 ? Math.round((1000 * plan.obj) / mainObj) / 10 : 100;
     const revList = result.revelations.filter((r) => r.stage > 0).map((r) => `${r.perk.name} ${r.stage}`).join(', ') || '-';
     const tradeoff = text('alt.tradeoff', {
       offense: signed(result.offenseScore - mainResult.offenseScore),
@@ -887,7 +1156,8 @@ function alternatives(p: Prepared, main: State, mainResult: BuildResult, count: 
 
 /**
  * The beam commits to revelation thresholds early; re-searching with one reached
- * domain damped lets other revelation mixes compete. Kept only if the exact objective improves.
+ * domain damped lets other revelation mixes compete. Kept only if the exact objective improves
+ * and the rotation stays valid.
  */
 function refine(p: Prepared, best: State): State {
   if (p.budget >= p.wheel.definition.totalCapacity) return best;
@@ -895,9 +1165,9 @@ function refine(p: Prepared, best: State): State {
   const stages = gridStages(p, best);
   for (let d = 0; d < 4; d++) {
     if (stages[d] < 1 || stages[d] > 2) continue;
-    const st = search(p.wheel, blendTables(p.parts, p.blend, [0, 1, 2, 3].map((x) => (x === d ? 0.2 : 1))), p.budget, p.gemRm);
+    const st = runSearch(p, blendTables(p.parts, p.blend, [0, 1, 2, 3].map((x) => (x === d ? 0.2 : 1))), LIGHT_SEARCH);
     const obj = objective(p, st);
-    if (obj > bestObj + 1e-9) {
+    if (obj > bestObj + 1e-9 && (!p.auto || planValid(p, gridStages(p, st)))) {
       best = st;
       bestObj = obj;
     }
@@ -905,16 +1175,58 @@ function refine(p: Prepared, best: State): State {
   return best;
 }
 
+/**
+ * Rotation plans to evaluate: the chosen preset, or (auto) every preset of the vocation plus the greedy
+ * schedule in boss mode. All share one reference T0 (best plan without a revelation requirement).
+ */
+function planSpecs(input: OptimizerInput): PlanSpec[] {
+  const chosen = presetById(input.vocation, input.rotationId);
+  const boss = input.context?.mode === 'boss';
+  const all = getRotationPresets(input.vocation);
+  const presets: (RotationPreset | null)[] = chosen ? [chosen] : [...all, ...(boss || !all.length ? [null] : [])];
+  const base = modelInputs(input).model;
+  const reference = Math.max(1, ...presets.filter((x) => !x?.requires?.revelation).map((x) => planTotal(base, x)));
+  const wheel = getEngineWheel(input.vocation);
+  const forced = forcedSeed(wheel, input.forcedSpells ?? [], Math.min(wheel.definition.totalCapacity, pointsOf(input)));
+  return presets.map((preset) => ({ preset, reference, auto: !chosen, forced }));
+}
+
 export function runOptimizer(input: OptimizerInput): OptimizerResult {
-  const p = prepare(input);
-  let best = refine(p, search(p.wheel, p.tables, p.budget, p.gemRm));
+  const plans = planSpecs(input).map((spec) => prepare(input, input.priority, undefined, spec));
+  // D20: the rotation is chosen jointly with the build: a light search per plan screens them, the best (and a
+  // runner-up within 2 %) get a full search; the best valid objective wins.
+  let p = plans[0];
+  let best: State | null = null;
+  let bestObj = -Infinity;
+  const consider = (q: Prepared, st: State) => {
+    if (plans.length > 1 && !planValid(q, gridStages(q, st))) return;
+    const obj = objective(q, st);
+    if (obj > bestObj + 1e-9) {
+      p = q;
+      best = st;
+      bestObj = obj;
+    }
+  };
+  let finalists = plans;
+  if (plans.length > 2) {
+    const screened = plans.map((q) => {
+      const st = runSearch(q, q.tables, LIGHT_SEARCH);
+      consider(q, st);
+      return { q, obj: planValid(q, gridStages(q, st)) ? objective(q, st) : -Infinity };
+    });
+    screened.sort((a, b) => b.obj - a.obj);
+    finalists = screened.filter((x, i) => i === 0 || (i === 1 && x.obj >= screened[0].obj - 0.02 * Math.abs(screened[0].obj))).map((x) => x.q);
+  }
+  for (const q of finalists) consider(q, runSearch(q));
+  let main = refine(p, best ?? runSearch(p));
   const n = Math.max(0, Math.min(5, Math.floor(input.alternatives ?? DEFAULT_ALTERNATIVES)));
   const count = Number.isFinite(n) ? n : DEFAULT_ALTERNATIVES;
   // An alternative search may beat the main one (objective is not convex): promote it and retry.
   for (let k = 0; ; k++) {
-    const result = assemble(p, best);
-    const { alts, better } = alternatives(p, best, result, count);
+    const result = assemble(p, main);
+    const { alts, better } = alternatives(p, plans, main, result, count);
     if (!better || k >= 3) return { ...result, alternatives: alts };
-    best = better;
+    main = better.st;
+    p = better.p;
   }
 }

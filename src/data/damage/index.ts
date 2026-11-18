@@ -10,7 +10,23 @@ import type { Coefficients, DamageArea, DamageSpell, DamageVariant, HealingSpell
 export type * from './types';
 
 export const SPELL_FORMULAS: SpellFormulasFile = formulasJson;
-export const DAMAGE_SPELLS: readonly DamageSpell[] = SPELL_FORMULAS.spells;
+/** Spells unlocked by a wheel revelation (D20) → revelation name (as in wheel-data.json). */
+export const REVELATION_SPELLS: Readonly<Record<string, string>> = {
+  'Divine Grenade': 'Divine Grenade',
+  "Executioner's Throw": "Executioner's Throw",
+  'Ice Burst': 'Twin Bursts',
+  'Terra Burst': 'Twin Bursts',
+  'Spiritual Outburst': 'Spiritual Outburst',
+  'Avatar of Steel': 'Avatar of Steel',
+  'Avatar of Light': 'Avatar of Light',
+  'Avatar of Storm': 'Avatar of Storm',
+  'Avatar of Nature': 'Avatar of Nature',
+  'Avatar of Balance': 'Avatar of Balance',
+};
+
+export const DAMAGE_SPELLS: readonly DamageSpell[] = SPELL_FORMULAS.spells.map((s) =>
+  REVELATION_SPELLS[s.name] ? { ...s, unlockedBy: REVELATION_SPELLS[s.name] } : s,
+);
 export const HEALING_SPELLS: readonly HealingSpell[] = SPELL_FORMULAS.healing;
 
 /** Combat turn length used by the API and tibiapal rotations. */
@@ -19,6 +35,12 @@ export const TURN_SECONDS = 2;
 const key = (s: string) => s.trim().toLowerCase().replace(/ rune$/, '');
 const damageByName = new Map(DAMAGE_SPELLS.map((s) => [key(s.name), s]));
 const healingByName = new Map(HEALING_SPELLS.map((s) => [key(s.name), s]));
+
+/** Revelation that unlocks a spell (null = always available). Avatars are buffs without a damage formula. */
+export function revelationSpell(name: string): string | null {
+  const k = key(name);
+  return Object.entries(REVELATION_SPELLS).find(([n]) => key(n) === k)?.[1] ?? null;
+}
 
 export function getDamageSpell(name: string): DamageSpell | undefined {
   return damageByName.get(key(name));
@@ -35,10 +57,54 @@ export function getDamageSpells(vocation: Vocation): DamageSpell[] {
 
 const LEVEL_KEYS = Object.keys(SPELL_FORMULAS.weaponBrackets.knight).map(Number).sort((a, b) => a - b);
 
-/** Representative weapon for a vocation at a level (nearest lower bracket). */
-export function weaponBracket(vocation: Vocation, level: number): WeaponBracket {
-  const k = [...LEVEL_KEYS].reverse().find((l) => level >= l) ?? LEVEL_KEYS[0];
-  return SPELL_FORMULAS.weaponBrackets[vocation][String(k)];
+/** D21: paladins hunt with a bow (+ quiver) and fight bosses with a crossbow. */
+export type PaladinWeapon = 'bow' | 'crossbow';
+
+const DIAMOND_ARROW = 37;
+const bow = (weapon: string, weaponId: number, atk: number): WeaponBracket => ({ weapon, weaponId, attack: atk + DIAMOND_ARROW, ammo: 'Diamond Arrow' });
+/** Representative bows (TibiaTools weapons meta: bow attack + Diamond Arrow 37). Paladin spells barely depend on attack. */
+export const BOW_BRACKETS: Readonly<Record<string, WeaponBracket>> = {
+  200: bow('Jungle Bow', 213, 6),
+  400: bow('Soulbleeder', 231, 8),
+  600: bow('Sanguine Bow', 227, 9),
+  800: bow('Grand Sanguine Bow', 209, 9),
+  1000: bow('Moonsilver Bow', 840, 10),
+  1250: bow('Stellar Moonsilver Bow', 851, 10),
+  1500: bow('Stellar Moonsilver Bow', 851, 10),
+};
+
+/** Default paladin weapon per mode (D21). */
+export const paladinWeaponFor = (mode: 'hunt' | 'boss'): PaladinWeapon => (mode === 'boss' ? 'crossbow' : 'bow');
+
+/** Representative weapon for a vocation at a level (nearest lower bracket); paladins: crossbow unless 'bow'. */
+export function weaponBracket(vocation: Vocation, level: number, paladinWeapon: PaladinWeapon = 'crossbow'): WeaponBracket {
+  const k = String([...LEVEL_KEYS].reverse().find((l) => level >= l) ?? LEVEL_KEYS[0]);
+  return vocation === 'paladin' && paladinWeapon === 'bow' ? BOW_BRACKETS[k] : SPELL_FORMULAS.weaponBrackets[vocation][k];
+}
+
+/**
+ * D21 Ballistic Mastery. Bow: +4 % physical and holy pierce; crossbow: +10 % critical extra damage
+ * (add to critExtraPct of critMultiplier()).
+ */
+export const BALLISTIC_MASTERY = {
+  bow: { piercePct: 4, elements: ['physical', 'holy'] as const },
+  crossbow: { critExtraDamagePct: 10 },
+} as const;
+
+/** D21 Positional Tactics: +3 distance 70 % of the time, otherwise +3 holy & healing magic level. */
+export const POSITIONAL_TACTICS = { skillBonus: 3, magicLevelBonus: 3, skillUptime: 0.7 } as const;
+
+/**
+ * Creature damage modifier after "pierce" (TibiaTools probe, scripts/probe-pierce.mjs, exact on 3 creatures):
+ * pierce first cancels resistance (adds 1:1 up to a neutral 1.0), the rest adds at half rate.
+ * Immunities (0) stay 0 (assumption). Physical hits are additionally reduced by armor (slightly more gain there).
+ */
+export function pierceDamageMod(mod: number, piercePct: number): number {
+  if (mod <= 0 || piercePct <= 0) return mod;
+  const p = piercePct / 100;
+  if (mod >= 1) return mod + p / 2;
+  const toNeutral = Math.min(p, 1 - mod);
+  return mod + toNeutral + (p - toNeutral) / 2;
 }
 
 export interface HitOptions {
@@ -56,6 +122,12 @@ export interface HitOptions {
   baseDamagePct?: number;
   /** Wheel flat "damage and healing" bonus (revelation stages + vessels); added per hit × variant.bonusFactor. */
   flatBonus?: number;
+  /** Extra main skill (e.g. Positional Tactics +3 distance). */
+  skillBonus?: number;
+  /** Extra magic level (e.g. Positional Tactics +3 holy/healing). */
+  magicLevelBonus?: number;
+  /** Paladin weapon for the default attack (D21); default crossbow. */
+  paladinWeapon?: PaladinWeapon;
 }
 
 /** Shared level term g(L) of every damage formula: L/5 up to 500, then +1 per 6/7/8/9 levels (breaks 1100/1800/2600). */
@@ -103,9 +175,9 @@ function statsFor(spell: DamageSpell, character: CharacterStats, opts: HitOption
   const c = resolveCharacterStats(vocation, character);
   return {
     level: c.level,
-    magicLevel: c.magicLevel,
-    skill: c.mainSkill,
-    attack: opts.attack ?? weaponBracket(vocation, c.level).attack,
+    magicLevel: c.magicLevel + (opts.magicLevelBonus ?? 0),
+    skill: c.mainSkill + (opts.skillBonus ?? 0),
+    attack: opts.attack ?? weaponBracket(vocation, c.level, opts.paladinWeapon).attack,
     shielding: c.shielding,
     shieldDefense: opts.shieldDefense ?? 50,
   };
@@ -127,11 +199,11 @@ export function spellAverageHit(spellName: string, character: CharacterStats, op
 }
 
 /** Average healing of one cast on one target (approximate formulas, see docs). */
-export function healingAverage(spellName: string, character: CharacterStats, opts: { vocation?: Vocation; baseHealingPct?: number; flatBonus?: number } = {}): number {
+export function healingAverage(spellName: string, character: CharacterStats, opts: { vocation?: Vocation; baseHealingPct?: number; flatBonus?: number; magicLevelBonus?: number } = {}): number {
   const spell = getHealingSpell(spellName);
   if (!spell) return 0;
   const c = resolveCharacterStats(opts.vocation ?? spell.vocations[0], character);
-  const raw = evaluate(spell.avg, { level: c.level, magicLevel: c.magicLevel, skill: 0, attack: 0, shielding: 0, shieldDefense: 0 });
+  const raw = evaluate(spell.avg, { level: c.level, magicLevel: c.magicLevel + (opts.magicLevelBonus ?? 0), skill: 0, attack: 0, shielding: 0, shieldDefense: 0 });
   return raw * (1 + (opts.baseHealingPct ?? 0) / 100) + (opts.flatBonus ?? 0);
 }
 

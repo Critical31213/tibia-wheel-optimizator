@@ -22,11 +22,22 @@ the build in the official planner.
   most valuable grade upgrades.
 - **Character.** Level (drives the points), promotion scroll points, optional manual points and per-vocation
   skills (melee/distance/fist, shielding, magic level; empty = estimated from level). They drive HP, base
-  mitigation and real spell damage, so e.g. a level 400 paladin prefers Hit Points over Mitigation Multiplier.
+  mitigation and real spell damage.
+- **Real mitigation formula.** Base mitigation = shielding × vocation factor + shield / spellbook / quiver defense,
+  calibrated on in-game values (paladin quiver for hunts, crossbow for bosses; mages use a spellbook; knights a
+  shield only in the shield rotation).
+- **Defense as effective HP.** HP, mitigation, dodge and resistances are compared as % effective HP
+  (EHP = HP / (1 − mitigation)); capacity and max mana have no value (potions and mana leech are assumed).
 - **Damage model.** Spell damage comes from per-spell formulas fitted offline on the TibiaTools damage API used
   by the tibiapal.com calculator, run through a rotation (cooldowns, crit, augments, flat bonus).
-- **Fight context.** Hunt (solo / team-lure / team-box) or Boss. Area spells are valued by the expected number of
-  targets; **single-target spells are ignored while hunting** and count only against bosses. Avatar revelations
+- **Rotations.** Per-vocation rotation presets (tibiapal); by default the optimizer picks the best one for the
+  spot and build, or you choose one. Revelation spells (Divine Grenade, Executioner's Throw, Twin Bursts,
+  Spiritual Outburst; Avatars on bosses) join the rotation while their revelation is active. Boss mode also tries
+  a greedy single-target plan. Augments of spells outside the rotation are worth nothing.
+- **Forced spells.** Force the wheel augment of utility spells (e.g. Divine Dazzle, Mystic Repulse, Heal Friend);
+  the build takes at least their stage I augment.
+- **Fight context.** Hunt or Boss (hunt styles were removed). Area spells use average target counts from tibiapal
+  while hunting and ~1 target on bosses; **single-target spells are ignored while hunting**. Avatar revelations
   count only in boss fights.
 - **Hunting spot.** Search 2006 monsters and add up to 10 with relative weights. Builds adapt to the weighted
   elemental weaknesses, resistances and damage types of the whole spot.
@@ -81,8 +92,8 @@ to JSON. The CipSoft code itself is never committed or shipped. Details: [docs/m
    dedication, convictions, augments, revelation stages, the Avatar (boss only) and gem mods.
    - Offense is the % change of rotation damage: fitted spell formulas × expected targets × the spot's weighted
      element modifier × crit, within cooldowns (single-target spells are worth 0 while hunting).
-   - Defense values HP as effective HP against the spot's damage spikes, and mitigation / damage reduction as
-     sustained reduction on the character's real base mitigation.
+   - Defense is the % change of effective HP: HP +x → x/HP, mitigation / dodge +pp → pp/(100 − m) on the
+     character's real base mitigation, resistances × the element's incoming share.
 2. The values are blended by the priority slider: `(1 − p)·offense + p·defense + 0.1·utility`.
 3. A beam search (width 24) fills whole slices along the planner's unlock graph. It looks ahead to the next
    revelation threshold, puts leftover points into a partially filled last slice, and refines by damping one
@@ -143,7 +154,8 @@ src/integration.test.ts      end-to-end tests
 - Damage formulas are fitted to the TibiaTools calculator (≤ 1.7 damage error), not taken from the game itself.
 - Healing formulas are approximate, and the cooldowns of the 2026 spells are estimates.
 - Armor is not modelled; base mitigation assumes default equipment per vocation.
-- Team target counts (team-lure ~5, team-box ~9) are estimates.
+- Hunt target counts are tibiapal averages; the shield defense (50) and quiver factor used for paladin
+  mitigation come from a few in-game data points.
 - Near a full wheel there may be no alternatives (not enough room for a distinct build).
 - Some legacy monsters have incomplete damage or resistance data on the source site.
 - The UI is functional, not polished; polishing is postponed until the functionality is accepted.

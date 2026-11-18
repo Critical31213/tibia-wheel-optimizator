@@ -1,10 +1,11 @@
 /**
- * Perk valuation. Units: `off` = % of total damage per turn (ΔT / T0, real formulas, see spells.ts),
- * `def` = survivability units (see K and docs/modules/engine.md), `util` = convenience (mana, capacity).
+ * Perk valuation. Units: `off` = % of total damage per turn (ΔT / reference rotation, real formulas, see spells.ts),
+ * `def` = % of effective HP (D18: EHP = HP / (1 − mitigation)) × threat, `util` = convenience.
+ * Capacity and max mana have no value (D18).
  */
 import type { Element, FightContext, Monster, Vocation } from '../types';
 import type { WheelSupremeMod, WheelTile } from '../data/wheel';
-import { maxHitPoints, maxMana, mitigationPercent } from '../data/character';
+import { maxHitPoints, maxMana, mitigationPercent, type Offhand } from '../data/character';
 import {
   cooldownGain,
   damageShare,
@@ -29,30 +30,12 @@ export interface Parts {
 export const ZERO: Parts = { off: 0, def: 0, util: 0 };
 
 export const K = {
-  /** Per +1 % of max HP, × spike factor (HP is a buffer against spikes). */
-  HP_DEF: 1,
-  /**
-   * Per +1 percentage point of damage reduction on all incoming damage. Reduction works on every hit
-   * (sustain: less healing and mana needed) as well as on spikes, hence > HP_DEF.
-   */
-  DR_DEF: 3,
-  /** Spike = this × level when no monster max damage is known. */
-  SPIKE_PER_LEVEL: 3,
-  /** Spike factor = clamp(SPIKE_HP × spike / maxHP, min, max). */
-  SPIKE_HP: 2,
-  SPIKE_MIN: 0.25,
-  SPIKE_MAX: 1.5,
+  /** +1 % output of a healing spell = this × its share of your healing, in % EHP (sustain; overheal discounted). */
+  HEAL_EHP: 0.5,
   /** Leech is strongly devalued (D14). Per +1 % leech. */
   LIFE_LEECH_DEF: 0.15,
   MANA_LEECH_OFF: 0.1,
   MANA_LEECH_DEF: 0.05,
-  /** Per +1 % of max mana: convenience only (a bigger pool does not raise damage). */
-  MANA_UTIL: 0.01,
-  /** Per +1 % of max HP: universal tie-break so HP beats mana even at priority 0. */
-  HP_UTIL: 0.02,
-  /** Per +1 % healing output. */
-  HEAL_DEF: 0.3,
-  CAP_UTIL: 0.002,
   MANA_COST_UTIL: 0.05,
   /** Larger area / shape: extra targets while hunting. */
   AREA_TARGETS: 1,
@@ -82,18 +65,8 @@ export const EFFECT_HP = 10;
 export const EFFECT_MANA = 11;
 export const EFFECT_CAPACITY = 12;
 
-/** Share of incoming damage per element without a monster. */
-const GENERIC_INCOMING: Partial<Record<Element, number>> = {
-  physical: 0.35,
-  fire: 0.1,
-  earth: 0.1,
-  energy: 0.1,
-  ice: 0.1,
-  holy: 0.05,
-  death: 0.1,
-  lifeDrain: 0.05,
-  manaDrain: 0.05,
-};
+/** Share of incoming damage per element without monster data (D18: physical). */
+const GENERIC_INCOMING: Partial<Record<Element, number>> = { physical: 1 };
 
 export interface ValuationContext {
   vocation: Vocation;
@@ -102,15 +75,19 @@ export interface ValuationContext {
   monster: Monster | null;
   model: SpellModel;
   level: number;
-  /** Defense multiplier from monster max damage. */
+  /** Uniform defense multiplier from monster max damage. */
   threat: number;
   /** Base max HP / mana at the level. */
   hp: number;
   mana: number;
-  /** Base mitigation (%) from shielding/defense. */
+  /** Base mitigation (%) with the rotation's offhand (D19). */
   mitigation: number;
-  /** clamp(2 × spike / maxHP): how much a bigger HP buffer matters. */
-  spikeFactor: number;
+  /** Base mitigation (%) with the vocation's default offhand (EHP reference across rotations). */
+  mitigationRef: number;
+  /** D21: forced spells (utility augments keep their value). */
+  forced: ReadonlySet<string>;
+  /** Exactly evaluated unique convictions (Positional Tactics, Ballistic Mastery). */
+  unique: Partial<Record<string, Parts>>;
   /** Share of incoming damage per element (weighted over the spot). */
   incoming: Partial<Record<Element, number>>;
   /** Δ% damage of +1 main skill / magic level (skill boost convictions). */
@@ -167,28 +144,21 @@ export function spotMonster(monsters: { monster: Monster; weight: number }[]): M
   };
 }
 
-export function spikeFactor(vocation: Vocation, level: number, monsters: { monster: Monster; weight: number }[]): number {
-  const withDmg = monsters.filter((m) => m.monster.maxDamage);
-  const wd = withDmg.reduce((s, m) => s + m.weight, 0);
-  const spike = wd > 0 ? withDmg.reduce((s, m) => s + m.weight * m.monster.maxDamage!, 0) / wd : K.SPIKE_PER_LEVEL * level;
-  return Math.min(K.SPIKE_MAX, Math.max(K.SPIKE_MIN, (K.SPIKE_HP * spike) / maxHitPoints(vocation, level)));
+/** Base character facts for valuation (mitigation with the given offhand, else the D19 default). */
+export function characterFacts(vocation: Vocation, level: number, shielding: number, offhand?: Offhand) {
+  return {
+    hp: maxHitPoints(vocation, level),
+    mana: maxMana(vocation, level),
+    mitigation: mitigationPercent(vocation, level, { shielding, offhand }),
+    mitigationRef: mitigationPercent(vocation, level, { shielding }),
+  };
 }
 
-/** Base character facts for valuation. */
-export function characterFacts(vocation: Vocation, level: number, shielding: number) {
-  return { hp: maxHitPoints(vocation, level), mana: maxMana(vocation, level), mitigation: mitigationPercent(vocation, level, { shielding }) };
-}
+const def = (v: Pick<ValuationContext, 'threat'>, x: number): Parts => ({ off: 0, def: x * v.threat, util: 0 });
 
-const def = (v: ValuationContext, x: number): Parts => ({ off: 0, def: x * v.threat, util: 0 });
-
-export function hpParts(v: ValuationContext, hp: number): Parts {
-  const pct = (100 * hp) / v.hp;
-  return { off: 0, def: pct * K.HP_DEF * v.spikeFactor * v.threat, util: pct * K.HP_UTIL };
-}
-
-export function manaParts(v: ValuationContext, mana: number): Parts {
-  const pct = (100 * mana) / v.mana;
-  return { off: 0, def: 0, util: pct * K.MANA_UTIL };
+/** +HP → % EHP gain = HP / base HP. */
+export function hpParts(v: Pick<ValuationContext, 'hp' | 'threat'>, hp: number): Parts {
+  return def(v, (100 * hp) / v.hp);
 }
 
 /** Extra damage reduction (percentage points) from a +`multiplierPct` % mitigation multiplier. */
@@ -196,31 +166,30 @@ export function mitigationGain(v: Pick<ValuationContext, 'mitigation'>, multipli
   return (v.mitigation * multiplierPct) / 100;
 }
 
-/** Damage reduction in percentage points, valued as relative reduction of damage taken. */
-export function reductionParts(v: ValuationContext, pp: number): Parts {
-  return def(v, (pp / Math.max(0.5, 1 - v.mitigation / 100)) * K.DR_DEF);
+/** Damage reduction (mitigation, dodge) in percentage points → % EHP gain = pp / (100 − mitigation). */
+export function reductionParts(v: Pick<ValuationContext, 'mitigation' | 'threat'>, pp: number): Parts {
+  return def(v, (100 * pp) / Math.max(50, 100 - v.mitigation));
 }
 
-export function mitigationParts(v: ValuationContext, multiplierPct: number): Parts {
+export function mitigationParts(v: Pick<ValuationContext, 'mitigation' | 'threat'>, multiplierPct: number): Parts {
   return reductionParts(v, mitigationGain(v, multiplierPct));
 }
 
-export function resistParts(v: ValuationContext, e: Element, pct: number): Parts {
-  return def(v, pct * K.DR_DEF * incomingShare(v, e));
+/** Elemental resistance: like damage reduction, × the element's share of incoming damage. */
+export function resistParts(v: Pick<ValuationContext, 'mitigation' | 'threat' | 'incoming'>, e: Element, pct: number): Parts {
+  return { ...ZERO, def: reductionParts(v, pct).def * incomingShare(v, e) };
 }
 
 /** Flat damage & healing bonus: real per-hit damage (× bonus factor × targets) and healing per cast. */
 export function flatParts(v: ValuationContext, flat: number): Parts {
-  return { off: flat * v.model.flatOffPerPoint, def: flat * v.model.flatHealPerPoint * K.HEAL_DEF * v.threat, util: 0 };
+  return { off: flat * v.model.flatOffPerPoint, def: flat * v.model.flatHealPerPoint * K.HEAL_EHP * v.threat, util: 0 };
 }
 
-/** Value of ONE dedication point of a tile. */
+/** Value of ONE dedication point of a tile (mana id 1 and capacity id 3 have no value, D18). */
 export function dedicationParts(v: ValuationContext, t: WheelTile): Parts {
   let p = ZERO;
   for (const d of t.dedication.perks) {
     if (d.id === 0) p = add(p, hpParts(v, d.perPoint));
-    else if (d.id === 1) p = add(p, manaParts(v, d.perPoint));
-    else if (d.id === 3) p = add(p, { off: 0, def: 0, util: d.perPoint * K.CAP_UTIL });
     else if (d.id === 4) p = add(p, mitigationParts(v, d.perPoint));
   }
   return p;
@@ -271,6 +240,9 @@ export function parseEffects(textValue: string): SpellEffect[] {
   return out;
 }
 
+/** Support spells that only give utility: augments worth 0 unless the spell is forced (D20/D21). */
+export const UTILITY_SPELLS = new Set(['Divine Dazzle']);
+
 /** Support-spell value at 100 % presence (multiplied by cooldown gains). */
 const SUPPORT_VALUE: Record<string, Parts> = {
   'Divine Dazzle': { off: 0, def: 1, util: 3 },
@@ -309,11 +281,13 @@ export function spellBundleParts(v: ValuationContext, spell: string, effects: Sp
   const stage = s.stageDomain >= 0 ? stages[s.stageDomain] : 3;
   if (s.avatar) return avatarParts(v, stage, effects.filter((e) => e.kind === 'cd').reduce((a, e) => a + e.amount, 0));
   if (s.revelation >= 0 && stage < 1) return ZERO;
+  if (UTILITY_SPELLS.has(spell) && !v.forced.has(spell)) return ZERO;
   if (s.kind === 'damage') {
     if (!s.usable) return ZERO;
     const base: RotationInput = { stages };
     const mods = new Map([[spell, toMods(effects, v.context.mode === 'hunt')]]);
-    const off = deltaOff(v.model, { stages, mods }, base);
+    // A perk never lowers damage: with preset ratios a cooldown cut could otherwise shift casts to a weaker spell.
+    const off = Math.max(0, deltaOff(v.model, { stages, mods }, base));
     const leech = effects.filter((e) => e.kind === 'leech').reduce((a, e) => a + e.amount, 0);
     let dfn = 0;
     if (leech > 0) dfn += (leech * K.LIFE_LEECH_DEF * damageShare(v.model, spell, stages)) / 100;
@@ -327,17 +301,16 @@ export function spellBundleParts(v: ValuationContext, spell: string, effects: Sp
   let cd = 0;
   const hs = s.kind === 'healing' ? healShare(v.model, spell) : 0;
   for (const e of effects) {
-    if (e.kind === 'heal') dfn += e.amount * hs * K.HEAL_DEF;
+    if (e.kind === 'heal') dfn += e.amount * hs * K.HEAL_EHP;
     else if (e.kind === 'mana') util += e.amount * K.MANA_COST_UTIL;
     else if (e.kind === 'duration') util += 1;
     else if (e.kind === 'defHit') dfn += 0.5;
     else if (e.kind === 'cd') cd += e.amount;
     else if (e.kind === 'jumps' && s.kind === 'support') util += e.amount * 0.5;
-    else if (e.kind === 'area' && s.kind === 'healing' && v.context.mode === 'hunt' && v.context.huntStyle !== 'solo') dfn += 100 * hs * K.HEAL_DEF * 0.1;
   }
   if (cd > 0) {
     const g = cooldownGain(spellCooldown(spell, stage), cd);
-    if (s.kind === 'healing') dfn += 100 * hs * K.HEAL_DEF * g;
+    if (s.kind === 'healing') dfn += 100 * hs * K.HEAL_EHP * g;
     else {
       const sup = SUPPORT_VALUE[spell] ?? { off: 1, def: 0, util: 1 };
       off += sup.off * g;
@@ -356,26 +329,25 @@ export function avatarParts(v: ValuationContext, stage: number, cdReduction = 0)
   const fights = Math.min(1, K.BOSS_INTERVAL_MIN / cdMin);
   const uptime = K.AVATAR_DURATION_S / K.BOSS_FIGHT_S;
   const boost = (1 + 0.5 + extra) / (1 + 0.1 * 0.5) - 1;
-  return { off: 100 * uptime * boost * fights, def: 100 * uptime * extra * fights * K.DR_DEF * v.threat, util: 0 };
+  return { off: 100 * uptime * boost * fights, def: ((100 * uptime * extra) / (1 - extra)) * fights * v.threat, util: 0 };
 }
 
 // ---------------------------------------------------------------------------
 // Convictions and revelations
 
 type UniqueFn = (v: ValuationContext) => Parts;
-const crowd = (c: FightContext) =>
-  c.mode === 'boss' ? 0.1 : c.huntStyle === 'solo' ? 0.3 : c.huntStyle === 'teamLure' ? 0.5 : 0.8;
-const team = (c: FightContext) => c.mode === 'hunt' && c.huntStyle !== 'solo';
+const crowd = (c: FightContext) => (c.mode === 'boss' ? 0.1 : 0.3);
 
 const UNIQUE: Record<string, UniqueFn> = {
   'Battle Instinct': (v) => ({ off: 1.5 * crowd(v.context), def: 2.5 * crowd(v.context) * v.threat, util: 0 }),
-  'Battle Healing': (v) => ({ off: 0, def: 15 * K.HEAL_DEF * v.threat, util: 0 }),
-  'Positional Tactics': () => ({ off: 2, def: 0, util: 0 }),
-  'Ballistic Mastery': () => ({ off: 2.5, def: 0, util: 0 }),
+  'Battle Healing': (v) => ({ off: 0, def: 9 * K.HEAL_EHP * v.threat, util: 0 }),
+  'Positional Tactics': (v) => v.unique['Positional Tactics'] ?? ZERO,
+  'Ballistic Mastery': (v) => v.unique['Ballistic Mastery'] ?? ZERO,
   'Runic Mastery': () => ({ off: 1.5, def: 0, util: 0 }),
   'Focus Mastery': () => ({ off: 3, def: 0, util: 0.5 }),
-  'Healing Link': (v) => ({ off: 0, def: (team(v.context) ? 2.5 : v.context.mode === 'boss' ? 1 : 0.5) * v.threat, util: 0 }),
-  'Guiding Presence': (v) => (team(v.context) ? { off: 1, def: 0, util: 5 } : ZERO),
+  'Healing Link': (v) => ({ off: 0, def: (v.context.mode === 'boss' ? 1 : 0.5) * v.threat, util: 0 }),
+  // party-only perk; team hunts are no longer modelled (D20)
+  'Guiding Presence': () => ZERO,
   Sanctuary: (v) => ({ off: 6, def: 1 * v.threat, util: 0 }),
 };
 
@@ -444,7 +416,7 @@ function passiveRevelation(v: ValuationContext, name: string, stage: number): Pa
       return { off: stageVal([8, 10, 12], stage) * Math.min(1, 5 / cd), def: 0, util: 0 };
     }
     case 'Blessing of the Grove':
-      return { off: 0, def: stageVal([3.5, 4.5, 6], stage) * th * (team(v.context) ? 1.5 : 1), util: 0 };
+      return { off: 0, def: stageVal([3.5, 4.5, 6], stage) * th, util: 0 };
     default:
       return ZERO;
   }
@@ -466,8 +438,7 @@ export function basicModParts(
     if (el) p = add(p, resistParts(v, el, x));
     else if (e.effectId === EFFECT_MITIGATION) p = add(p, mitigationParts(v, x));
     else if (e.effectId === EFFECT_HP) p = add(p, hpParts(v, x));
-    else if (e.effectId === EFFECT_MANA) p = add(p, manaParts(v, x));
-    else if (e.effectId === EFFECT_CAPACITY) p = add(p, { off: 0, def: 0, util: x * K.CAP_UTIL });
+    // EFFECT_MANA / EFFECT_CAPACITY: no value (D18)
   }
   return p;
 }
@@ -527,6 +498,9 @@ export function supremeModParts(
   }
   const spell = m.spell;
   if (!spell) return ZERO;
+  // D21: healing gems excluded for mages
+  const healingGem = m.category === 'augHealing' || v.model.spells.get(spell)?.kind === 'healing';
+  if (healingGem && (v.vocation === 'sorcerer' || v.vocation === 'druid')) return ZERO;
   if (v.model.spells.get(spell)?.avatar && v.context.mode !== 'boss') return ZERO;
   const wheel = facts.wheelEffects.get(spell) ?? [];
   let p = sub(

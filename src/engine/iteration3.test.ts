@@ -8,9 +8,8 @@ import { buildSpellModel, damageShare, NO_STAGES, normaliseMonsters, spotElement
 import { hpParts, mitigationParts, supremeModParts } from './values';
 import { getEngineWheel, stageFor } from './wheel/build';
 
-const HUNT: FightContext = { mode: 'hunt', huntStyle: 'solo' };
-const BOX: FightContext = { mode: 'hunt', huntStyle: 'teamBox' };
-const BOSS: FightContext = { mode: 'boss', huntStyle: 'solo' };
+const HUNT: FightContext = { mode: 'hunt' };
+const BOSS: FightContext = { mode: 'boss' };
 
 const monster = (id: string, mods: Monster['elementModifiers'], maxDamage = 800): Monster => ({
   id,
@@ -43,9 +42,9 @@ describe('character and defense valuation', () => {
     expect(r.gemRecommendations.find((g) => g.quality === 'lesser')?.mods[0].name).not.toBe('Mitigation Multiplier');
   });
 
-  it('mitigation becomes competitive for a level 1500 knight at high defense priority', () => {
+  it('D18: a level 1500 knight still prefers Hit Points; mitigation gains relative ground', () => {
     const r = optimize({ vocation: 'knight', points: 1450, monster: null, priority: 100, character: { level: 1500 } });
-    expect(r.gemRecommendations.find((g) => g.quality === 'lesser')?.mods[0].name).toBe('Mitigation Multiplier');
+    expect(r.gemRecommendations.find((g) => g.quality === 'lesser')?.mods[0].name).toBe('Hit Points');
     const v = valuationFor({ vocation: 'knight', points: 1450, monster: null, character: { level: 1500 } });
     const low = valuationFor({ vocation: 'knight', points: 350, monster: null, character: { level: 400 } });
     const ratio = (x: typeof v) => mitigationParts(x, 0.03).def / hpParts(x, 3).def;
@@ -113,12 +112,12 @@ describe('hunting spots (multi-monster)', () => {
         points: 1500,
         monster: null,
         priority: 30,
-        context: BOX,
+        context: HUNT,
         monsters: [{ monster: fireWeak, weight: wf }, { monster: energyWeak, weight: we }],
       });
     expect(run(3, 1).allocation).toEqual(run(6, 2).allocation);
     const fire = (wf: number, we: number) => {
-      const m = buildSpellModel('sorcerer', BOX, [{ monster: fireWeak, weight: wf }, { monster: energyWeak, weight: we }]);
+      const m = buildSpellModel('sorcerer', HUNT, [{ monster: fireWeak, weight: wf }, { monster: energyWeak, weight: we }]);
       return damageShare(m, 'Great Fire Wave', NO_STAGES);
     };
     expect(fire(9, 1)).toBeGreaterThan(fire(1, 9));
@@ -136,7 +135,7 @@ describe('alternatives', () => {
   it.each([
     ['paladin', 600, HUNT, 30],
     ['paladin', 600, BOSS, 30],
-    ['knight', 1500, BOX, 90],
+    ['knight', 1500, HUNT, 90],
     ['druid', 2500, BOSS, 50],
   ] as [Vocation, number, FightContext, number][])('%s %i: distinct, labelled alternatives', (vocation, points, context, priority) => {
     const r = optimize({ vocation, points, monster: null, priority, context });
@@ -169,7 +168,7 @@ describe('alternatives', () => {
 // Planner code
 
 const CASES: OptimizerInput[] = [
-  { vocation: 'knight', points: 1500, monster: null, priority: 90, context: BOX },
+  { vocation: 'knight', points: 1500, monster: null, priority: 90, context: HUNT },
   { vocation: 'paladin', points: 600, monster: null, priority: 30, context: BOSS },
   { vocation: 'sorcerer', points: 2200, monster: null, priority: 20 },
   { vocation: 'druid', points: 800, monster: null, priority: 40 },
@@ -236,7 +235,7 @@ describe.skipIf(!(existsSync(cachePath) as boolean))('planner code vs official p
 describe('mana is not preferred over HP (max mana does not raise damage)', () => {
   it.each(['paladin', 'sorcerer', 'druid', 'monk'] as const)('%s lesser gem recommendation is not Mana, even at max DPS priority', (vocation) => {
     for (const priority of [0, 10, 30]) {
-      const r = optimize({ vocation, points: 550, monster: null, priority, context: { mode: 'hunt', huntStyle: 'solo' }, character: { level: 600 } });
+      const r = optimize({ vocation, points: 550, monster: null, priority, context: HUNT, character: { level: 600 } });
       const lesser = r.gemRecommendations.find((g) => g.quality === 'lesser');
       expect(lesser?.mods.some((m) => /^Mana$/.test(m.name))).toBe(false);
     }
