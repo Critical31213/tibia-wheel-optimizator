@@ -89,8 +89,8 @@ describe('Revelation Mastery look-ahead', () => {
     const withGem = optimize({ ...base, gems: [gem] });
     const stage = (r: typeof plain) => r.revelations.find((x) => x.perk.name === top.perk.name)!;
     expect(withGem.vessels.some((a) => a.gem?.supreme?.modId === rm.id)).toBe(true);
-    const sum = (r: typeof plain) => r.revelations.reduce((s, x) => s + x.stage, 0);
-    expect(sum(withGem)).toBeGreaterThanOrEqual(sum(plain));
+    const score = (r: typeof plain) => 0.8 * r.offenseScore + 0.2 * r.defenseScore;
+    expect(score(withGem)).toBeGreaterThanOrEqual(score(plain));
     expect(stage(withGem).stage).toBeGreaterThan(stage(plain).stage);
   });
 });
@@ -229,6 +229,16 @@ describe.skipIf(!(existsSync(cachePath) as boolean))('planner code vs official p
       v.delete();
       planner.delete();
       expect(pts).toEqual(Object.fromEntries(Object.entries(r.allocation).map(([id, p]) => [gridForSliceId(id, input.vocation), p])));
+    }
+  });
+});
+
+describe('mana is not preferred over HP (max mana does not raise damage)', () => {
+  it.each(['paladin', 'sorcerer', 'druid', 'monk'] as const)('%s lesser gem recommendation is not Mana, even at max DPS priority', (vocation) => {
+    for (const priority of [0, 10, 30]) {
+      const r = optimize({ vocation, points: 550, monster: null, priority, context: { mode: 'hunt', huntStyle: 'solo' }, character: { level: 600 } });
+      const lesser = r.gemRecommendations.find((g) => g.quality === 'lesser');
+      expect(lesser?.mods.some((m) => /^Mana$/.test(m.name))).toBe(false);
     }
   });
 });

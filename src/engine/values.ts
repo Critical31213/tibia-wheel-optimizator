@@ -46,9 +46,10 @@ export const K = {
   LIFE_LEECH_DEF: 0.15,
   MANA_LEECH_OFF: 0.1,
   MANA_LEECH_DEF: 0.05,
-  /** Per +1 % of base mana. */
-  MANA_OFF: 0.1,
-  MANA_DEF: 0.05,
+  /** Per +1 % of max mana: convenience only (a bigger pool does not raise damage). */
+  MANA_UTIL: 0.01,
+  /** Per +1 % of max HP: universal tie-break so HP beats mana even at priority 0. */
+  HP_UTIL: 0.02,
   /** Per +1 % healing output. */
   HEAL_DEF: 0.3,
   CAP_UTIL: 0.002,
@@ -181,12 +182,13 @@ export function characterFacts(vocation: Vocation, level: number, shielding: num
 const def = (v: ValuationContext, x: number): Parts => ({ off: 0, def: x * v.threat, util: 0 });
 
 export function hpParts(v: ValuationContext, hp: number): Parts {
-  return def(v, ((100 * hp) / v.hp) * K.HP_DEF * v.spikeFactor);
+  const pct = (100 * hp) / v.hp;
+  return { off: 0, def: pct * K.HP_DEF * v.spikeFactor * v.threat, util: pct * K.HP_UTIL };
 }
 
 export function manaParts(v: ValuationContext, mana: number): Parts {
   const pct = (100 * mana) / v.mana;
-  return { off: pct * K.MANA_OFF, def: pct * K.MANA_DEF * v.threat, util: 0 };
+  return { off: 0, def: 0, util: pct * K.MANA_UTIL };
 }
 
 /** Extra damage reduction (percentage points) from a +`multiplierPct` % mitigation multiplier. */
