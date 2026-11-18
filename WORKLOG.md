@@ -372,6 +372,10 @@ Data `src/data/damage/stances.ts`; engine `src/engine/stances.ts` (character, sp
 
 User: sorcerer 850 points, offense, Master of Decay got Gift of Life instead of Lord of Destruction. Cause: LoD was valued as fire ×1.015–1.030 regardless of stance (only Hell's Core in a death rotation). Per wheel data it boosts the elemental stance type: Flames +2/3/4 % fire damage, Thunder +2/3/4 pp crit chance, Decay +15/25.5/30 pp crit extra damage (applied to natural + converted casts; assumption). LoD stage 1/2/3 with Decay: 0.8/1.6/3.2 → 1.9/3.5/5.4 % damage. 850 points, priority 0 now: Beam Mastery 2 + LoD 2. Tests added.
 
+### 2026-11-18 — Search: augment pair look-ahead
+
+User: is +1 magic level worth more than the second Death Echo augment? No: +1 ML ≈ 0.6 % damage, Death Echo stage II (+12 % base damage) ≈ 3.8 %. Stage I (−2 s cooldown) is worth 0 in the DE – EW – DE – GDB preset (every turn is already used and Death Echo deals less per cast than Energy Wave), so the beam search never filled the first copy and missed the pair (forcing Death Echo gave 25.1 vs 22.6 % damage). `rankOf` now credits stage II × LOOKAHEAD_WEIGHT while one copy is full and the other is affordable (ranking only). 850 points, priority 0: Beam Mastery 2 + LoD 1 + both Death Echo augments (25.2 %). RM look-ahead test relaxed: the plain knight build now already reaches stage 3, so the gem must give a higher stage or the same stage with fewer slice points.
+
 ## In progress / Next
 
 - [x] S1 Data — scraper + monster dataset + search API.

@@ -77,5 +77,8 @@ describe('D24 Lord of Destruction follows the elemental stance', () => {
     const names = r.revelations.filter((x) => x.stage > 0).map((x) => x.perk.name);
     expect(names).toContain('Lord of Destruction');
     expect(names).not.toContain('Gift of Life');
+    // Augment pair look-ahead: stage I (-2 s cooldown) is worth 0 here, stage II (+12 % base damage) needs both copies.
+    expect(r.allocation.QTR2).toBe(100);
+    expect(r.allocation.QBL2).toBe(100);
   });
 });

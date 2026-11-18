@@ -165,6 +165,8 @@ interface Search {
   density: number;
   /** Revelation points of owned RM gems active with `vessels` unlocked vessels: [vessels][domain]. */
   gemRm: number[][];
+  /** Augment slice pairs (same conviction): stage II needs both copies. */
+  pairs: [number, number][];
 }
 
 const isFull = (w: EngineWheel, alloc: ArrayLike<number>, i: number) => alloc[i] >= w.slices[i].capacity;
@@ -188,6 +190,15 @@ function rankOf(s: Search, st: State, i = -1, pts = 0, delta = 0): number {
     if (target - dp > remaining) continue;
     const gain = s.t.rev[d][stage + 1] - s.t.rev[d][stage];
     shaping += gain * ((dp - prev) / (target - prev)) * LOOKAHEAD_WEIGHT;
+  }
+  // Augment stage II comes only with the second copy (stage I may be worth ~0, e.g. a cooldown the rotation cannot use).
+  for (const [x, y] of s.pairs) {
+    const fx = isFull(s.wheel, st.alloc, x) || (x === i && fills);
+    const fy = isFull(s.wheel, st.alloc, y) || (y === i && fills);
+    if (fx === fy) continue;
+    const other = fx ? y : x;
+    const need = s.wheel.slices[other].capacity - st.alloc[other] - (other === i ? pts : 0);
+    if (need <= remaining) shaping += Math.max(0, s.t.aug2[other]) * LOOKAHEAD_WEIGHT;
   }
   return st.score + delta + shaping + remaining * s.density;
 }
@@ -283,7 +294,8 @@ function search(wheel: EngineWheel, t: Tables, budget: number, gemRm: number[][]
     density += Math.max(0, t.ded[i] + conv / sl.capacity);
   });
   density /= n;
-  const s: Search = { wheel, t, budget, density, gemRm };
+  const pairs = wheel.slices.filter((sl) => sl.kind === 'augment' && sl.twin > sl.idx).map((sl): [number, number] => [sl.idx, sl.twin]);
+  const s: Search = { wheel, t, budget, density, gemRm, pairs };
   let empty: State = {
     alloc: new Int32Array(n),
     used: 0,

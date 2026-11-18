@@ -90,7 +90,9 @@ describe('Revelation Mastery look-ahead', () => {
     expect(withGem.vessels.some((a) => a.gem?.supreme?.modId === rm.id)).toBe(true);
     const score = (r: typeof plain) => 0.8 * r.offenseScore + 0.2 * r.defenseScore;
     expect(score(withGem)).toBeGreaterThanOrEqual(score(plain));
-    expect(stage(withGem).stage).toBeGreaterThan(stage(plain).stage);
+    const [s1, s2] = [stage(plain), stage(withGem)];
+    expect(s2.stage).toBeGreaterThanOrEqual(s1.stage);
+    if (s2.stage === s1.stage) expect(withGem.domainPoints[s2.perk.domain]).toBeLessThan(plain.domainPoints[s1.perk.domain]);
   });
 });
 

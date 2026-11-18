@@ -183,6 +183,8 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 | worst case (perf test, 3200 points) | ~45 ms |
 | full wheel | 3 ms |
 
+- **Augment pair look-ahead.** While exactly one copy of an augment is full and the other is affordable, the rank adds stage II × `LOOKAHEAD_WEIGHT` (stage I can be worth 0, e.g. an unusable cooldown).
+
 ## 4. Gems (`gems.ts`)
 
 - **Placement rule.** Maximise Σ blend(gem value in vessel) over a one-to-one assignment (Hungarian algorithm), using only each vessel's active slots.
