@@ -32,6 +32,8 @@ Roles:
 | D13 | 2026-11-18 | Character inputs per vocation: EK level+melee+shielding; RP level+distance+shielding+mlvl; MS/ED level+mlvl; Monk level+fist+mlvl. | Needed for HP/mana, mitigation, spell damage and healing (e.g. RP mas san scales with mlvl). |
 | D14 | 2026-11-18 | Flat "Damage and Healing" bonus valued relative to real per-hit damage/healing; consider Revelation Mastery gems that reach the next revelation stage (bigger flat bonus). Leech slices strongly devalued. | User guidance. |
 | D15 | 2026-11-18 | Multiple monsters per hunting spot with weights; best build + 2 alternatives; export-only planner code (incl. gems); gem/upgrade ranking by gain only (no cost). UI polishing postponed until functionality is accepted. | User answers. |
+| D16 | 2026-11-18 | **Hunt mode (AoE hunting) never values single-target spells** (all hunt styles); single-target spells count only in Boss mode. | User rule. |
+| D17 | 2026-11-18 | Damage model calibrated on the public TibiaTools damage API used by tibiapal.com (`https://tibiatools.io/api/v1`: `GET /meta/{vocations,stances,weapons,ammo,shields,perks,spells,creatures,charms}`, `POST /damage`). Datamined **offline** (polite: low rate, cached) into fitted per-spell formulas + perk effects committed as static data; no runtime dependency. | User: tibiapal estimates are very good; avoid hammering a third-party API on every slider move. |
 
 ---
 
