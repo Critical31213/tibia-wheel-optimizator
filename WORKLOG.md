@@ -38,6 +38,7 @@ Roles:
 | D19 | 2026-11-18 | Real mitigation formula (no fight modes in the current game): ≈ shielding/100 % + shield/spellbook/quiver defense × vocation factor; calibration points: RP shielding 108 → 1.07 %; RP + shield 2.5 % total (shield part 1.28 %); ED 781 → 0.4 % shielding + 0.87 % spellbook. RP: quiver (hunt, bow) / crossbow (boss); mages: spellbook; EK: shield only in the shield rotation. | User data + Canary source. |
 | D20 | 2026-11-18 | Hunt styles removed (hunt targets = tibiapal averages; boss = 1). Damage based on rotation presets (`src/data/damage/rotations.ts`): engine auto-picks the best preset for the spot/build (user may override); revelation-unlocked spells (Divine Grenade, Executioner's Throw, Ice/Terra Burst, Spiritual Outburst; Avatars in boss) are added when the revelation is active; druid ultimate area spell (Eternal Winter / Wrath of Nature) chosen by resistance. Augments of spells outside the rotation (transit slices) have no value. | User guidance. |
 | D21 | 2026-11-18 | Forced spells: the user can force wheel augments of chosen spells (utility, e.g. Divine Dazzle, Mystic Repulse, Heal Friend). Healing gems excluded for ED/MS; for RP/EK/Monk valued on the defense side. Ballistic Mastery (bow: +4 % physical/holy pierce; crossbow: +10 % crit extra damage) and Positional Tactics (+3 distance 70 % of the time, else +3 holy/healing mlvl) valued exactly. | User guidance + planner texts. |
+| D22 | 2026-11-18 | tibiapal hunt target averages already include the wheel's area augment (Expanded Shape); without it a spell hits 0.5 fewer. Gem picks maximise overall damage; mods within 10 % of the chosen one's gain are listed as near-equal substitutes (`GemRecommendation.similar`); greater gem shown once with substitutes. | User guidance (EK Front Sweep vs Fierce Berserk tie). |
 
 ---
 
@@ -323,6 +324,7 @@ Max mana was scored as offense, so at DPS-leaning priority lesser gems for every
   - ARCHITECTURE: contracts, gates and tests.
   - `docs/modules/integration.md`.
 
+### 2026-11-18 — D22 area augments + gem substitutesArea-augmented spells use the tibiapal average only with the augment (else −0.5 targets; `SpellEval.areaGap`). Gem recommendations carry `similar` (≥90 % of the chosen mod's gain; UI line "Near-equal substitutes"). EK 1200 pts max DPS: greater gem now Augmented Fierce Berserk, Front Sweep listed at 93 %. 487 tests.
 ## In progress / Next
 
 - [x] S1 Data — scraper + monster dataset + search API.

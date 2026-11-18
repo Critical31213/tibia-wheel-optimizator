@@ -5,6 +5,7 @@ import { optimize } from './index';
 import { valuationFor } from './optimizer';
 import { augmentParts } from './values';
 import { getEngineWheel } from './wheel/build';
+import { buildSpellModel, targetsAt } from './spells';
 
 const HUNT = { mode: 'hunt' } as const;
 const at = (level: number) => ({ points: Math.max(0, level - 50), character: { level } });
@@ -122,5 +123,22 @@ describe('transit slices and forced spells', () => {
     expect(slices.some((sl) => (r.allocation[sl.slice.id] ?? 0) >= sl.capacity)).toBe(true);
     const tiny = optimize({ ...input, points: 5, forcedSpells: ['Divine Dazzle'] });
     expect(tiny.rationaleMsgs!.map((m) => m.key)).toContain('rationale.forcedImpossible');
+  });
+});
+
+describe('D22: area augments and near-equal gem substitutes', () => {
+  it('a spell with its wheel area augment uses the tibiapal hunt average; without it fewer targets', () => {
+    const m = buildSpellModel('knight', { mode: 'hunt' }, null, { level: 1250 });
+    const fs = m.spells.get('Front Sweep')!;
+    expect(fs.areaGap).toBeGreaterThan(0);
+    expect(targetsAt(m, fs, 0, 1)).toBeCloseTo(fs.targets + fs.areaGap);
+  });
+
+  it('EK 1200 pts max DPS: greater gem lists near-equal substitutes', () => {
+    const r = optimize({ vocation: 'knight', points: 1200, monster: null, priority: 0, context: { mode: 'hunt' } });
+    const greater = r.gemRecommendations.find((g) => g.quality === 'greater')!;
+    const sup = greater.mods.find((x) => x.kind === 'supreme')!;
+    for (const s of greater.similar ?? []) expect(s.relative).toBeGreaterThanOrEqual(90);
+    expect(sup.name === 'Augmented Fierce Berserk' || greater.similar?.some((s) => s.name === 'Augmented Fierce Berserk')).toBe(true);
   });
 });

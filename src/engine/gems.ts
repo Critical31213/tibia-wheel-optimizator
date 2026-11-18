@@ -262,9 +262,27 @@ export function round1(x: number): number {
   return Math.round(x * 10) / 10;
 }
 
+/** D22: substitutes within this share of the chosen mod's gain are listed as near-equal. */
+export const SIMILAR_THRESHOLD = 0.9;
+
+function similarFor(env: GemEnv, picks: ModPick[]): NonNullable<GemRecommendation['similar']> {
+  const out: NonNullable<GemRecommendation['similar']> = [];
+  const used = new Set(picks.map((p) => p.kind + p.id));
+  for (const p of picks) {
+    if (p.score <= 0) continue;
+    const ranked = p.slot === 'supreme' ? rankSupreme(env, 4) : rankBasic(env, p.slot === 'basic1' ? 1 : 2, 4);
+    for (const r of ranked) {
+      if (used.has(r.kind + r.id) || r.score < p.score * SIMILAR_THRESHOLD) continue;
+      if (out.length >= 3) break;
+      out.push({ slot: p.slot, modId: r.id, name: r.name, relative: Math.round((100 * r.score) / p.score) });
+    }
+  }
+  return out;
+}
+
 export function recommendations(env: GemEnv): GemRecommendation[] {
   const list = [
-    ...bestGems(env, 'greater', 4, 2),
+    ...bestGems(env, 'greater', 4),
     ...bestGems(env, 'regular', 4),
     ...bestGems(env, 'lesser', 4),
   ].filter((g) => g.score > 0);
@@ -278,6 +296,7 @@ export function recommendations(env: GemEnv): GemRecommendation[] {
         gain: round1(g.score),
         reason: r.text,
         reasonMsg: r.msg,
+        similar: similarFor(env, g.picks),
       };
     })
     .sort((a, b) => b.gain - a.gain || QUALITY_RANK[b.quality] - QUALITY_RANK[a.quality]);

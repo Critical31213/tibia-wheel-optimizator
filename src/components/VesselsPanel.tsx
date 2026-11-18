@@ -119,6 +119,12 @@ export function VesselsPanel({ vocation, result, mods }: VesselsPanelProps) {
                 ))}
               </ul>
               {r.reason && <p className="mt-1 text-xs text-parchment-400">{engineText(t, r.reasonMsg, r.reason)}</p>}
+              {!!r.similar?.length && (
+                <p className="mt-1 text-xs text-parchment-300">
+                  {t('recs.similar')}{' '}
+                  {r.similar.map((s) => `${s.name} (${t(`slot.${s.slot}`)}, ${s.relative}%)`).join(' · ')}
+                </p>
+              )}
             </li>
           ))}
         </ol>

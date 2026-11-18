@@ -7,6 +7,7 @@ import type { Element, FightContext, Monster, Vocation } from '../types';
 import type { WheelSupremeMod, WheelTile } from '../data/wheel';
 import { maxHitPoints, maxMana, mitigationPercent, type Offhand } from '../data/character';
 import {
+  AREA_AUGMENT,
   cooldownGain,
   damageShare,
   deltaOff,
@@ -228,7 +229,6 @@ const EFFECT_PATTERNS: [RegExp, EffectKind][] = [
   [/Duration increased/i, 'duration'],
   [/-(\d+)% damage from the next hostile/i, 'defHit'],
 ];
-const AREA_PATTERN = /Expanded Shape|area enlarged|Range increased/i;
 
 export function parseEffects(textValue: string): SpellEffect[] {
   const out: SpellEffect[] = [];
@@ -236,7 +236,7 @@ export function parseEffects(textValue: string): SpellEffect[] {
     const m = re.exec(textValue);
     if (m) out.push({ kind, amount: m[1] !== undefined ? Math.abs(Number(m[1])) : 1 });
   }
-  if (AREA_PATTERN.test(textValue)) out.push({ kind: 'area', amount: 1 });
+  if (AREA_AUGMENT.test(textValue)) out.push({ kind: 'area', amount: 1 });
   return out;
 }
 

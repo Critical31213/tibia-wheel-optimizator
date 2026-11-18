@@ -32,6 +32,9 @@ export const DEFAULT_CONTEXT: FightContext = { mode: 'hunt' };
 
 /** Area/chain/beam targets in boss mode (summons, adds). */
 export const BOSS_AREA_TARGETS = 1.2;
+/** Wheel area augments ('Expanded Shape' etc.): tibiapal hunt averages assume them (D22). */
+export const AREA_AUGMENT = /Expanded Shape|area enlarged|Range increased/i;
+export const AREA_AUGMENT_GAP = 0.5;
 const SOLO_FALLBACK: Record<SpellMeta['area'], number> = { single: 1, area: 5, chain: 4, beam: 2.4 };
 const MAX_TARGETS_FALLBACK: Record<SpellMeta['area'], number> = { single: 1, area: 20, chain: 6, beam: 7 };
 /** Cooldown can never drop below this fraction of the base cooldown. */
@@ -134,6 +137,8 @@ export interface SpellEval {
   /** Domain index whose stage changes the spell (granting revelation or Beam Mastery), else -1. */
   stageDomain: number;
   avatar: boolean;
+  /** Hunt: tibiapal averages already include the wheel's area augment (D22); without it the spell hits this many fewer. */
+  areaGap: number;
   /** Part of the attack rotation (damage spell, not a rune; D16: not single-target in hunt mode). */
   usable: boolean;
   /** Hits per stage 0..3: main, extra (null if none). */
@@ -260,6 +265,11 @@ export function buildSpellModel(
     ...getDamageSpells(vocation).filter((s) => s.spellType === 'spell').map((s) => s.name),
   ]);
 
+  const areaAug = new Set<string>();
+  for (const sl of wheel.slices) {
+    const a = sl.tile.conviction.augment;
+    if (a && AREA_AUGMENT.test(a.stage1 + ' ' + a.stage2)) a.spells.forEach((n) => areaAug.add(n));
+  }
   const spells = new Map<string, SpellEval>();
   for (const name of names) {
     const meta = getSpell(name);
@@ -286,7 +296,8 @@ export function buildSpellModel(
       area,
       singleTarget,
       maxTargets,
-      targets: singleTarget ? 1 : expectedTargets(shape, context),
+      areaGap: context.mode === 'hunt' && !singleTarget && areaAug.has(name) ? AREA_AUGMENT_GAP : 0,
+      targets: singleTarget ? 1 : Math.max(1, expectedTargets(shape, context) - (context.mode === 'hunt' && areaAug.has(name) ? AREA_AUGMENT_GAP : 0)),
       outerTargets: outerBeamTargets({ area, avgHitsHuntOuter: meta?.avgHitsHuntOuter ?? dmg?.avgTargetsHuntOuter }, context),
       elem: kind === 'damage' ? spotElementMultiplier(spot, element) : 1,
       revelation,
@@ -388,7 +399,7 @@ export function targetsAt(model: SpellModel, s: SpellEval, stage: number, extra 
   if (!extra && !(def?.maxTargets && stage >= 1)) return s.targets;
   const shape = { kind: s.kind, area: s.area, maxTargets: max, avgHitsHunt: s.meta?.avgHitsHunt ?? s.dmg?.avgTargetsHunt ?? undefined };
   const t = expectedTargets(shape, model.context, max);
-  return model.context.mode === 'hunt' ? Math.min(max, t + extra * 0.5) : t;
+  return model.context.mode === 'hunt' ? Math.max(1, Math.min(max, t - s.areaGap + extra * 0.5)) : t;
 }
 
 /** Average damage of one cast (all targets, element, crit, passives). */

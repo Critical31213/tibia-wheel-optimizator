@@ -187,6 +187,7 @@ export const en = {
   'recs.title': 'Recommended gems',
   'recs.none': 'No gem recommendations yet.',
   'recs.gain': 'Gain {gain}',
+  'recs.similar': 'Near-equal substitutes:',
 
   'upgrades.title': 'Best upgrades',
   'upgrades.none': 'No upgrades to suggest — add your gems above.',

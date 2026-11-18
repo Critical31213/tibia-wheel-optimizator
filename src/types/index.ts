@@ -243,6 +243,8 @@ export interface GemRecommendation {
   gain: number;
   reason: string;
   reasonMsg?: EngineMessage;
+  /** Near-equal substitutes (D22): other mods for a slot within ~10 % of the chosen mod's gain. */
+  similar?: { slot: 'basic1' | 'basic2' | 'supreme'; modId: number; name: string; /** % of the chosen mod's gain. */ relative: number }[];
 }
 
 export interface UpgradeRecommendation {

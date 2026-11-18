@@ -181,6 +181,7 @@ export const pl: Dictionary = {
   'recs.title': 'Zalecane gemy',
   'recs.none': 'Brak zaleceń gemów.',
   'recs.gain': 'Zysk {gain}',
+  'recs.similar': 'Prawie równie dobre zamienniki:',
 
   'upgrades.title': 'Najlepsze ulepszenia',
   'upgrades.none': 'Brak ulepszeń do zaproponowania — dodaj swoje gemy powyżej.',
