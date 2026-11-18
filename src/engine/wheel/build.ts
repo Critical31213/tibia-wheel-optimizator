@@ -133,6 +133,8 @@ function build(vocation: Vocation): EngineWheel {
   );
   const definition: WheelDefinition = {
     vocation,
+    vessels: [],
+    mods: [],
     slices: slices.map((s) => s.slice),
     revelations: revelations.map(({ id, name, description, category, domain, thresholds }) => ({
       id,

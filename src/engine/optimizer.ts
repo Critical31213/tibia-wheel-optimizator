@@ -372,6 +372,10 @@ export function runOptimizer(input: OptimizerInput): OptimizerResult {
     offenseScore: norm(got.off, max.off),
     defenseScore: norm(got.def, max.def),
     rationale: rationale(input, wheel, ctx, best, stages, budget),
+    vessels: [],
+    gemRecommendations: [],
+    upgradeRecommendations: [],
+    spells: [],
   };
 }
 

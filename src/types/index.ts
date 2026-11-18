@@ -126,6 +126,104 @@ export interface WheelDefinition {
   revelations: RevelationPerk[];
   /** Total capacity of the whole wheel. */
   totalCapacity: number;
+  /** Gem vessels (8), unlocked one by one by filling Gem Vessel slices. */
+  vessels: VesselDefinition[];
+  /** Gem mods available to this vocation. */
+  mods: ModDefinition[];
+}
+
+// ---------------------------------------------------------------------------
+// Fight context
+// ---------------------------------------------------------------------------
+
+/** 'boss' = single target; only here Avatar spells are valued. */
+export type FightMode = 'hunt' | 'boss';
+
+/** Drives the expected number of monsters hit by area spells. */
+export type HuntStyle = 'solo' | 'teamLure' | 'teamBox';
+
+export interface FightContext {
+  mode: FightMode;
+  huntStyle: HuntStyle;
+}
+
+// ---------------------------------------------------------------------------
+// Gems
+// ---------------------------------------------------------------------------
+
+/** Lesser = 1 basic mod, regular = 2 basic mods, greater = 2 basic + 1 supreme. */
+export type GemQuality = 'lesser' | 'regular' | 'greater';
+
+/** Mod grade I–IV. */
+export type ModGrade = 1 | 2 | 3 | 4;
+
+export type ModKind = 'basic' | 'supreme';
+
+export interface ModDefinition {
+  /** Id within its kind (basic and supreme ids overlap). */
+  id: number;
+  kind: ModKind;
+  name: string;
+  category: PerkCategory;
+  /** Display value per grade, index 0 = grade I. */
+  gradeValues: string[];
+  /** Basic mods only: which basic slot(s) may hold it. */
+  slots?: (1 | 2)[];
+}
+
+export interface GemModRef {
+  modId: number;
+  grade: ModGrade;
+}
+
+export interface OwnedGem {
+  id: string;
+  quality: GemQuality;
+  basic1: GemModRef | null;
+  basic2: GemModRef | null;
+  supreme: GemModRef | null;
+}
+
+export interface VesselDefinition {
+  id: number;
+  /** Highest gem quality whose mods are all active in this vessel. */
+  quality: GemQuality;
+  /** Number of filled Gem Vessel slices required to unlock it (1..8). */
+  unlockOrder: number;
+}
+
+export interface VesselAssignment {
+  vesselId: number;
+  quality: GemQuality;
+  unlocked: boolean;
+  gem: OwnedGem | null;
+  source: 'owned' | 'recommended' | 'empty';
+}
+
+export interface GemRecommendation {
+  quality: GemQuality;
+  mods: { kind: ModKind; modId: number; name: string; grade: ModGrade }[];
+  /** Relative score gain (same units as offense/defense scores). */
+  gain: number;
+  reason: string;
+}
+
+export interface UpgradeRecommendation {
+  gemId: string;
+  slot: 'basic1' | 'basic2' | 'supreme';
+  modId: number;
+  name: string;
+  fromGrade: ModGrade;
+  toGrade: ModGrade;
+  gain: number;
+}
+
+/** How the engine valued a spell (augment) in the current context. */
+export interface SpellUsage {
+  name: string;
+  expectedTargets: number;
+  useful: boolean;
+  reason: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -140,6 +238,10 @@ export interface OptimizerInput {
   monster: Monster | null;
   /** 0 = maximum DPS, 100 = maximum survivability. */
   priority: number;
+  /** Defaults to { mode: 'hunt', huntStyle: 'solo' }. */
+  context?: FightContext;
+  /** Gems the player owns; empty/undefined = recommend only. */
+  gems?: OwnedGem[];
 }
 
 export interface StatLine {
@@ -173,4 +275,12 @@ export interface OptimizerResult {
   defenseScore: number;
   /** Short explanations of why the engine chose this build. */
   rationale: string[];
+  /** Vessel contents: owned gems placed optimally, else recommendations. */
+  vessels: VesselAssignment[];
+  /** Best gems to look for / invest in, best first. */
+  gemRecommendations: GemRecommendation[];
+  /** Most valuable grade upgrades of owned gem mods, best first. */
+  upgradeRecommendations: UpgradeRecommendation[];
+  /** Spells considered and how useful they are in this context. */
+  spells: SpellUsage[];
 }
