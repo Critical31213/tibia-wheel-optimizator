@@ -1,5 +1,5 @@
 import type { OptimizerResult, PerkCategory, WheelDefinition } from '../types';
-import { useT } from '../i18n';
+import { engineText, useT } from '../i18n';
 import { cx, DOMAIN_COLORS, formatNumber } from '../lib/labels';
 
 const CATEGORY_TEXT: Record<PerkCategory, string> = {
@@ -119,9 +119,9 @@ export function ResultsPanel({ wheel, result }: ResultsPanelProps) {
                   <span className={cx('mr-2 text-[10px] uppercase', CATEGORY_TEXT[s.category])}>
                     {t(`category.${s.category}`)}
                   </span>
-                  {s.label}
+                  {engineText(t, s.labelMsg, s.label)}
                 </dt>
-                <dd className="tabular-nums text-parchment-50">{s.value}</dd>
+                <dd className="tabular-nums text-parchment-50">{s.value === 'Active' ? t('common.active') : s.value}</dd>
               </div>
             ))}
           </dl>
@@ -132,8 +132,8 @@ export function ResultsPanel({ wheel, result }: ResultsPanelProps) {
         <>
           <SubHeading>{t('results.why')}</SubHeading>
           <ul className="list-disc space-y-1 pl-5 text-sm text-parchment-200 marker:text-gold-500">
-            {result.rationale.map((r) => (
-              <li key={r}>{r}</li>
+            {result.rationale.map((r, i) => (
+              <li key={r}>{engineText(t, result.rationaleMsgs?.[i], r)}</li>
             ))}
           </ul>
         </>

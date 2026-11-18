@@ -38,8 +38,8 @@ export const K = {
   /** Per +1 % of base mana. */
   MANA_OFF: 0.15,
   MANA_DEF: 0.1,
-  /** Per +1 % mitigation multiplier (≈ base mitigation 15 %). */
-  MIT_DEF: 0.18,
+  /** Per +1 % damage reduction on all incoming damage. */
+  MIT_DR_DEF: 1,
   /** Per +1 % resistance × share of incoming damage of that element. */
   RES_DEF: 1,
   DODGE_DEF: 1,
@@ -61,6 +61,13 @@ export const K = {
 } as const;
 
 const HP_PER_LEVEL: Record<Vocation, number> = { knight: 15, paladin: 10, sorcerer: 5, druid: 5, monk: 10 };
+/**
+ * Typical base mitigation (% damage reduction) at mid/high level, APPROXIMATE.
+ * In-game mitigation = (defense + shielding) × equipment × wheel multiplier × stance; the wheel's
+ * "Mitigation Multiplier" scales it multiplicatively. Knights (shield, high shielding) are highest,
+ * mages (wand + spellbook) lowest.
+ */
+export const BASE_MITIGATION: Record<Vocation, number> = { knight: 20, paladin: 10, monk: 14, sorcerer: 6, druid: 6 };
 const MANA_PER_LEVEL: Record<Vocation, number> = { knight: 5, paladin: 15, sorcerer: 30, druid: 30, monk: 10 };
 
 /** Share of incoming damage per element without a monster. */
@@ -133,8 +140,13 @@ export function manaParts(v: ValuationContext, mana: number): Parts {
   return { off: pct * K.MANA_OFF, def: pct * K.MANA_DEF * v.threat, util: 0 };
 }
 
-export function mitigationParts(v: ValuationContext, pct: number): Parts {
-  return def(v, pct * K.MIT_DEF);
+/** Extra damage reduction (percentage points) from a +`multiplierPct` % mitigation multiplier. */
+export function mitigationGain(vocation: Vocation, multiplierPct: number): number {
+  return (BASE_MITIGATION[vocation] * multiplierPct) / 100;
+}
+
+export function mitigationParts(v: ValuationContext, multiplierPct: number): Parts {
+  return def(v, mitigationGain(v.vocation, multiplierPct) * K.MIT_DR_DEF);
 }
 
 export function resistParts(v: ValuationContext, e: Element, pct: number): Parts {

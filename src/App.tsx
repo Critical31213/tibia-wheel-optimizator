@@ -14,7 +14,6 @@ import { usePersistentGems } from './hooks/usePersistentGems';
 import { usePersistentInputs } from './hooks/usePersistentInputs';
 import { useT } from './i18n';
 import { getMonsterById, getWheel, optimize, useMonsterData } from './lib/api';
-import { modsWithDevFallback } from './lib/devFixtures';
 import { contextOf } from './lib/inputState';
 import { VOCATION_LABELS } from './lib/labels';
 
@@ -27,7 +26,6 @@ export default function App() {
   const deferredGems = useDeferredValue(gems);
 
   const wheel = useMemo(() => getWheel(inputs.vocation), [inputs.vocation]);
-  const { mods, isFixture } = useMemo(() => modsWithDevFallback(wheel), [wheel]);
   const maxPoints = wheel.totalCapacity;
   const monster = useMemo(
     () => (monstersReady && inputs.monsterId ? (getMonsterById(inputs.monsterId) ?? null) : null),
@@ -56,7 +54,6 @@ export default function App() {
     [deferred.vocation, points, deferredMonster, deferred.priority, mode, huntStyle, deferredGems],
   );
   const resultWheel = useMemo(() => getWheel(deferred.vocation), [deferred.vocation]);
-  const resultMods = useMemo(() => modsWithDevFallback(resultWheel).mods, [resultWheel]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
@@ -73,7 +70,7 @@ export default function App() {
           <MonsterSearch value={monster} ready={monstersReady} onChange={(m) => update({ monsterId: m?.id ?? null })} />
           <FightContextPanel value={context} onChange={update} />
           <PrioritySlider value={inputs.priority} onChange={(priority) => update({ priority })} />
-          <GemsPanel vocation={inputs.vocation} gems={gems} mods={mods} isFixture={isFixture} onChange={setGems} />
+          <GemsPanel vocation={inputs.vocation} gems={gems} mods={wheel.mods} onChange={setGems} />
         </div>
 
         <div className="flex flex-col gap-4">
@@ -91,7 +88,7 @@ export default function App() {
           </Panel>
           {result && (
             <Panel title={t('vessels.title')} headingId="vessels-heading">
-              <VesselsPanel vocation={deferred.vocation} result={result} mods={resultMods} />
+              <VesselsPanel vocation={deferred.vocation} result={result} mods={resultWheel.mods} />
             </Panel>
           )}
         </div>

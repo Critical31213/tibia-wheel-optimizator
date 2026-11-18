@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ModDefinition, ModGrade, OptimizerResult, OwnedGem, Vocation } from '../types';
-import { useT } from '../i18n';
+import { engineText, useT } from '../i18n';
 import { findMod, slotKind, slotsForQuality } from '../lib/gems';
 import { cx, formatNumber, gemName, ROMAN } from '../lib/labels';
 import { GemIcon } from './GemIcon';
@@ -60,7 +60,7 @@ export function VesselsPanel({ vocation, result, mods }: VesselsPanelProps) {
         <Empty>{t('vessels.none')}</Empty>
       ) : (
         <ul className="grid gap-2 sm:grid-cols-2">
-          {result.vessels.map((v, i) => (
+          {result.vessels.map((v) => (
             <li
               key={v.vesselId}
               className={cx('rounded-lg border p-2.5', v.unlocked ? 'border-ink-500 bg-ink-850' : 'border-ink-700 opacity-60')}
@@ -68,7 +68,7 @@ export function VesselsPanel({ vocation, result, mods }: VesselsPanelProps) {
               <div className="flex items-center gap-2 text-xs">
                 <GemIcon quality={v.quality} dim={!v.unlocked} />
                 <span className="font-medium text-parchment-100">
-                  {t('vessels.vesselN', { n: i + 1 })}
+                  {t('vessels.vesselN', { n: v.vesselId + 1 })}
                 </span>
                 <span className="text-parchment-400">{t(`quality.${v.quality}`)}</span>
                 <span className={cx('ml-auto', v.unlocked ? 'text-weak' : 'text-parchment-400')}>
@@ -117,7 +117,7 @@ export function VesselsPanel({ vocation, result, mods }: VesselsPanelProps) {
                   <ModChip key={`${m.kind}-${m.modId}`} name={m.name} grade={m.grade} />
                 ))}
               </ul>
-              {r.reason && <p className="mt-1 text-xs text-parchment-400">{r.reason}</p>}
+              {r.reason && <p className="mt-1 text-xs text-parchment-400">{engineText(t, r.reasonMsg, r.reason)}</p>}
             </li>
           ))}
         </ol>
@@ -138,6 +138,11 @@ export function VesselsPanel({ vocation, result, mods }: VesselsPanelProps) {
                 {ROMAN[u.fromGrade]} → {ROMAN[u.toGrade]}
               </span>
               <span className="w-16 shrink-0 text-right text-xs tabular-nums text-weak">{t('upgrades.gain', { gain: gain(u.gain) })}</span>
+              {u.gainToMax !== undefined && u.toGrade < 4 && (
+                <span className="hidden w-24 shrink-0 text-right text-[11px] tabular-nums text-parchment-400 sm:inline">
+                  {t('upgrades.toMax', { gain: gain(u.gainToMax) })}
+                </span>
+              )}
             </li>
           ))}
         </ol>
@@ -172,11 +177,14 @@ export function VesselsPanel({ vocation, result, mods }: VesselsPanelProps) {
                 </span>
                 <span className="sr-only">{s.useful ? t('spells.useful') : t('spells.notUseful')}:</span>
                 <span className="min-w-0 flex-1 truncate text-parchment-100">{s.name}</span>
+                {s.share !== undefined && s.share > 0 && (
+                  <span className="shrink-0 text-xs tabular-nums text-gold-300">{t('spells.share', { share: formatNumber(Math.round(s.share)) })}</span>
+                )}
                 <span className="shrink-0 text-xs tabular-nums text-parchment-300">
                   {t('spells.targets', { n: formatNumber(Math.round(s.expectedTargets * 10) / 10) })}
                 </span>
               </div>
-              {s.reason && <p className="mt-0.5 pl-5 text-xs text-parchment-400">{s.reason}</p>}
+              {s.reason && <p className="mt-0.5 pl-5 text-xs text-parchment-400">{engineText(t, s.reasonMsg, s.reason)}</p>}
             </li>
           ))}
         </ul>

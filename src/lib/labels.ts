@@ -1,5 +1,6 @@
 /** Display labels and colours shared by UI components (no React here). */
 import type { Domain, Element, GemQuality, ModGrade, PerkCategory, Vocation } from '../types';
+import { WHEEL_DATA } from '../data/wheel';
 import { en } from '../i18n/en';
 import type { MessageKey } from '../i18n/en';
 
@@ -96,18 +97,11 @@ export function priorityLabel(value: number): string {
   return en[priorityKey(value)];
 }
 
-/** Vocation-specific gem item names (game terms, English). */
-const GEM_BASE_NAMES: Record<Vocation, string> = {
-  knight: 'Guardian Gem',
-  paladin: 'Marksman Gem',
-  sorcerer: 'Mage Gem',
-  druid: 'Sage Gem',
-  monk: 'Spiritualist Gem',
-};
+const QUALITY_LEVEL: Record<GemQuality, number> = { lesser: 0, regular: 1, greater: 2 };
 
+/** Vocation-specific gem item name from the planner data (`VesselInfos.GemNames`), e.g. "Greater Sage Gem". */
 export function gemName(vocation: Vocation, quality: GemQuality): string {
-  const base = GEM_BASE_NAMES[vocation];
-  return quality === 'lesser' ? `Lesser ${base}` : quality === 'greater' ? `Greater ${base}` : base;
+  return WHEEL_DATA.vessels.gemNames[QUALITY_LEVEL[quality]][vocation];
 }
 
 export const QUALITY_COLORS: Record<GemQuality, string> = {

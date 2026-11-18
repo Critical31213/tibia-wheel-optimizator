@@ -12,19 +12,29 @@ promotion points for a Tibia character, given:
 2. the **available points**,
 3. an optional **target monster** (its elemental resistances and damage types,
    sourced from tibiopedia.pl),
-4. a **priority slider** between maximum DPS (0) and maximum survivability (100).
+4. a **priority slider** between maximum DPS (0) and maximum survivability (100),
+5. the **fight context** (hunt solo / team-lure / team-box, or boss),
+6. the **gems the player owns** (placed in vessels; recommendations and upgrades).
+
+Wheel facts come from the official test-server planner (upcoming update) via an offline extraction pipeline.
 
 ```
-┌──────────────┐     Monster[]      ┌──────────────┐
-│  src/data    │ ─────────────────▶ │              │
-│ (static JSON │                    │   src/App    │  OptimizerInput
-│  + search)   │                    │  (UI state)  │ ───────────────┐
-└──────▲───────┘                    │              │                ▼
-       │ offline                    └──────▲───────┘        ┌──────────────┐
-┌──────┴───────┐                           │ OptimizerResult│  src/engine  │
-│ scripts/     │                           └────────────────│ (wheel model │
-│ scraper      │  ◀── tibiopedia.pl                         │ + optimizer) │
-└──────────────┘                                            └──────────────┘
+OFFLINE (npm scripts; outputs committed)
+  tibiopedia.pl ─────────────▶ scripts/scrape-monsters.ts ─▶ src/data/monsters.json
+  test.tibia.com planner ─┐
+   (manual browser save   ├──▶ scripts/.cache/wod/ ──┐
+    of 3 files)           │                          ├──▶ scripts/extract-wheel.mjs ─▶ src/data/wheel/wheel-data.json
+  tibiapal.com avg hits ──┴──▶ scripts/.cache/tibiapal/ ┘    (runs WASM in Node,        + src/data/wheel/spells.ts
+                                                              asserts every rule)
+
+RUNTIME (static SPA)
+  src/data/wheel ──getWheelData()──▶ src/engine ──getWheel()/optimize()──┐
+  src/data (lazy chunk) ──searchMonsters()───────────────────────────────┤
+                                                                         ▼
+  URL + localStorage (inputs, context) ──▶ src/App ◀──▶ src/lib/api.ts (facade)
+  localStorage per vocation (gems) ──────▶    │  OptimizerInput ▶ / ◀ OptimizerResult
+                                              ▼
+                 components ◀── src/i18n (PL/EN; engine.<key> for EngineMessage)
 ```
 
 ## 2. Tech stack
@@ -45,7 +55,7 @@ promotion points for a Tibia character, given:
 ├── ARCHITECTURE.md         # this file
 ├── README.md               # user-facing quick start
 ├── assets/icon.svg         # project icon (README)
-├── docs/modules/           # data.md, engine.md, ui.md, integration.md
+├── docs/modules/           # data.md, wheel-data.md, engine.md, ui.md, integration.md
 ├── scripts/
 │   ├── scrape-monsters.ts  # offline tibiopedia.pl scraper → src/data/monsters.json
 │   └── extract-wheel.mjs   # planner WASM → src/data/wheel/wheel-data.json
@@ -55,10 +65,12 @@ promotion points for a Tibia character, given:
 └── src/
     ├── types/index.ts      # shared contract (all modules)
     ├── data/               # monsters.json (2006) + search API (lazy-loaded chunk)
+    ├── data/wheel/         # wheel-data.json (planner facts) + spells.ts, getWheelData()
     ├── engine/             # wheel/build.ts, spells, values, gems, optimizer, messages
     ├── components/         # React UI components
-    ├── hooks/              # usePersistentInputs, useDebouncedValue
-    ├── lib/                # api.ts facade, geometry, inputState, labels (pure, tested)
+    ├── hooks/              # usePersistentInputs, usePersistentGems, useDebouncedValue
+    ├── i18n/               # en/pl dictionaries (UI + engine.<key>), engineText(), provider
+    ├── lib/                # api.ts facade, geometry, inputState, gems, labels (pure, tested)
     ├── integration.test.ts # end-to-end tests (data + engine + input parsing)
     ├── App.tsx             # top-level state and layout
     ├── main.tsx            # entry; starts loading monster data
@@ -69,10 +81,21 @@ promotion points for a Tibia character, given:
 
 All cross-module types live in `src/types/index.ts`.
 
-| Module | Public API (`index.ts`) | Consumers |
-|--------|-------------------------|-----------|
-| `src/data` | `MONSTERS`, `searchMonsters(query, limit)`, `getMonsterById(id)` | UI |
-| `src/engine` | `getWheel(vocation)`, `optimize(input)`, `pointsForLevel(level, scrollPoints = 0)` | UI |
+| Module | Public API | Consumers |
+|--------|------------|-----------|
+| `src/data` | `MONSTERS`, `searchMonsters(query, limit)`, `getMonsterById(id)` | UI (lazy, via `lib/api.ts`) |
+| `src/data/wheel` | `getWheelData(v)`, `WHEEL_DATA`, `SPELLS`, `getSpell(name)` | Engine; UI `labels.gemName` |
+| `src/engine` | `getWheel(v)` → `WheelDefinition` (slices, revelations, `vessels`, `mods`); `optimize(OptimizerInput)` → `OptimizerResult`; `pointsForLevel`; `ENGINE_MESSAGES` | UI |
+| `src/i18n` | `useT()`, `translator(lang)`, `engineText(t, EngineMessage, fallback)` | UI |
+
+Key contract types (`src/types/index.ts`):
+
+| Type | Notes |
+|------|-------|
+| `OptimizerInput` | `vocation, points, monster, priority`, optional `context: FightContext`, `gems: OwnedGem[]` |
+| `OptimizerResult` | allocation, path, revelations, convictions, stats, rationale (+`rationaleMsgs`), `vessels` (0-based `vesselId`), `gemRecommendations`, `upgradeRecommendations` (+`gainToMax`), `spells` (+`share`) |
+| `EngineMessage` | `{ key, params }` → UI looks up `engine.<key>`; English strings remain as fallback |
+| `OwnedGem` / `ModDefinition` | quality lesser/regular/greater → 1/2/3 mods; grades I–IV; supreme `target` |
 
 The UI reaches both modules only through `src/lib/api.ts`, which re-exports the engine and loads
 `src/data` with a dynamic `import()` (separate chunk; `useMonsterData()` signals readiness).
@@ -118,6 +141,7 @@ Full details: [`docs/modules/engine.md`](docs/modules/engine.md).
   - Every source gives `{off, def, util}`, blended as `(1−p)·off + p·def + 0.1·util` (each weight at least 0.05).
   - Spell value = share of total damage = weight × expected targets (context: solo = tibiapal average, team-lure 5, team-box 9, boss 1.2, single-target 1) × element multiplier (immune → 0).
   - Cooldowns are capped at 50 % of base. Avatar has value only in boss mode.
+  - The Mitigation Multiplier (gem mod and dedication) scales an estimated base mitigation per vocation (knight 20 % … mages 6 %). It does not add flat damage reduction.
 - **Search** (`optimizer.ts`):
   - Beam search (width 24) over full-slice fills with revelation look-ahead and a partial last slice.
   - Vessel value = Hungarian placement of owned or recommended gems.
@@ -145,22 +169,28 @@ Details: [docs/modules/ui.md](docs/modules/ui.md).
 
 ## 8. Quality gates (S4 Integration)
 
-| Gate | Command | Status (2026-11-18) |
+| Gate | Command | Status (2026-11-18, iteration 2) |
 |------|---------|---------------------|
 | Types | `npm run typecheck` (`tsc -b`, strict) | 0 errors |
-| Tests | `npm test` (Vitest) | 7 files, 115 tests |
+| Tests | `npm test` (Vitest) | 12 files, 353 tests |
 | Lint | `npm run lint` (oxlint) | 0 warnings |
-| Build | `npm run build` | main 267 kB (84 kB gzip) + lazy data 699 kB (76 kB gzip) |
+| Build | `npm run build` | main 629 kB (138 kB gzip, incl. wheel data) + lazy monster data 699 kB (76 kB gzip) + CSS 26 kB |
+| Smoke | `vite preview` + curl | HTTP 200 for page, deep link, chunks, CSS |
 
 ### Testing strategy
 
-- **Unit, per module:** `src/data/index.test.ts` (dataset shape, spot checks, search ranking, 20),
-  `src/engine/geometry.test.ts` (layout, capacities, adjacency, 35), `src/engine/optimizer.test.ts`
-  (path validity on random inputs, priority/monster effects, `pointsForLevel`, 13), `src/lib/*.test.ts`
-  (SVG geometry, input serialisation, labels, 16).
-- **Integration:** `src/integration.test.ts` (31) runs the real dataset through the UI facade and the real
-  engine: every vocation at levels 100/300/600/1000, priority extremes, real monsters (Fury, Demon,
-  Dragon Lord), edge budgets, determinism and untrusted URL/localStorage input. Matrix in
-  [`docs/modules/integration.md`](docs/modules/integration.md).
-- **Smoke:** `vite build` + `vite preview`, page and both chunks served with HTTP 200.
-- Not covered: DOM/component tests (no jsdom) — UI logic is kept in pure, tested helpers instead.
+- **Unit, per module.**
+
+  | Area | Files and tests |
+  |---|---|
+  | Data | `src/data/index.test.ts` (20), `src/data/wheel/wheel.test.ts` (38: planner facts, graph, vessels, mods, spells) |
+  | Engine | `model.test.ts` (37), `spells.test.ts` (13), `gems.test.ts` (11: Hungarian vs brute force, placement, mitigation model), `optimizer.test.ts` (69: random-path validity, determinism, perf, reference builds) |
+  | UI helpers | `src/lib/*.test.ts` (24) and `src/i18n/i18n.test.ts` (6: PL/EN parity including every engine key, `engineText` fallback) |
+
+- **Integration (`src/integration.test.ts`, 135).** Runs the real data through the UI facade and the real engine.
+  - 5 vocations × 4 fight contexts × 5 budgets (100–4000) with owned gems.
+  - Checks the directed unlock path, that Avatar is valued only in boss mode, vessel placement and quality, recommendations, and that i18n keys resolve.
+  - Also covers levels, priority extremes, real monsters, edge budgets, determinism, URL/localStorage round-trips and untrusted input.
+  - Matrix: [`docs/modules/integration.md`](docs/modules/integration.md).
+- **Smoke.** `vite build` + `vite preview`, with the page and every chunk served with HTTP 200.
+- **Not covered.** DOM/component tests (no jsdom). UI logic is kept in pure, tested helpers instead.

@@ -312,8 +312,10 @@ export function upgrades(env: GemEnv, vessels: VesselAssignment[]): UpgradeRecom
       const ref = gem[slot];
       if (!ref || ref.grade >= 4) continue;
       const to = (ref.grade + 1) as ModGrade;
-      const gain = env.blend(modParts(env, slot, ref.modId, to)) - env.blend(modParts(env, slot, ref.modId, ref.grade));
+      const cur = env.blend(modParts(env, slot, ref.modId, ref.grade));
+      const gain = env.blend(modParts(env, slot, ref.modId, to)) - cur;
       if (gain <= 1e-6) continue;
+      const gainToMax = to === 4 ? gain : env.blend(modParts(env, slot, ref.modId, 4)) - cur;
       const mod = slot === 'supreme' ? findSupreme(env.wheel, ref.modId) : findBasic(env.wheel, ref.modId);
       out.push({
         gemId: gem.id,
@@ -323,6 +325,7 @@ export function upgrades(env: GemEnv, vessels: VesselAssignment[]): UpgradeRecom
         fromGrade: ref.grade,
         toGrade: to,
         gain: Math.round(gain * 100) / 100,
+        gainToMax: Math.round(gainToMax * 100) / 100,
       });
     }
   }

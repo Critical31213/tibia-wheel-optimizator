@@ -527,10 +527,10 @@ function rationale(
     }
     if (m.damageTypes.length || m.maxDamage) {
       out.push(
-        text('rationale.threat', {
+        text(m.maxDamage ? 'rationale.threatMax' : 'rationale.threat', {
           monster: m.name,
           types: m.damageTypes.length ? m.damageTypes.join('/') : 'unknown',
-          max: m.maxDamage ? ` (up to ~${m.maxDamage}/turn)` : '',
+          ...(m.maxDamage ? { max: m.maxDamage } : {}),
           threat: threatOf(m).toFixed(2),
         }),
       );

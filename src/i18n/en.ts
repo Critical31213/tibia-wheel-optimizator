@@ -1,4 +1,12 @@
 /** English UI strings. Game terms (perk / spell / mod names) come from data and are not translated. */
+import { ENGINE_MESSAGES, type EngineMessageKey } from '../engine/messages';
+
+/** Engine messages (`engine.<key>`): the English templates are the engine's own. */
+const engineEn = Object.fromEntries(Object.entries(ENGINE_MESSAGES).map(([k, v]) => [`engine.${k}`, v])) as Record<
+  `engine.${EngineMessageKey}`,
+  string
+>;
+
 export const en = {
   'app.title': 'Wheel of Destiny Optimizer',
   'app.subtitle': 'Pick a vocation, your points and a target — get a suggested Tibia wheel build.',
@@ -10,6 +18,8 @@ export const en = {
 
   'common.show': 'Show',
   'common.hide': 'Hide',
+  'common.unknown': 'unknown',
+  'common.active': 'Active',
 
   'vocation.title': 'Vocation',
   'vocation.blurb.knight': 'Melee tank',
@@ -106,7 +116,6 @@ export const en = {
   'gems.grade': 'Grade',
   'gems.gradeOf': 'Grade of {slot}',
   'gems.noModData': 'Mod list for this vocation is not available yet.',
-  'gems.devFixture': 'Dev preview: sample mods (wheel data has no mods yet).',
   'gems.storedLocally': 'Saved in this browser for each vocation (not in the shared link).',
 
   'quality.lesser': 'Lesser',
@@ -133,9 +142,11 @@ export const en = {
   'upgrades.title': 'Best upgrades',
   'upgrades.none': 'No upgrades to suggest — add your gems above.',
   'upgrades.gain': 'Gain {gain}',
+  'upgrades.toMax': 'to IV: {gain}',
 
   'spells.title': 'Spells in this context',
   'spells.targets': '~{n} targets',
+  'spells.share': '{share}% dmg',
   'spells.useful': 'Useful',
   'spells.notUseful': 'Not useful',
   'spells.none': 'No spell data yet.',
@@ -160,6 +171,8 @@ export const en = {
   'results.why': 'Why this build',
   'results.fillOrder': 'Fill order',
   'results.ringOf': '{domain}, ring {ring}',
+
+  ...engineEn,
 } as const;
 
 export type MessageKey = keyof typeof en;

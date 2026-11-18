@@ -30,7 +30,7 @@ screens it is two columns (controls left, results right).
 | `src/components/LanguageSwitch.tsx` | PL / EN segmented toggle. |
 | `src/hooks/usePersistentGems.ts` | Owned gems per vocation in localStorage (not in the URL). |
 | `src/lib/gems.ts` | Gem slot rules, mod filtering, gem (de)serialisation (tested). |
-| `src/lib/devFixtures.ts` | **Dev-only** sample mods while `wheel.mods` is empty — remove (see below). |
+| `src/i18n/engine.ts` | `engineText(t, msg, fallback)`: renders engine messages (`engine.<key>`) and translates id params. |
 | `src/i18n/` | `en.ts` / `pl.ts` dictionaries, `lang.ts` (pure helpers), `context.ts` (`useT`, `useI18n`), `I18nProvider.tsx` (tested). |
 | `src/hooks/useDebouncedValue.ts` | Generic debounce hook. |
 | `src/hooks/usePersistentInputs.ts` | Inputs state persisted to localStorage + URL. |
@@ -50,7 +50,7 @@ App
 │  └─ MonsterCard      monster
 ├─ FightContextPanel   value: FightContext, onChange(patch)
 ├─ PrioritySlider      value, onChange(priority)
-├─ GemsPanel           vocation, gems, mods, isFixture, onChange(updater)
+├─ GemsPanel           vocation, gems, mods, onChange(updater)
 ├─ Panel › WheelChart  wheel, result | null
 ├─ Panel › ResultsPanel wheel, result   (empty-state text when points = 0)
 └─ Panel › VesselsPanel vocation, result, mods   (only when result != null)
@@ -94,16 +94,9 @@ Gems are deliberately **not** in the URL (too long); a shared link carries every
   An unknown stored `modId` is kept and shown as `#id`.
 - Grade I–IV is an inline `SegmentedControl` next to each mod select (disabled until a mod is chosen); the
   grade's `gradeValues` entry is shown next to the slot label.
-- "Add gem" uses a quality select labelled with the vocation-specific gem name (`gemName`, e.g.
-  "Greater Sage Gem"); each gem card has a quality select and a Remove button. The panel is collapsible
+- "Add gem" uses a quality select labelled with the vocation-specific gem name (`gemName`, read from the planner's
+  `VesselInfos.GemNames` in the wheel data, e.g. "Greater Sage Gem" for sorcerers and "Greater Mystic Gem" for druids); each gem card has a quality select and a Remove button. The panel is collapsible
   (`aria-expanded` / `aria-controls`); it starts open when the vocation already has gems.
-
-### Dev fixture (remove)
-
-`src/lib/devFixtures.ts` → `modsWithDevFallback(wheel)` returns sample mods only when `wheel.mods` is empty
-**and** `import.meta.env.DEV`; the panel then shows a "Dev preview" notice. Production builds never include it
-(verified: fixture strings absent from `dist`). Once S2 fills `wheel.mods`, delete the file and use `wheel.mods`
-directly in `App.tsx` (2 call sites).
 
 ## Results: vessels & gems
 
@@ -181,3 +174,7 @@ the selected monster resolves. The engine is bundled eagerly (it is small).
 - 2026-11-18 — (S4) Fixture fallback removed; monster data lazy-loaded; scroll points field; `MAX_POINTS` = 4000.
 - 2026-11-18 — (iteration 2) Fight context, My gems editor, Vessels & gems results, PL/EN i18n (`src/i18n/`),
   `SegmentedControl`; gems per vocation in localStorage, context in URL. 126 tests pass, lint/build clean.
+- 2026-11-18 — (S4, iteration 2) Removed the dev mod fixture (the UI uses `wheel.mods`).
+  - Engine messages are rendered in PL/EN (`engineText`), with the English string as fallback.
+  - Spell share (`% dmg`) and upgrade `gainToMax` (gain to grade IV) are shown.
+  - Gem names come from the data, and vessels are labelled `vesselId + 1`.

@@ -1,58 +1,68 @@
 # Integration & QA (S4 Integration)
 
-## Files owned / changed
+## Iteration 2 (2026-11-18)
+
+### Files changed
 
 | File | Change |
 |------|--------|
-| `src/integration.test.ts` | New end-to-end tests: real dataset + real engine + input parsing (31 tests). |
-| `src/lib/api.ts` | Fixture fallback removed; engine re-exported; monster data lazy-loaded (`loadMonsterData`, `isMonsterDataLoaded`, `useMonsterData`). |
-| `src/lib/fixtures.ts` | Deleted. |
-| `src/App.tsx` | Demo banner / `isDemoWheel` removed; waits for monster data before resolving `monsterId`. |
-| `src/main.tsx` | Starts loading the monster chunk before the first render. |
-| `src/components/MonsterSearch.tsx` | `ready` prop, "Loading monster data…" state. |
-| `src/components/PointsInput.tsx` | Promotion scroll points field (0–50) for the level helper; effect-free text sync (lint). |
-| `src/hooks/usePersistentInputs.ts` | Drops unknown monster ids once the dataset has loaded. |
-| `src/lib/inputState.ts` | `MAX_POINTS` 100 000 → 4000 (wheel capacity); `withKnownMonster` helper. |
-| `vite.config.ts` | `chunkSizeWarningLimit: 800` (the lazy data chunk is ~700 kB by design). |
+| `src/engine/values.ts` | Mitigation Multiplier now scales an estimated `BASE_MITIGATION` per vocation (`mitigationGain`) instead of being valued as a flat percentage. |
+| `src/engine/gems.ts` | `UpgradeRecommendation.gainToMax` (gain from the current grade straight to IV). |
+| `src/engine/messages.ts`, `optimizer.ts` | `rationale.threat` split into `threat` / `threatMax`, so no English fragment travels as a param. |
+| `src/lib/devFixtures.ts` | Deleted; `App` passes `wheel.mods` directly. |
+| `src/i18n/engine.ts` (new) | `engineText(t, msg, fallback)`: looks up `engine.<key>`, translates id params (elements, hunt styles, `unknown`), and falls back to the English string. |
+| `src/i18n/en.ts`, `pl.ts` | `engine.*` keys: EN is generated from `ENGINE_MESSAGES`, PL is written by hand. New keys `common.unknown`, `common.active`, `upgrades.toMax`, `spells.share`. The dev-fixture key is removed. |
+| `src/components/ResultsPanel.tsx` | Stats labels and rationale use `labelMsg` / `rationaleMsgs`. |
+| `src/components/VesselsPanel.tsx` | Vessel label is `vesselId + 1`. Reasons are translated. Spell share is shown as "% dmg". Upgrades show "to IV" gain. |
+| `src/components/GemsPanel.tsx`, `src/App.tsx` | `isFixture` prop removed. |
+| `src/lib/labels.ts` | `gemName` reads `WHEEL_DATA.vessels.gemNames`. The guessed names were wrong: sorcerer is *Sage*, druid is *Mystic*. |
+| `.gitattributes` | `* text=auto eol=lf` (stops CRLF warnings). |
+| `vite.config.ts` | Comment documents the chunk sizes. |
 
-## Integration decisions
+### Decisions
 
-- **No fixtures.** The engine returns real 36-slice, 5-ring, 4000-point wheels for all vocations, and the
-  dataset has 2006 monsters, so the UI calls the real modules directly.
-- **Rings.** UI geometry derives the ring count from `slice.ring`, so 5 rings needed no change. The only stale
-  4-ring/unknown-capacity assumption was `MAX_POINTS = 100_000`; it is now 4000 and a test asserts it equals
-  `getWheel(v).totalCapacity` for every vocation.
-- **Bundle.** Before: one 964 kB JS chunk (160 kB gzip). After: main 267 kB (84 kB gzip) + lazy `data`
-  chunk 699 kB (76 kB gzip). The public `src/data` contract stays synchronous; only the UI facade is lazy.
+- **Mitigation.** Effective damage-reduction gain = `BASE_MITIGATION[voc] × multiplier`.
+  - Approximate bases: knight 20 %, monk 14 %, paladin 10 %, sorcerer and druid 6 %.
+  - In-game: (defense + shielding) × equipment × wheel multiplier × stance.
+  - Grade IV is +6 % reduction for a knight and +1.8 % for a mage, valued like a 1 % all-element reduction per point.
+  - It stays the top defensive `basic1` choice for knights. Offensive mage builds now prefer mana.
+- **Bundle.** `wheel-data.json` (~0.5 MB pretty, ~300 kB minified) is needed synchronously by `getWheel()`/`optimize()` for the first render, so it stays in the main chunk.
+  - Main chunk: 629 kB (138 kB gzip). Lazy monster chunk: 699 kB (76 kB gzip). CSS: 26 kB (6 kB gzip).
+  - Splitting per vocation would need an async engine API, so it is not worth it at 138 kB gzip.
+- **Engine message params.** Proper names (monsters, spells, revelations) stay in English. Element and hunt-style ids are translated in the UI.
 
-## Test matrix (`src/integration.test.ts`)
+### Test matrix additions (`src/integration.test.ts`, 135 tests total)
 
 | Area | Cases |
 |------|-------|
-| Wiring | Facade returns nothing before `loadMonsterData()`, real data after; 5 vocations × (36 slices, 5 rings, 4000 capacity = `MAX_POINTS`, 4 revelations). |
-| Levels | 5 vocations × level 100/300/600/1000 → valid path (unlock rule, capacities, only last slice partial), `pointsUsed = min(points, 4000)`, domain sums, revelation stages match thresholds, scores in 0–100. |
-| Scrolls | `pointsForLevel(1000, 50) = 1000` reaches a stage ≥ 2 revelation. |
-| Priority | Sorcerer vs Fury (energy 110 %, death 110 %): priority 0 has higher offense, priority 100 higher defense; rationale names the weakness. |
-| Monster | Knight vs Demon at priority 70: valid build, rationale mentions Demon. |
-| Edge budgets | 0, 1, 49, 51, 3999, 4000, 9999 (capped), `NaN`, priority 250. |
-| Determinism | Same input → deep-equal result. |
-| Search | "dragon" → Dragon first; hits resolve by id; empty query → []. |
-| Input parsing | Invalid vocation, unknown monster id, negative / huge / fractional / `Infinity` / `NaN` points & priority, corrupted localStorage payloads, full URL round-trip → valid build. |
+| Vocation × context × points | 5 vocations × boss / solo / team-lure / team-box × 100/500/1000/2000/4000 points (100 cases). Each case owns 3 gems (lesser/regular/greater). |
+| Per case | Valid path (old checks plus the **directed** planner unlock graph). Avatar spells are `useful` only in boss mode, and no Avatar mods are recommended while hunting. 8 vessels with ids 0–7, unlocked in order. Owned gems are placed at most once, in `min(unlocked, owned)` vessels, and the greater gem goes into a greater vessel when one is unlocked. Recommended gems never exceed the vessel quality. Recommendations are non-empty once a vessel is unlocked. Upgrades are +1 grade with `gainToMax ≥ gain`. Every engine message resolves in PL and EN with no leftover `{param}`. |
+| Avatar | At 2000 points and priority 0, boss mode reaches an Avatar stage ≥ 1 and ≥ the hunting stage, for every vocation. |
+| Targets | Great Fire Wave expects more targets in team-box than solo, and ≤ 1.2 against a boss. |
+| Persistence | Fight context URL round-trip (`f`, `h`), invalid values dropped. Owned gems round-trip per vocation storage key, and corrupted JSON gives `[]`. |
 
-## Gate results (2026-11-18)
+Other new tests: the mitigation model and mage builds (`engine/gems.test.ts`), engine key parity and placeholders
+in PL/EN plus `engineText` fallback (`i18n/i18n.test.ts`), and planner gem names (`lib/labels.test.ts`).
+
+### Gate results (2026-11-18)
 
 | Gate | Result |
 |------|--------|
 | `npm run typecheck` | 0 errors |
-| `npm test` | 7 files, 115 tests passed |
-| `npm run lint` | 0 warnings |
-| `npm run build` | OK — 267 kB main + 699 kB lazy data chunk |
-| `vite preview` + curl | HTTP 200 for page, main and data chunks |
+| `npm test` | 12 files, 353 tests passed |
+| `npm run lint` | 0 warnings / errors |
+| `npm run build` | OK. Main 629 kB (138 kB gzip), lazy data 699 kB (76 kB gzip), CSS 26 kB. |
+| `vite preview` + curl | HTTP 200 for the page, a deep link with context, both JS chunks and the CSS |
 
-## Open issues
+### Open issues
 
-- No component/DOM tests (no jsdom/testing-library installed); UI behaviour is covered only by pure-helper tests
-  and a manual smoke run.
-- Perk values, monk data and Vessel Resonance are approximations (see `engine.md`); gems are not modelled.
-- Monster damage/max-damage data is incomplete for some legacy entries (see `data.md`).
-- Scroll points are not persisted in the URL/localStorage (only the resulting points are).
+- The mitigation base per vocation, spell `maxTargets`, team target counts and monk elements are estimates.
+- tibiapal reference builds are in the legacy code format, and there is no planner export code.
+- There are no DOM/component tests (no jsdom). UI logic lives in pure, tested helpers.
+- Scroll points are not persisted.
+
+## Iteration 1 (summary)
+
+- Removed the UI fixture fallback. `MAX_POINTS` is 4000 (asserted against `getWheel().totalCapacity`). Added the promotion-scroll field.
+- The monster dataset is lazy-loaded through `src/lib/api.ts` (`loadMonsterData`, `useMonsterData`). Unknown monster ids from the URL or storage are dropped.
+- 31 integration tests cover levels, priority, monsters (Fury, Demon, Dragon Lord), edge budgets, determinism and untrusted input.

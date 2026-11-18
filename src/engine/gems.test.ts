@@ -4,6 +4,7 @@ import { optimize } from './index';
 import { activeSlots, assign, bestGems, type GemEnv, gemParts, placeGems, toOwnedGem, upgrades } from './gems';
 import { blendWith, valuationFor, weightsFor } from './optimizer';
 import { getEngineWheel } from './wheel/build';
+import { BASE_MITIGATION, mitigationGain, mitigationParts } from './values';
 
 function env(vocation: (typeof VOCATIONS)[number] = 'knight', points = 2000): GemEnv {
   return {
@@ -124,6 +125,7 @@ describe('upgrade recommendations', () => {
       for (const u of ups) {
         expect(u.toGrade).toBe(u.fromGrade + 1);
         expect(u.gain).toBeGreaterThan(0);
+        expect(u.gainToMax).toBeGreaterThanOrEqual(u.gain - 1e-9);
       }
       const gains = ups.map((u) => u.gain);
       expect(gains).toEqual([...gains].sort((a, b) => b - a));
@@ -136,5 +138,27 @@ describe('upgrade recommendations', () => {
     expect(upgrades(e, [{ vesselId: 2, quality: 'greater', unlocked: true, gem: g4, source: 'owned' }])).toEqual([]);
     const g1 = toOwnedGem('rec', bestGems(e, 'greater', 1)[0], 1);
     expect(upgrades(e, [{ vesselId: 2, quality: 'greater', unlocked: true, gem: g1, source: 'recommended' }])).toEqual([]);
+  });
+});
+
+describe('mitigation multiplier', () => {
+  it('multiplies the vocation base mitigation instead of adding flat %', () => {
+    expect(mitigationGain('knight', 30)).toBeCloseTo(6);
+    expect(mitigationGain('sorcerer', 30)).toBeLessThan(mitigationGain('paladin', 30));
+    expect(mitigationGain('paladin', 30)).toBeLessThan(mitigationGain('knight', 30));
+    for (const vocation of VOCATIONS) expect(BASE_MITIGATION[vocation]).toBeLessThan(30);
+  });
+
+  it('values grade IV below a flat 30 % damage reduction and scales by vocation', () => {
+    const k = mitigationParts(env('knight').v, 30).def;
+    const s = mitigationParts(env('sorcerer').v, 30).def;
+    expect(k).toBeLessThan(10);
+    expect(s).toBeLessThan(k / 2);
+  });
+
+  it('does not dominate offensive mage builds', () => {
+    const r = optimize({ vocation: 'sorcerer', points: 2000, monster: null, priority: 0 });
+    const lesser = r.gemRecommendations.find((g) => g.quality === 'lesser');
+    expect(lesser?.mods[0].name).not.toBe('Mitigation Multiplier');
   });
 });

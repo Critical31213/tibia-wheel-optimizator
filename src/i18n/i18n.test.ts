@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { ENGINE_MESSAGES } from '../engine/messages';
 import { en } from './en';
+import { engineText } from './engine';
 import { detectLang, format, translator } from './lang';
 import { pl } from './pl';
 
@@ -12,6 +14,29 @@ describe('i18n dictionaries', () => {
   it('PL and EN use the same placeholders per key', () => {
     const ph = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort();
     for (const k of Object.keys(en) as (keyof typeof en)[]) expect(ph(pl[k]), k).toEqual(ph(en[k]));
+  });
+});
+
+describe('engine messages', () => {
+  it('every engine message key has a PL and EN translation with the same placeholders', () => {
+    const ph = (s: string) => (s.match(/\{\w+\}/g) ?? []).sort();
+    for (const [k, template] of Object.entries(ENGINE_MESSAGES)) {
+      const key = `engine.${k}` as keyof typeof en;
+      expect(en[key], key).toBe(template);
+      expect(pl[key]?.trim(), key).toBeTruthy();
+      expect(ph(pl[key]), key).toEqual(ph(template));
+    }
+  });
+
+  it('renders translated messages, ids and falls back to English', () => {
+    const tpl = translator('pl');
+    expect(engineText(tpl, { key: 'spell.immune', params: { monster: 'Demon', element: 'fire' } }, 'x')).toBe(
+      'Demon jest niewrażliwy na ogień.',
+    );
+    expect(engineText(tpl, { key: 'rationale.hunt', params: { style: 'teamBox', targets: 9 } }, 'x')).toContain('Drużyna');
+    expect(engineText(tpl, { key: 'no.such.key' }, 'fallback')).toBe('fallback');
+    expect(engineText(tpl, undefined, 'fallback')).toBe('fallback');
+    expect(engineText(translator('en'), { key: 'stat.mana' }, 'x')).toBe('Mana');
   });
 });
 

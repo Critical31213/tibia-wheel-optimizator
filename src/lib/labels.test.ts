@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clamp, cx, modifierKind, priorityLabel } from './labels';
+import { clamp, cx, gemName, modifierKind, priorityLabel } from './labels';
 
 describe('modifierKind', () => {
   it('classifies element modifiers', () => {
@@ -26,5 +26,15 @@ describe('clamp / cx', () => {
   });
   it('joins truthy class names', () => {
     expect(cx('a', false, null, 'b', undefined)).toBe('a b');
+  });
+});
+
+describe('gemName', () => {
+  it('uses the planner gem names per vocation and quality', () => {
+    expect(gemName('sorcerer', 'greater')).toBe('Greater Sage Gem');
+    expect(gemName('druid', 'lesser')).toBe('Lesser Mystic Gem');
+    expect(gemName('knight', 'regular')).toBe('Guardian Gem');
+    expect(gemName('monk', 'greater')).toBe('Greater Spiritualist Gem');
+    expect(gemName('paladin', 'lesser')).toBe('Lesser Marksman Gem');
   });
 });

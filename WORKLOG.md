@@ -125,18 +125,46 @@ Roles:
 - Assumptions: heuristic spell weights and baselines; the Mitigation Multiplier mod is taken literally; level ≈ points + 50.
 - Tests: 4 engine test files. `tsc -b` clean, all tests pass, lint clean. Perf ≤ 10 ms at 4000 points. Docs: `docs/modules/engine.md`.
 
+### 2026-11-18 — S4 Integration (iteration 2)
+- **Mitigation fix.** Per the planner, the Mitigation Multiplier "increases your mitigation multiplicatively".
+  - Gain = `BASE_MITIGATION[voc] × multiplier`. Approximate bases: knight 20, monk 14, paladin 10, mages 6 %.
+  - It is no longer a flat reduction. Grade IV = +6 % for a knight and +1.8 % for a mage.
+  - Offensive mage builds no longer pick it. Tests were added in `engine/gems.test.ts`.
+- **Engine ↔ UI.**
+  - Removed `src/lib/devFixtures.ts` and the `isFixture` prop.
+  - Engine messages are translated (`src/i18n/engine.ts` `engineText`, `engine.*` in PL/EN, with element and hunt-style params translated).
+  - The UI shows spell `share` and `gainToMax` (now filled by `gems.ts`). Vessels are labelled `vesselId + 1`.
+  - `rationale.threat` was split into `threat`/`threatMax` so no English text travels as a param.
+- **Bug fixed: gem names.** They were guessed (sorcerer "Mage", druid "Sage"). They now come from the planner's
+  `GemNames` (Sage = sorcerer, Mystic = druid).
+- **Integration tests.** 135 in `src/integration.test.ts`. The matrix is 5 vocations × 4 contexts × 5 budgets with owned gems.
+  - Checks the directed path, that Avatar is valued only in boss mode, vessel quality and placement, non-empty recommendations, and that PL/EN keys resolve.
+  - Also covers persistence round-trips (context in the URL, gems in localStorage) and Avatar stage in boss vs hunt.
+  - The i18n parity test now covers every engine key.
+- Added `.gitattributes` (`* text=auto eol=lf`).
+- **Gates.**
+  - typecheck 0 errors. 353 tests in 12 files pass. lint 0.
+  - Build: main 629 kB (138 kB gzip; the wheel data is needed for the first render and is kept there on purpose), lazy monster chunk 699 kB (76 kB gzip).
+  - `vite preview` serves everything with HTTP 200.
+- **Docs.** README, ARCHITECTURE (pipeline diagram, contracts, gates), `docs/modules/integration.md`, `engine.md`, `ui.md`.
+
 ## In progress / Next
 
 - [x] S1 Data — scraper + monster dataset + search API.
 - [x] S2 Engine — wheel model for 5 vocations + optimizer.
 - [x] S3 UI — components, dark Tibian theme, wheel visualization.
 - [x] S4 Integration — wire everything, zero TS errors, tests, docs, README.
+- [x] Iteration 2 — official planner data extracted (S1), fight context + gems editor + PL/EN UI (S3).
+- [x] Iteration 2 — engine on planner data: context-aware spells, Avatar boss-only, gems & vessels (S2).
+- [x] Iteration 2 — integration: mitigation fix, engine messages i18n, fixtures removed, E2E matrix (S4).
 
 ## Known limitations / Next steps
 
-- Perk value units are heuristic; calibrate against real damage/healing formulas.
-- Monk wheel data and Vessel Resonance values are approximate; gems are not modelled.
+- Perk values are heuristic; calibrate spell weights and baselines against real damage/healing formulas.
+- Mitigation base per vocation (`BASE_MITIGATION`) is an estimate; verify against in-game Cyclopedia values.
+- Spell `maxTargets` and team target counts (team-lure 5, team-box 9) are approximate; monk spell elements assumed physical.
+- tibiapal reference builds use the legacy code format (slice meanings may have changed); no planner export code is generated.
 - Some legacy monsters lack damage types / max damage on tibiopedia.pl.
-- No DOM/component tests — add jsdom + Testing Library for `App`, `MonsterSearch`, `PointsInput`.
+- No DOM/component tests — add jsdom + Testing Library for `App`, `GemsPanel`, `MonsterSearch`, `PointsInput`.
 - Scroll points are not persisted; consider adding them to the URL state.
 - Consider a Web Worker for `optimize()` if the beam width is increased.

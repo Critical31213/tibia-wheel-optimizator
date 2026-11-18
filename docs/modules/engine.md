@@ -97,7 +97,17 @@ Every source yields `Parts = { off, def, util }`:
 - `extra` is 5/10/15 % by stage. `def` is the uptime-scaled damage reduction.
 - This applies to the revelation itself and to its supreme mods, momentum included.
 
-**Basic mods.** Resistances are worth `pct × incomingShare(monster, element)`; with no monster, generic shares are used. HP, mana and capacity scale relative to `level ≈ points + 50`. Mitigation is worth `pct × 0.18`.
+**Basic mods.** Resistances are worth `pct × incomingShare(monster, element)`; with no monster, generic shares are used. HP, mana and capacity scale relative to `level ≈ points + 50`.
+
+**Mitigation Multiplier** (basic mod 30: 20/22/24/30 % by grade; dedication 0.075 %/point). The planner says it
+"increases your mitigation multiplicatively", so it scales the character's base mitigation and is not a flat
+damage reduction:
+- extra damage reduction = `BASE_MITIGATION[vocation] × multiplier / 100`, then valued like +1 % reduction on all damage (`K.MIT_DR_DEF = 1`) × threat;
+- `BASE_MITIGATION` (approximate, mid/high level) = knight 20 %, monk 14 %, paladin 10 %, sorcerer 6 %, druid 6 %;
+- in-game mitigation = (defense + shielding) × equipment × wheel multiplier × combat stance, so knights with a shield are highest and mages are lowest;
+- example: a grade IV gem is worth +6 % reduction for a knight and +1.8 % for a mage.
+
+It remains the top defensive `basic1` mod for knights. Offensive mage builds prefer mana.
 
 **Supreme mods.** Damage, crit, cooldown and healing use the spell model. Revelation Mastery is worth Δ(revelation value) for the extra points. Momentum is worth `off = 0.5·m` and `def = 0.2·m`.
 
@@ -139,12 +149,15 @@ Complexity:
 - **`upgradeRecommendations`.**
   - Only owned gems, only active slots, and only +1 grade.
   - `gain = blend(grade + 1) − blend(grade)`, with momentum included for cooldown mods, sorted descending.
+  - `gainToMax = blend(IV) − blend(grade)`.
 
 ## 5. i18n
 
 - `rationaleMsgs`, `SpellUsage.reasonMsg`, `GemRecommendation.reasonMsg` and `StatLine.labelMsg` carry `{ key, params }`.
 - Keys are `rationale.*`, `spell.*`, `gem.*` and `stat.*`, and are listed in `ENGINE_MESSAGES` (English templates with `{param}` placeholders).
 - The plain `rationale`, `reason` and `label` strings stay in English.
+- The UI translates `engine.<key>` (PL and EN in `src/i18n/`) and the id params (elements, hunt styles) through `engineText()`.
+- `rationale.threat` and `rationale.threatMax` are separate keys, so no English fragment ends up in a param.
 - `renderMessage` fills placeholders and leaves unknown ones as they are.
 
 ## 6. Assumptions
@@ -152,7 +165,7 @@ Complexity:
 - Spell weights (single 0.6, area 0.5, per-spell overrides), the baseline attacks, and the boss window (120 s fight, 30 min between attempts) are heuristics.
 - `maxTargets` and monk elements are approximate (S1).
 - The level is estimated as points + 50 and is used to scale HP, mana and flat bonuses.
-- The Mitigation Multiplier basic mod (up to 30 % at grade IV) is taken literally as % mitigation. It therefore dominates `basic1` for defensive builds, and its in-game units should be verified.
+- The Mitigation Multiplier multiplies an **estimated** base mitigation per vocation (`BASE_MITIGATION`, see §2). Calibrate it against in-game values.
 - Momentum is valued as a flat cooldown proxy.
 
 ## 7. Tests

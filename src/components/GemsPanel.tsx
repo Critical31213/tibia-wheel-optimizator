@@ -121,12 +121,11 @@ interface GemsPanelProps {
   vocation: Vocation;
   gems: OwnedGem[];
   mods: ModDefinition[];
-  isFixture: boolean;
   onChange: (update: (gems: OwnedGem[]) => OwnedGem[]) => void;
 }
 
 /** Collapsible inventory of owned gems (quality, mods, grades). */
-export function GemsPanel({ vocation, gems, mods, isFixture, onChange }: GemsPanelProps) {
+export function GemsPanel({ vocation, gems, mods, onChange }: GemsPanelProps) {
   const t = useT();
   const bodyId = useId();
   const qualityId = useId();
@@ -152,7 +151,6 @@ export function GemsPanel({ vocation, gems, mods, isFixture, onChange }: GemsPan
       }
     >
       <div id={bodyId} hidden={!open}>
-        {isFixture && <p className="mb-2 rounded-md bg-gold-700/20 px-2 py-1 text-[11px] text-gold-300">{t('gems.devFixture')}</p>}
         {mods.length === 0 && <p className="mb-2 text-xs text-parchment-400">{t('gems.noModData')}</p>}
         {gems.length === 0 ? (
           <p className="mb-3 text-sm text-parchment-300">{t('gems.empty')}</p>

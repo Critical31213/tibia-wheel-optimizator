@@ -2,7 +2,7 @@
  * Translatable engine messages. The UI looks up `engine.<key>` and fills `{param}` placeholders;
  * the English templates below are the source of truth and the plain-string fallback.
  * Params are numbers, proper names (monsters, spells, revelations) or ids: elements
- * (`physical`, `fire`, …), hunt styles (`solo`, `teamLure`, `teamBox`) and gem qualities.
+ * (`physical`, `fire`, …, `unknown`), hunt styles (`solo`, `teamLure`, `teamBox`) and gem qualities.
  */
 import type { EngineMessage } from '../types';
 
@@ -16,7 +16,8 @@ export const ENGINE_MESSAGES = {
   'rationale.noWeakness': '{monster} has no weakness to this vocation\'s elements; element-neutral perks were preferred.',
   'rationale.resists': '{monster} resists {list}: spells of those elements were de-prioritised.',
   'rationale.immune': '{monster} is immune to {list}: {spells} are useless here.',
-  'rationale.threat': '{monster} deals {types} damage{max}: defense value scaled ×{threat}.',
+  'rationale.threat': '{monster} deals {types} damage: defense value scaled ×{threat}.',
+  'rationale.threatMax': '{monster} deals {types} damage (up to ~{max}/turn): defense value scaled ×{threat}.',
   'rationale.noMonster': 'No monster selected: generic build without elemental tailoring.',
   'rationale.revelations': 'Revelations reached: {list}.',
   'rationale.noRevelation': 'Not enough points for a revelation (250 in one domain); points go into the best inner slices.',
