@@ -71,15 +71,49 @@ summary, rationale) → UI renders the wheel and the summary.
 
 ## 5. Data integration (S1 Data)
 
-_To be documented by the Data & Scraper Specialist — see `docs/modules/data.md`._
+- **Source:** [tibiopedia.pl](https://tibiopedia.pl) (Polish), scraped **offline** by
+  `scripts/scrape-monsters.ts` (`npm run scrape:monsters`; cheerio, 2 workers,
+  400 ms gap, retries, HTML cache in gitignored `scripts/.cache/`).
+- **Output:** `src/data/monsters.json` — 2006 `Monster` records (bestiary, bosses,
+  quest and other creatures; arena/event/trap entries skipped), sorted by name,
+  bundled statically. No runtime network access.
+- **Normalization:** Polish labels / icon file names → `Element` keys;
+  `elementModifiers` = % damage taken (site's `+80%` resistance → 20, immune → 0,
+  neutral → 100; unknown `?%` omitted). HP 0 placeholders omitted.
+- **API (`src/data/index.ts`):** `MONSTERS`, `searchMonsters(query, limit = 10)`
+  (diacritic-insensitive, ranked exact > prefix > word-prefix > substring),
+  `getMonsterById(id)`, plus helpers `getModifier`, `getWeakestElements`,
+  `getStrongestElements`, `getBestAttackElement`, `normalizeText`.
+- Details, page structure, mapping table and limitations: [`docs/modules/data.md`](docs/modules/data.md).
 
 ## 6. Wheel model and optimization algorithm (S2 Engine)
 
-_To be documented by the Algorithm & Logic Engineer — see `docs/modules/engine.md`._
+Full details: [`docs/modules/engine.md`](docs/modules/engine.md).
+
+- **Model** (`src/engine/wheel/`): 36 slices in 5 rings (4×50, 8×75, 12×100, 8×150, 4×200 = 4000 points,
+  1000 per domain), layout/capacities/unlock prerequisites/per-slot bonuses taken from the canary server sources.
+  `geometry.ts` builds angles (clockwise from 12 o'clock) and symmetric adjacency; per-vocation files
+  (`vocations/*.ts`) define dedication per point, spell augments, 200-slot passives and the 4 revelations
+  (thresholds 250/500/1000). Monk is marked approximate.
+- **Unlock rule**: ring-1 slices are always available; any other slice needs at least one full adjacent slice.
+- **Scoring** (`scoring.ts`): each perk has an (off, def, util) value vector with element tags;
+  `value = (1−p)·off·offMult + p·def·defMult·threat + 0.1·util`, where `offMult = mean (modifier/100)²`
+  over the perk's elements, `defMult` rewards coverage of the monster's damage types and `threat` scales with
+  `maxDamage`.
+- **Search** (`optimizer.ts`): beam search (width 24) over full-slice fills ranked by score + revelation
+  look-ahead + remaining·density, greedy completion with a partially filled last slice; deterministic, 2–6 ms.
+- **Points**: `pointsForLevel(level, scrollPoints = 0) = max(0, level − 50)` (+ up to 50 scroll points).
 
 ## 7. UI (S3 UI)
 
-_To be documented by the Frontend & UI Designer — see `docs/modules/ui.md`._
+Single-page React UI (`src/App.tsx`, `src/components/`, `src/hooks/`, `src/lib/`).
+Inputs (vocation, points/level, monster, priority) live in `usePersistentInputs`
+(localStorage + URL query) and feed a memoized `optimize()` call — no Calculate button.
+Results render as an SVG wheel (`WheelChart`, area-proportional slice fill, fill-order
+badges, tooltips) and a `ResultsPanel` (scores, revelations, convictions, stats, rationale,
+fill order). Components use only the `src/lib/api.ts` facade, which temporarily falls back
+to demo fixtures while the engine is a stub. Dark Tibian theme via Tailwind v4 `@theme` tokens.
+Details: [docs/modules/ui.md](docs/modules/ui.md).
 
 ## 8. Quality gates (S4 Integration)
 

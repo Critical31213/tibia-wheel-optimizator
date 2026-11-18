@@ -38,11 +38,40 @@ Roles:
 - Created `WORKLOG.md`, `ARCHITECTURE.md`, `docs/modules/`.
 - Delegating S1/S2/S3 in parallel, then S4 for integration.
 
+### 2026-11-18 — S3 UI
+- Dark Tibian theme (Tailwind v4 `@theme` tokens, Cinzel headings), favicon.
+- Components: VocationPicker, PointsInput, MonsterSearch (ARIA combobox) + MonsterCard,
+  PrioritySlider, WheelChart (SVG), ResultsPanel; two-column layout ≥ lg, 360 px OK.
+- Inputs persisted to localStorage + URL query; live memoized recompute.
+- `src/lib/api.ts` facade with removable fixture fallback (`src/lib/fixtures.ts`).
+- `tsc -b`, `vitest run src/lib` (16 tests), `npm run build` green. Docs: `docs/modules/ui.md`.
+
+### 2026-11-18 — S1 Data
+- Scraper `scripts/scrape-monsters.ts` (cheerio + tsx; `npm run scrape:monsters`),
+  polite: 2 workers, 400 ms gap, generic UA, 4 retries w/ backoff, gitignored HTML cache.
+- `src/data/monsters.json`: 2006 monsters scraped from tibiopedia.pl (no fallback needed).
+  Handles cookie-gated splash page, legacy text-only attack lists, HP 0 placeholders.
+- `src/data/index.ts`: `MONSTERS`, ranked `searchMonsters`, `getMonsterById` + element helpers.
+- Tests `src/data/index.test.ts` (20, incl. Dragon/Dragon Lord/Demon/Hydra/Grim Reaper
+  spot checks) green; `tsc -b` clean. Docs: `docs/modules/data.md`.
+
+### 2026-11-18 — S2 Engine
+- Research: tibia.fandom.com is paywalled (HTTP 402) for automated fetch; used search summaries (fandom
+  *Version 13 Updates*, tibiaqa.com) + canary server sources (`WheelSlots_t`, `getMaxPointsPerSlot`,
+  `canPlayerSelectPointOnSlot`, `io_wheel.cpp` per-slot bonuses, revelation stages, promotion scrolls).
+- **Finding:** the wheel has 5 rings (4×50, 8×75, 12×100, 8×150, 4×200 = 4000), not 4 rings; a full domain is
+  exactly 1000, so revelation stage 3 needs a full domain. UI geometry is generic (ring count derived), no change needed.
+- Implemented `src/engine/wheel/` (geometry builder, perk model, 5 vocation files, build/cache),
+  `scoring.ts` (priority blend + monster tailoring), `optimizer.ts` (beam search + revelation look-ahead,
+  partial last slice, stats, rationale), `pointsForLevel(level, scrollPoints = 0)`.
+- Tests: `geometry.test.ts` + `optimizer.test.ts` (48 tests) green; `tsc -b` clean. Docs: `docs/modules/engine.md`.
+- Approximate: perk value units, monk spell elements/passives, Vessel Resonance value; gems not modelled.
+
 ---
 
 ## In progress / Next
 
-- [ ] S1 Data — scraper + monster dataset + search API.
-- [ ] S2 Engine — wheel model for 5 vocations + optimizer.
-- [ ] S3 UI — components, dark Tibian theme, wheel visualization.
+- [x] S1 Data — scraper + monster dataset + search API.
+- [x] S2 Engine — wheel model for 5 vocations + optimizer.
+- [x] S3 UI — components, dark Tibian theme, wheel visualization.
 - [ ] S4 Integration — wire everything, zero TS errors, tests, docs, README.
