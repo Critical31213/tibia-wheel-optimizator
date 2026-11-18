@@ -234,7 +234,10 @@ Roles:
   - `tsc -b` 0 errors. `vitest run`: 17 files, 494 tests. Lint 0.
   - Build: main 724 kB (158 kB gzip, incl. damage JSON and fflate inflate), lazy monsters 699 kB (76 kB gzip).
 - **Docs.** README (character, spots, alternatives, export, TibiaTools/tibiapal attribution, `npm run datamine:damage`), ARCHITECTURE (pipeline, contracts, data flow, gates), `docs/modules/integration.md`, `engine.md`, `ui.md`.
-### 2026-11-18 — Fix: max mana valued as offenseMax mana was scored as offense, so at DPS-leaning priority lesser gems for every vocation recommended Mana over Hit Points. A bigger mana pool does not raise damage: mana is now utility only (`K.MANA_UTIL`), HP gets a small utility tie-break (`K.HP_UTIL`). Test added in `iteration3.test.ts`; RM look-ahead test now checks the objective instead of the sum of stages.
+
+### 2026-11-18 — Fix: max mana valued as offense
+
+Max mana was scored as offense, so at DPS-leaning priority lesser gems for every vocation recommended Mana over Hit Points. A bigger mana pool does not raise damage: mana is now utility only (`K.MANA_UTIL`), HP gets a small utility tie-break (`K.HP_UTIL`). Test added in `iteration3.test.ts`; RM look-ahead test now checks the objective instead of the sum of stages.
 
 ## In progress / Next
 
