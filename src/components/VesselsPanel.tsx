@@ -135,7 +135,7 @@ export function VesselsPanel({ vocation, result, mods }: VesselsPanelProps) {
 
       <SubHeading>{t('upgrades.title')}</SubHeading>
       {result.upgradeRecommendations.length === 0 ? (
-        <Empty>{t('upgrades.none')}</Empty>
+        <Empty>{t(result.vessels.some((v) => v.unlocked && !v.gem) ? 'upgrades.fillFirst' : 'upgrades.none')}</Empty>
       ) : (
         <ol className="divide-y divide-ink-700 rounded-lg border border-ink-700">
           {result.upgradeRecommendations.map((u) => (

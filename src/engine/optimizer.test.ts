@@ -142,7 +142,7 @@ describe('behaviour', () => {
     for (const s of res.stats) expect(s.labelMsg?.key).toMatch(/^stat\./);
   });
 
-  it('runs well under 50 ms (warm)', () => {
+  it('runs well under 75 ms (warm, incl. RM gem re-optimization)', () => {
     const inputs = VOCATIONS.flatMap((vocation) =>
       [100, 1000, 2500, 4000].map((points) => ({ vocation, points, monster: null, priority: 50, context: CONTEXTS[0] })),
     );
@@ -158,7 +158,7 @@ describe('behaviour', () => {
       }
       worst = Math.max(worst, ms);
     }
-    expect(worst).toBeLessThan(50);
+    expect(worst).toBeLessThan(75);
   });
 
   it('roughly agrees with the planner reference builds', () => {

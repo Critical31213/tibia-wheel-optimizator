@@ -34,7 +34,7 @@ import {
   type ValuationContext,
   ZERO,
 } from './values';
-import { type EngineWheel, MOMENTUM_PER_GRADE, stageFor } from './wheel/build';
+import { type EngineWheel, stageFor } from './wheel/build';
 
 export type GemSlot = 'basic1' | 'basic2' | 'supreme';
 export const SLOTS_BY_QUALITY: Record<GemQuality, GemSlot[]> = {
@@ -248,7 +248,7 @@ function supremeReason(env: GemEnv, m: WheelSupremeMod) {
   const s = v.model.spells.get(spell);
   if (m.category === 'augCooldown') {
     if (s?.avatar) return text('gem.avatar', { spell });
-    return text('gem.cooldown', { spell, momentum: MOMENTUM_PER_GRADE[3] });
+    return text('gem.cooldown', { spell });
   }
   if (m.category === 'augHealing') return text('gem.healing', { spell });
   if (s && s.kind === 'damage') {
@@ -271,7 +271,7 @@ function similarFor(env: GemEnv, picks: ModPick[]): NonNullable<GemRecommendatio
   const used = new Set(picks.map((p) => p.kind + p.id));
   for (const p of picks) {
     if (p.score <= 0) continue;
-    const ranked = p.slot === 'supreme' ? rankSupreme(env, 4) : rankBasic(env, p.slot === 'basic1' ? 1 : 2, 4);
+    const ranked = p.slot === 'supreme' ? rankSupreme(env, NEW_GEM_GRADE) : rankBasic(env, p.slot === 'basic1' ? 1 : 2, NEW_GEM_GRADE);
     for (const r of ranked) {
       if (used.has(r.kind + r.id) || r.score < p.score * SIMILAR_THRESHOLD) continue;
       if (out.length >= 3) break;
@@ -281,11 +281,14 @@ function similarFor(env: GemEnv, picks: ModPick[]): NonNullable<GemRecommendatio
   return out;
 }
 
+/** A newly revealed gem has all mods at grade I (higher grades come from the Fragment Workshop). */
+export const NEW_GEM_GRADE = 1;
+
 export function recommendations(env: GemEnv): GemRecommendation[] {
   const list = [
-    ...bestGems(env, 'greater', 4),
-    ...bestGems(env, 'regular', 4),
-    ...bestGems(env, 'lesser', 4),
+    ...bestGems(env, 'greater', NEW_GEM_GRADE),
+    ...bestGems(env, 'regular', NEW_GEM_GRADE),
+    ...bestGems(env, 'lesser', NEW_GEM_GRADE),
   ].filter((g) => g.score > 0);
   return list
     .map((g) => {
@@ -293,7 +296,7 @@ export function recommendations(env: GemEnv): GemRecommendation[] {
       const r = pickReason(env, top);
       return {
         quality: g.quality,
-        mods: g.picks.map((p) => ({ kind: p.kind, modId: p.id, name: p.name, grade: 4 as ModGrade })),
+        mods: g.picks.map((p) => ({ kind: p.kind, modId: p.id, name: p.name, grade: NEW_GEM_GRADE as ModGrade })),
         gain: round1(g.score),
         reason: r.text,
         reasonMsg: r.msg,

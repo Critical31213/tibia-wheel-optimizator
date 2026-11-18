@@ -191,13 +191,14 @@ export const en = {
   'vessels.emptyAdd': 'Empty — add a gem',
   'vessels.none': 'Vessel placement is not available yet.',
 
-  'recs.title': 'Recommended gems',
+  'recs.title': 'Recommended gems (new gem, grade I)',
   'recs.none': 'No gem recommendations yet.',
   'recs.gain': 'Gain {gain}',
   'recs.similar': 'Near-equal substitutes:',
 
   'upgrades.title': 'Best upgrades',
   'upgrades.none': 'No upgrades to suggest — add your gems above.',
+  'upgrades.fillFirst': 'Fill every unlocked vessel with a gem first; grade upgrades (+1) come after that.',
   'upgrades.gain': 'Gain {gain}',
   'upgrades.toMax': 'to IV: {gain}',
 

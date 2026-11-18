@@ -90,13 +90,13 @@ describe('gem placement', () => {
     }
   });
 
-  it('recommends gems per quality at grade IV with reasons', () => {
+  it('recommends gems per quality at grade I (new gems) with reasons', () => {
     for (const vocation of VOCATIONS) {
       const res = optimize({ vocation, points: 2000, monster: null, priority: 50 });
       const qs = new Set(res.gemRecommendations.map((g) => g.quality));
       expect(qs).toEqual(new Set(['lesser', 'regular', 'greater']));
       for (const g of res.gemRecommendations) {
-        expect(g.mods.every((m) => m.grade === 4)).toBe(true);
+        expect(g.mods.every((m) => m.grade === 1)).toBe(true);
         expect(g.reason.length).toBeGreaterThan(0);
         expect(g.reasonMsg?.key).toMatch(/^gem\./);
       }

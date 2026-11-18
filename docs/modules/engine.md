@@ -7,7 +7,7 @@ Owner: **S2 Engine** (iteration 3). Every number comes from the official test-se
 
 | Export | Purpose |
 |---|---|
-| `optimize(input): OptimizerResult` | The best allocation, path, revelations, convictions, stats, vessels, gem and upgrade recommendations, and spells. Also `plannerCode` and `alternatives`. Deterministic; < 35 ms worst case including alternatives. |
+| `optimize(input): OptimizerResult` | The best allocation, path, revelations, convictions, stats, vessels, gem and upgrade recommendations, and spells. Also `plannerCode` and `alternatives`. Deterministic; < 75 ms worst case including alternatives and RM re-optimization. |
 | `getWheel(vocation): WheelDefinition` | Contract view: 36 slices, 4 revelations, 8 `vessels`, and `mods` (basic and supreme). |
 | `pointsForLevel`, `MIN_LEVEL_FOR_POINTS`, `MAX_SCROLL_POINTS` | Unchanged. |
 | `ENGINE_MESSAGES`, `renderMessage`, `EngineMessageKey` | i18n templates for `rationaleMsgs`, `reasonMsg` and `labelMsg`. |
@@ -192,11 +192,12 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
   - D23: a vessel holds only a gem the player owns. Unlocked vessels without an owned gem have `gem: null` and `source: 'empty'`; the engine never emits `source: 'recommended'`.
   - Locked vessels have `unlocked: false`, `gem: null` and `source: 'empty'`.
 - **`gemRecommendations`.**
-  - Per quality, at grade IV: the best `basic1` (HP or Mitigation Multiplier only), the best distinct `basic2`, and the top-2 supreme variants for greater gems. Only mods with positive value are listed. Healing supreme gems (healing spell augments and cooldowns) are 0 for sorcerer and druid, and valued as EHP for the others.
+  - Per quality, at grade I (D26: a newly revealed gem): the best `basic1` (HP or Mitigation Multiplier only), the best distinct `basic2`, and the top-2 supreme variants for greater gems. Only mods with positive value are listed. Healing supreme gems (healing spell augments and cooldowns) are 0 for sorcerer and druid, and valued as EHP for the others.
+  - Revelation Mastery (D26): `withRmReoptimized` re-runs the search (main plan, beam width 16) with a hypothetical greater grade-I gem owned, once without a supreme mod and once per RM mod. Gain = basics (static) + objective(with RM) − objective(without). Reason `gem.rmReopt` (new stage) or `gem.rmReoptFree` (same stage, freed points). Avatar RM skipped outside boss mode; skipped when the wheel is full.
   - Advice only (D23): computed for all three qualities (with or without owned gems) and never placed into a vessel or used by the search.
   - Each has `reason` and `reasonMsg` from the dominant mod (spell share, avatar in boss, RM stage gained, resistance vs monster, and so on), sorted by gain.
 - **`upgradeRecommendations`.**
-  - Only owned gems, only active slots, and only +1 grade.
+  - Only owned gems, only active slots, and only +1 grade; empty (D26) while an unlocked vessel has no gem.
   - `gain = blend(grade + 1) − blend(grade)`, with momentum included for cooldown mods, sorted descending.
   - `gainToMax = blend(IV) − blend(grade)`.
 
@@ -225,6 +226,7 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 | `model.test.ts` | Geometry, the directed unlock graph matches `WHEEL_DATA`, twins, vessels and mods, thresholds, messages. |
 | `spells.test.ts` | Targets (tibiapal averages, hunt > boss), D16 (single-target unusable in hunt, boss targets ≤ 1.2, no Augmented Annihilation in hunt), immune → useless, Avatar, cooldown floor, momentum, effect parsing, augments. |
 | `gems.test.ts` | Hungarian vs brute force, active slots, placement, recommendations, upgrades, Mitigation Multiplier scaling with real base mitigation. |
+| `gemSteps.test.ts` | D26: upgrades only with every unlocked vessel filled; RM gem re-optimization (owning the gem reaches the predicted stage), no avatar RM in hunt. |
 | `optimizer.test.ts` | Path validity on random inputs, RM, vessel unlock order, augments, determinism, edge budgets, priority, perf < 50 ms (best of 3 per input), planner reference builds. |
 | `iteration3.test.ts` | Character level and skills, HP > mitigation (RP 400), HP still beats Mitigation Multiplier for EK 1500 at priority 100 (D18), leech devalued, RM look-ahead and owned RM gem, multi-monster weighting, distinct alternatives, planner code decode and unlock path, official planner WASM round-trip (`skipIf` when `scripts/.cache/wod/skillgrid.cjs` is missing). |
 | `iteration5.test.ts` | D23: no `recommended` vessel source (main + alternatives, planner code carries only owned gems), recommendations without owned gems, vessel slice = flat bonus without gems, owned-gem vessel valuation matches the placement, owned gems placed in the build; distinct focus labels. |

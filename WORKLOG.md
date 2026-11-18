@@ -42,6 +42,7 @@ Roles:
 | D23 | 2026-11-18 | A vessel holds only a gem the player added; unlocked vessels without an owned gem stay empty (never a recommended gem). The search values Gem Vessel slices only by the slice's own effects (+1 flat) and owned gems the new vessel can hold; gem recommendations stay advice (all qualities) and do not affect the allocation. | User: priority 50 sorcerer chose "no revelation" because 3 vessel slices were worth ~20 pp EHP from assumed grade-IV gems. |
 | D24 | 2026-11-18 | Stances (Vocation Adjustments 2026, TibiaWiki after the 7 July 2026 patch) are modelled and picked automatically per rotation plan by their build-independent value (damage vs the shared reference T0 + % EHP) at the user's priority. One stance per vocation; sorcerers one elemental + one aura. Elemental stances convert the next other-element spell: converted share = min(1, element casts / other casts). Serene uptime 80 %, 30 % of incoming damage from non-adjacent enemies (Divine Defiance dodge); Divine Defiance's healing magic level is valued through healing (e.g. Salvation). Monk presets carry their virtue. Elemental pierce capped at 2× sensitivity. | User request; values confirmed by the user (Q1–Q4). |
 | D25 | 2026-11-18 | Base spell cooldowns follow TibiaWiki where the TibiaTools datamine differs (`COOLDOWN_OVERRIDES`, applied on load): Shield Bash 4, Death Echo 6, Great Death Beam 6, Forked Glacier 6, Forked Thorns 6, Strong Ice Wave 4, Devastating Knockout 8, Mystic Repulse 8, Thousand Fist Blows 8, Intense Wound Cleansing 120 s. The rotation display includes the build's augment mods (cooldowns). | User: the DE – EW – DE – GDB rotation needs Death Echo's −2 s augment (DE was 4 s in the datamine). |
+| D26 | 2026-11-18 | Gem steps: recommended gems are valued at grade I (a newly revealed gem); Fragment Workshop upgrades (+1 grade) are listed only once every unlocked vessel holds a gem. Revelation Mastery gems are valued by re-optimizing the wheel with the gem owned (greater, grade I): RM value = re-optimized objective with vs without the mod (beam width 16), plus the gem's basics; avatar RM is skipped outside boss mode; a full wheel keeps the static value. | User: players without gems or with small gems need small steps; an RM gem changes the best wheel, not only the stage. |
 
 ---
 
@@ -380,6 +381,13 @@ User: is +1 magic level worth more than the second Death Echo augment? No: +1 ML
 ### 2026-11-18 — Cooldowns from TibiaWiki (D25)
 
 All 70 non-rune damage/healing spells checked against TibiaWiki; 10 differed (mostly 2026 spells). With Death Echo at 6 s its first augment (−2 s) is worth ~7.6 % damage (was 0) and stage II ~4 %. 850 points, priority 0: Beam Mastery 2 + LoD 1 + both Death Echo augments; DE 14.3 casts/min shown. The askarak/chakoya spot test no longer expects Master of Flames: with Great Death Beam at 6 s the Decay death-beam rotation wins both spots (Flames still wins at T0 without the wheel). Open: the 7 July 2026 patch also lowered base damage (Death Echo 85 → 75, Great Death Beam 170 → 155); check whether the TibiaTools formulas include it.
+
+### 2026-11-18 — Damage & healing analysis; gem steps (D26)
+
+- +1 flat damage & healing equals 5/6/7/8/9 levels (breaks 500/1100/1800/2600): ~0.2 % rotation damage at level 300, ~0.09 % at 2500. A used spell's augment is worth 5–15× more per wheel point; flat D&H comes from domain points (revelation stages) and vessel slices, not from a separate choice. The engine values it at its marginal value and does not chase it.
+- Front Sweep's augment falls at level 2500 (6.8 % → 1.5 %) because Groundshaker out-damages unaugmented Front Sweep in the greedy rotation; the augment's value is the gain over Groundshaker. Not a bug.
+- Vessel resonance: +1 per filled Gem Vessel slice confirmed by the user (TibiaWiki's gem-size rule predates the update).
+- D26 implemented (`withRmReoptimized`, `NEW_GEM_GRADE`); warm performance budget raised to 75 ms (RM probes ~+60 %).
 
 ## In progress / Next
 

@@ -136,10 +136,11 @@ describe('D22: area augments and near-equal gem substitutes', () => {
 
   it('EK 1200 pts max DPS: greater gem lists near-equal substitutes', () => {
     const r = optimize({ vocation: 'knight', points: 1200, monster: null, priority: 0, context: { mode: 'hunt' } });
-    const greater = r.gemRecommendations.find((g) => g.quality === 'greater')!;
+    const greater = r.gemRecommendations.find((g) => g.quality === 'greater' && !g.mods.some((m) => /Revelation Mastery/.test(m.name)))!;
     const sup = greater.mods.find((x) => x.kind === 'supreme')!;
     for (const s of greater.similar ?? []) expect(s.relative).toBeGreaterThanOrEqual(90);
-    expect(sup.name === 'Augmented Fierce Berserk' || greater.similar?.some((s) => s.name === 'Augmented Fierce Berserk')).toBe(true);
+    // Grade I (new gem): Executioner's Throw's cooldown mod edges out Fierce Berserk.
+    expect(['Augmented Fierce Berserk', "Augmented Executioner's Throw"]).toContain(sup.name);
   });
 });
 

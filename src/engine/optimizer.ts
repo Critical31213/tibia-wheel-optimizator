@@ -11,6 +11,9 @@ import type {
   EngineMessage,
   Element,
   FightContext,
+  GemModRef,
+  GemRecommendation,
+  ModGrade,
   OptimizerInput,
   OptimizerResult,
   OwnedGem,
@@ -31,6 +34,7 @@ import {
   activeSlots,
   type GemEnv,
   gemParts,
+  NEW_GEM_GRADE,
   placedRmPoints,
   placeGems,
   recommendations,
@@ -99,6 +103,8 @@ export interface SearchOpts {
 }
 export const FULL_SEARCH: SearchOpts = { width: BEAM_WIDTH, complete: COMPLETE_TOP };
 export const LIGHT_SEARCH: SearchOpts = { width: 12, complete: 2 };
+/** RM gem re-optimization probes. */
+const PROBE_SEARCH: SearchOpts = { width: 16, complete: 2 };
 const SCREEN_SEARCH: SearchOpts = { width: 8, complete: 1 };
 /** Fraction of the next revelation stage credited proportionally to progress (ranking only). */
 const LOOKAHEAD_WEIGHT = 0.6;
@@ -1070,7 +1076,8 @@ function assemble(p: Prepared, best: State): BuildResult {
     rationaleMsgs: why.map((x) => x.msg),
     vessels,
     gemRecommendations: recommendations(env),
-    upgradeRecommendations: upgrades(env, vessels),
+    // Fragment Workshop upgrades only once every unlocked vessel holds a gem.
+    upgradeRecommendations: vessels.every((vs) => !vs.unlocked || vs.gem) ? upgrades(env, vessels) : [],
     spells: spellUsages(v, stages, wheel),
     plannerCode: plannerCodeFor(input.vocation, allocation, vessels),
     rotation: rotationUsage(p, stages, best.alloc),
@@ -1277,6 +1284,71 @@ export function pickStances(input: OptimizerInput, preset: RotationPreset | null
 }
 
 export function runOptimizer(input: OptimizerInput): OptimizerResult {
+  const { p, plans, main } = bestBuild(input);
+  const n = Math.max(0, Math.min(5, Math.floor(input.alternatives ?? DEFAULT_ALTERNATIVES)));
+  const count = Number.isFinite(n) ? n : DEFAULT_ALTERNATIVES;
+  const result = alternatives(p, plans, main, count);
+  result.gemRecommendations = withRmReoptimized(input, p, main, result.gemRecommendations);
+  return result;
+}
+
+/**
+ * Revelation Mastery gems are valued by re-optimizing the wheel with the gem owned (grade I, in a greater
+ * vessel): the gain covers a new stage as well as points freed for other slices. Light searches keep it cheap;
+ * their bias cancels in the with/without difference.
+ */
+function withRmReoptimized(input: OptimizerInput, p: Prepared, main: State, recs: GemRecommendation[]): GemRecommendation[] {
+  // A full wheel has no points to move: the static stage valuation is exact.
+  if (p.budget >= p.wheel.definition.totalCapacity) return recs;
+  const greater = recs.find((r) => r.quality === 'greater');
+  const basic = (k: number) => {
+    const m = greater?.mods.filter((x) => x.kind === 'basic')[k];
+    return m ? { modId: m.modId, grade: NEW_GEM_GRADE as ModGrade } : null;
+  };
+  const rest = recs.filter((r) => !r.mods.some((m) => m.kind === 'supreme' && p.wheel.supremeMods.find((s) => s.id === m.modId)?.category === 'revelationMastery'));
+  const out = [...rest];
+  const probe = (supreme: GemModRef | null) => {
+    const gem: OwnedGem = { id: 'rm-probe', quality: 'greater', basic1: basic(0), basic2: basic(1), supreme };
+    const gems = [...p.gems, gem];
+    // Same rotation plan and valuation; only the owned gems (vessel values, RM offsets) change.
+    const q: Prepared = { ...prepare({ ...input, gems }, input.priority, p), gemRm: ownedRmOffsets(p.wheel, gems) };
+    return { p: q, main: searchPlan(q, PROBE_SEARCH) };
+  };
+  const basicsGain = recs.find((r) => r.quality === 'regular')?.gain ?? 0;
+  const plain = probe(null);
+  const plainObj = objective(plain.p, plain.main);
+  const before = gridStages(p, main);
+  for (const m of p.wheel.supremeMods) {
+    if (m.category !== 'revelationMastery') continue;
+    const d = revelationIndex(p.wheel.revelations, m.revelation);
+    // Avatars are not recommended for hunting.
+    if (d < 0 || (p.wheel.revelations[d].data.isAvatar && p.v.context.mode !== 'boss')) continue;
+    const hypo = probe({ modId: m.id, grade: NEW_GEM_GRADE as ModGrade });
+    const obj = objective(hypo.p, hypo.main);
+    // RM value = the same greater gem with vs without the mod (both re-optimized); basics as valued statically.
+    const rmGain = obj - plainObj;
+    if (rmGain <= 0.05) continue;
+    const gain = basicsGain + rmGain;
+    const stage = gridStages(hypo.p, hypo.main)[d];
+    const revelation = m.revelation ?? '';
+    const msg = stage > before[d] ? text('gem.rmReopt', { revelation, stage }) : text('gem.rmReoptFree', { revelation });
+    out.push({
+      quality: 'greater',
+      mods: [
+        ...(greater?.mods.filter((x) => x.kind === 'basic') ?? []),
+        { kind: 'supreme', modId: m.id, name: m.name, grade: NEW_GEM_GRADE as ModGrade },
+      ],
+      gain: round1(gain),
+      reason: msg.text,
+      reasonMsg: msg.msg,
+      similar: [],
+    });
+  }
+  return out.sort((a, b) => b.gain - a.gain);
+}
+
+/** Best build (plan + allocation) for an input, without alternatives. */
+function bestBuild(input: OptimizerInput): { p: Prepared; plans: Prepared[]; main: State } {
   const plans = planSpecs(input).map((spec) => prepare(input, input.priority, undefined, spec));
   // D20: the rotation is chosen jointly with the build: a light search per plan screens them, the best (and a
   // runner-up within 2 %) get a full search; the best valid objective wins.
@@ -1303,8 +1375,5 @@ export function runOptimizer(input: OptimizerInput): OptimizerResult {
     finalists = screened.filter((x, i) => i === 0 || (i === 1 && x.obj >= screened[0].obj - 0.02 * Math.abs(screened[0].obj))).map((x) => x.q);
   }
   for (const q of finalists) consider(q, searchPlan(q));
-  const main = refine(p, best ?? runSearch(p));
-  const n = Math.max(0, Math.min(5, Math.floor(input.alternatives ?? DEFAULT_ALTERNATIVES)));
-  const count = Number.isFinite(n) ? n : DEFAULT_ALTERNATIVES;
-  return alternatives(p, plans, main, count);
+  return { p, plans, main: refine(p, best ?? runSearch(p)) };
 }
