@@ -1,5 +1,6 @@
 import type { OptimizerResult, PerkCategory, WheelDefinition } from '../types';
-import { CATEGORY_LABELS, cx, DOMAIN_COLORS, DOMAIN_LABELS, formatNumber } from '../lib/labels';
+import { useT } from '../i18n';
+import { cx, DOMAIN_COLORS, formatNumber } from '../lib/labels';
 
 const CATEGORY_TEXT: Record<PerkCategory, string> = {
   offense: 'text-offense',
@@ -40,21 +41,22 @@ interface ResultsPanelProps {
 
 /** Textual breakdown of the optimized build. */
 export function ResultsPanel({ wheel, result }: ResultsPanelProps) {
+  const t = useT();
   const byId = new Map(wheel.slices.map((s) => [s.id, s]));
 
   return (
     <div>
       <div className="grid gap-3 sm:grid-cols-2">
-        <ScoreBar label="Offense" value={result.offenseScore} color="bg-offense" />
-        <ScoreBar label="Defense" value={result.defenseScore} color="bg-defense" />
+        <ScoreBar label={t('results.offense')} value={result.offenseScore} color="bg-offense" />
+        <ScoreBar label={t('results.defense')} value={result.defenseScore} color="bg-defense" />
       </div>
       <p className="mt-2 text-xs text-parchment-400">
-        {formatNumber(result.pointsUsed)} of {formatNumber(result.pointsTotal)} points used.
+        {t('results.pointsUsed', { used: formatNumber(result.pointsUsed), total: formatNumber(result.pointsTotal) })}
       </p>
 
       {result.revelations.length > 0 && (
         <>
-          <SubHeading>Revelation perks</SubHeading>
+          <SubHeading>{t('results.revelations')}</SubHeading>
           <ul className="grid gap-2 sm:grid-cols-2">
             {result.revelations.map(({ perk, stage, domainPoints }) => {
               const next = perk.thresholds[stage];
@@ -69,7 +71,7 @@ export function ResultsPanel({ wheel, result }: ResultsPanelProps) {
                     <span className="text-sm font-medium" style={{ color: col.text }}>
                       {perk.name}
                     </span>
-                    <span className="flex gap-1" role="img" aria-label={`Stage ${stage} of ${perk.thresholds.length}`}>
+                    <span className="flex gap-1" role="img" aria-label={t('results.stage', { stage, total: perk.thresholds.length })}>
                       {perk.thresholds.map((t, i) => (
                         <span
                           key={t}
@@ -80,8 +82,8 @@ export function ResultsPanel({ wheel, result }: ResultsPanelProps) {
                     </span>
                   </div>
                   <p className="mt-0.5 text-xs text-parchment-400">
-                    {DOMAIN_LABELS[perk.domain]} · {formatNumber(domainPoints)} pts
-                    {next !== undefined && ` · next stage at ${formatNumber(next)}`}
+                    {t('results.domainPoints', { domain: t(`domain.${perk.domain}`), points: formatNumber(domainPoints) })}
+                    {next !== undefined && t('results.nextStage', { points: formatNumber(next) })}
                   </p>
                 </li>
               );
@@ -92,7 +94,7 @@ export function ResultsPanel({ wheel, result }: ResultsPanelProps) {
 
       {result.convictions.length > 0 && (
         <>
-          <SubHeading>Conviction perks</SubHeading>
+          <SubHeading>{t('results.convictions')}</SubHeading>
           <ul className="flex flex-wrap gap-1.5">
             {result.convictions.map((p, i) => (
               <li
@@ -109,13 +111,13 @@ export function ResultsPanel({ wheel, result }: ResultsPanelProps) {
 
       {result.stats.length > 0 && (
         <>
-          <SubHeading>Stats</SubHeading>
+          <SubHeading>{t('results.stats')}</SubHeading>
           <dl className="divide-y divide-ink-700 rounded-lg border border-ink-700">
             {result.stats.map((s) => (
               <div key={s.label} className="flex items-center justify-between gap-3 px-3 py-1.5 text-sm">
                 <dt className="text-parchment-200">
                   <span className={cx('mr-2 text-[10px] uppercase', CATEGORY_TEXT[s.category])}>
-                    {CATEGORY_LABELS[s.category]}
+                    {t(`category.${s.category}`)}
                   </span>
                   {s.label}
                 </dt>
@@ -128,7 +130,7 @@ export function ResultsPanel({ wheel, result }: ResultsPanelProps) {
 
       {result.rationale.length > 0 && (
         <>
-          <SubHeading>Why this build</SubHeading>
+          <SubHeading>{t('results.why')}</SubHeading>
           <ul className="list-disc space-y-1 pl-5 text-sm text-parchment-200 marker:text-gold-500">
             {result.rationale.map((r) => (
               <li key={r}>{r}</li>
@@ -139,7 +141,7 @@ export function ResultsPanel({ wheel, result }: ResultsPanelProps) {
 
       {result.path.length > 0 && (
         <>
-          <SubHeading>Fill order</SubHeading>
+          <SubHeading>{t('results.fillOrder')}</SubHeading>
           <ol className="space-y-1 text-sm">
             {result.path.map((id, i) => {
               const s = byId.get(id);
@@ -156,7 +158,7 @@ export function ResultsPanel({ wheel, result }: ResultsPanelProps) {
                   />
                   <span className="min-w-0 flex-1 truncate text-parchment-200">
                     {s ? s.conviction.name : id}
-                    {s && <span className="text-parchment-400"> · {DOMAIN_LABELS[s.domain]}, ring {s.ring}</span>}
+                    {s && <span className="text-parchment-400"> · {t('results.ringOf', { domain: t(`domain.${s.domain}`), ring: s.ring })}</span>}
                   </span>
                   <span className="shrink-0 tabular-nums text-parchment-300">
                     {pts}

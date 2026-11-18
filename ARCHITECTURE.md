@@ -47,7 +47,8 @@ promotion points for a Tibia character, given:
 ├── assets/icon.svg         # project icon (README)
 ├── docs/modules/           # data.md, engine.md, ui.md, integration.md
 ├── scripts/
-│   └── scrape-monsters.ts  # offline tibiopedia.pl scraper → src/data/monsters.json
+│   ├── scrape-monsters.ts  # offline tibiopedia.pl scraper → src/data/monsters.json
+│   └── extract-wheel.mjs   # planner WASM → src/data/wheel/wheel-data.json
 ├── public/favicon.svg
 ├── index.html
 ├── vite.config.ts          # React + Tailwind plugins, chunk size limit
@@ -96,6 +97,12 @@ summary, rationale) → UI renders the wheel and the summary.
   `getMonsterById(id)`, plus helpers `getModifier`, `getWeakestElements`,
   `getStrongestElements`, `getBestAttackElement`, `normalizeText`.
 - Details, page structure, mapping table and limitations: [`docs/modules/data.md`](docs/modules/data.md).
+- **Wheel data (iteration 2):** `scripts/extract-wheel.mjs` (`npm run extract:wheel`) runs the official
+  test-server planner WASM in Node (inputs downloaded manually into gitignored `scripts/.cache/wod/`) and writes
+  `src/data/wheel/wheel-data.json` (36 slices × 5 vocations, unlock graph, revelations 250/500/1000, vessels,
+  basic/supreme mods, momentum, Revelation Mastery, decoded tibiapal reference builds). `src/data/wheel/spells.ts`
+  holds spell metadata (element, area, tibiapal avg hits, isNew). API: `getWheelData(v)`, `SPELLS`, `getSpell(name)`.
+  Details: [`docs/modules/wheel-data.md`](docs/modules/wheel-data.md).
 
 ## 6. Wheel model and optimization algorithm (S2 Engine)
 
@@ -125,6 +132,10 @@ badges, tooltips) and a `ResultsPanel` (scores, revelations, convictions, stats,
 fill order). Components use only the `src/lib/api.ts` facade (real engine; monster dataset
 lazy-loaded). Points are clamped to the 4000-point wheel capacity; the level helper uses
 `pointsForLevel(level, scrollPoints)`. Dark Tibian theme via Tailwind v4 `@theme` tokens.
+Iteration 2: fight context (Hunt/Boss + hunt style, in URL), a "My gems" editor (owned gems per
+vocation in localStorage, passed as `OptimizerInput.gems`), a Vessels & gems results panel
+(vessels, recommended gems, upgrades, spell usage) and a PL/EN switch (`src/i18n/`, typed
+dictionaries, `useT()`; game terms stay English).
 Details: [docs/modules/ui.md](docs/modules/ui.md).
 
 ## 8. Quality gates (S4 Integration)

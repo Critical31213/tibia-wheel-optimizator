@@ -159,7 +159,7 @@ describe('integration: input parsing', () => {
   });
 
   it('round-trips a full state through the URL and back into a valid build', () => {
-    const state = { vocation: 'sorcerer' as const, points: 750, monsterId: 'demon', priority: 25 };
+    const state = { ...DEFAULT_INPUTS, vocation: 'sorcerer' as const, points: 750, monsterId: 'demon', priority: 25 };
     const back = withKnownMonster({ ...DEFAULT_INPUTS, ...fromQuery(toQuery(state)) }, known);
     expect(back).toEqual(state);
     const r = optimize({ vocation: back.vocation, points: back.points, monster: getMonsterById(back.monsterId!)!, priority: back.priority });

@@ -8,6 +8,9 @@ element), damage types it *deals*, an estimated max damage, image and source
 link. The data is scraped **offline** from [tibiopedia.pl](https://tibiopedia.pl)
 and committed as JSON (see decision D2 in `WORKLOG.md`).
 
+Wheel of Destiny data (official planner facts, spell metadata) is documented separately in
+[`wheel-data.md`](wheel-data.md).
+
 ## Files owned
 
 | File | Role |

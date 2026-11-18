@@ -1,6 +1,6 @@
 /** Serialisation of the user's inputs (URL query string + localStorage). Pure. */
 import { VOCATIONS } from '../types';
-import type { Vocation } from '../types';
+import type { FightContext, FightMode, HuntStyle, Vocation } from '../types';
 import { clamp } from './labels';
 
 export interface InputState {
@@ -8,14 +8,26 @@ export interface InputState {
   points: number;
   monsterId: string | null;
   priority: number;
+  mode: FightMode;
+  huntStyle: HuntStyle;
 }
+
+export const FIGHT_MODES: readonly FightMode[] = ['hunt', 'boss'];
+export const HUNT_STYLES: readonly HuntStyle[] = ['solo', 'teamLure', 'teamBox'];
 
 export const DEFAULT_INPUTS: InputState = {
   vocation: 'knight',
   points: 0,
   monsterId: null,
   priority: 50,
+  mode: 'hunt',
+  huntStyle: 'solo',
 };
+
+export const contextOf = (s: Pick<InputState, 'mode' | 'huntStyle'>): FightContext => ({
+  mode: s.mode,
+  huntStyle: s.huntStyle,
+});
 
 /** Upper bound for point values: total wheel capacity (5 rings, 36 slices, 4000 points) for every vocation. */
 export const MAX_POINTS = 4000;
@@ -39,11 +51,13 @@ export function sanitize(raw: Record<string, unknown>): Partial<InputState> {
   if (pr !== undefined) out.priority = clamp(pr, 0, 100);
   if (typeof raw.monsterId === 'string' && raw.monsterId.trim()) out.monsterId = raw.monsterId.trim();
   else if (raw.monsterId === null) out.monsterId = null;
+  if (FIGHT_MODES.includes(raw.mode as FightMode)) out.mode = raw.mode as FightMode;
+  if (HUNT_STYLES.includes(raw.huntStyle as HuntStyle)) out.huntStyle = raw.huntStyle as HuntStyle;
   return out;
 }
 
 /** Query param names: short so shared links stay tidy. */
-const KEYS = { vocation: 'v', points: 'p', monsterId: 'm', priority: 'prio' } as const;
+const KEYS = { vocation: 'v', points: 'p', monsterId: 'm', priority: 'prio', mode: 'f', huntStyle: 'h' } as const;
 
 export function fromQuery(search: string): Partial<InputState> {
   const q = new URLSearchParams(search);
@@ -52,6 +66,8 @@ export function fromQuery(search: string): Partial<InputState> {
     points: q.get(KEYS.points) ?? undefined,
     priority: q.get(KEYS.priority) ?? undefined,
     monsterId: q.get(KEYS.monsterId) ?? undefined,
+    mode: q.get(KEYS.mode) ?? undefined,
+    huntStyle: q.get(KEYS.huntStyle) ?? undefined,
   });
 }
 
@@ -66,6 +82,8 @@ export function toQuery(state: InputState, search = ''): string {
   q.set(KEYS.vocation, state.vocation);
   q.set(KEYS.points, String(state.points));
   q.set(KEYS.priority, String(state.priority));
+  q.set(KEYS.mode, state.mode);
+  q.set(KEYS.huntStyle, state.huntStyle);
   if (state.monsterId) q.set(KEYS.monsterId, state.monsterId);
   else q.delete(KEYS.monsterId);
   return `?${q.toString()}`;

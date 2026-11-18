@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MAX_SCROLL_POINTS, pointsForLevel } from '../lib/api';
+import { useT } from '../i18n';
 import { clamp, formatNumber } from '../lib/labels';
 import { Panel } from './Panel';
 
@@ -12,6 +13,7 @@ interface PointsInputProps {
 
 /** Promotion points, with an optional "enter level instead" helper. */
 export function PointsInput({ value, max, onChange }: PointsInputProps) {
+  const t = useT();
   const [text, setText] = useState(String(value));
   const [level, setLevel] = useState('');
   const [scrolls, setScrolls] = useState(0);
@@ -46,10 +48,10 @@ export function PointsInput({ value, max, onChange }: PointsInputProps) {
   const levelPoints = levelToPoints(level, scrolls);
 
   return (
-    <Panel title="Promotion points" step={2} headingId="points-heading">
+    <Panel title={t('points.title')} step={2} headingId="points-heading">
       <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
         <label className="flex flex-col gap-1 text-xs text-parchment-300">
-          Points
+          {t('points.points')}
           <input
             type="number"
             inputMode="numeric"
@@ -63,15 +65,15 @@ export function PointsInput({ value, max, onChange }: PointsInputProps) {
             aria-describedby="points-help"
           />
         </label>
-        <span className="pb-2.5 text-xs text-parchment-400">or</span>
+        <span className="pb-2.5 text-xs text-parchment-400">{t('points.or')}</span>
         <label className="flex flex-col gap-1 text-xs text-parchment-300">
-          Character level
+          {t('points.level')}
           <input
             type="number"
             inputMode="numeric"
             min={1}
             step={1}
-            placeholder="e.g. 400"
+            placeholder={t('points.levelPlaceholder')}
             value={level}
             onChange={(e) => onLevel(e.target.value)}
             className="field text-lg tabular-nums"
@@ -79,7 +81,7 @@ export function PointsInput({ value, max, onChange }: PointsInputProps) {
         </label>
       </div>
       <label className="mt-2 flex items-center justify-between gap-2 text-xs text-parchment-300">
-        Promotion scroll points (0–{MAX_SCROLL_POINTS}, added to level)
+        {t('points.scrolls', { max: MAX_SCROLL_POINTS })}
         <input
           type="number"
           inputMode="numeric"
@@ -94,11 +96,11 @@ export function PointsInput({ value, max, onChange }: PointsInputProps) {
       <p id="points-help" className="mt-2 text-xs text-parchment-400">
         {levelPoints !== null && (
           <>
-            Level {formatNumber(Math.round(Number(level)))} ≈ {formatNumber(levelPoints)} points
-            {levelPoints > max && ' (capped)'}.{' '}
+            {t('points.levelEquals', { level: formatNumber(Math.round(Number(level))), points: formatNumber(levelPoints) })}
+            {levelPoints > max && t('points.capped')}.{' '}
           </>
         )}
-        Wheel capacity: <span className="text-parchment-200 tabular-nums">{formatNumber(max)}</span> points.
+        {t('points.capacity', { points: formatNumber(max) })}
       </p>
     </Panel>
   );

@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "scrape:monsters": "tsx scripts/scrape-monsters.ts"
+    "scrape:monsters": "tsx scripts/scrape-monsters.ts",
+    "extract:wheel": "node scripts/extract-wheel.mjs"
   },
   "dependencies": {
     "react": "^19.3.1",

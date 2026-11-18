@@ -91,6 +91,32 @@ Roles:
 - Findings: 36 tiles = 6×6 grid ids 0–35 (`QTL0..QBR8`); directed unlock graph identical for all vocations; 8 vessels with fixed levels, unlocked in order by filling Gem Vessel slices; mod grades I–IV.
 - Extended contract `src/types/index.ts`: `FightContext`, gem/mod/vessel types, new `OptimizerResult` fields (engine returns empty stubs for now).
 
+### 2026-11-18 — S1 Data (iteration 2)
+- `scripts/extract-wheel.mjs` (`npm run extract:wheel`): runs the planner WASM in Node, asserts every rule
+  empirically, writes `src/data/wheel/wheel-data.json` (~0.5 MB, facts only). Loader `src/data/wheel/index.ts`
+  (`getWheelData`, `SPELLS`, `getSpell`, `getWheelSpellNames`), types `src/data/wheel/types.ts`, spells `spells.ts` (57).
+- Findings: unlock graph identical for all vocations (fill must be complete); revelation stages at 250/500/1000
+  domain points, flat dmg/heal bonus Σ[0,4,9,20][stage]; RM slice = +125 to its own domain, RM gem = +150/165/180/225
+  to the named revelation (thresholds only); augments: 2 copies, stage I then II order-independent; vessels
+  lesser,regular,greater,lesser,greater,regular,greater,greater, vessel n unlocks at n+1 filled Gem Vessel slices
+  (any), +1 dmg/heal per Gem Vessel slice; momentum 0/0.33/0.66/1 % per grade on supreme cooldown mods;
+  mitigation dedication 0.075 %/pt. tibiapal builds are legacy codes (decoded, slice points only).
+- New spells (2026 Vocation Adjustments): Shield Slam, Divine/Ethereal Barrage, Death Echo, Forked Thorns/Glacier,
+  Thousand Fist Blows. Approximate: most `maxTargets`, monk elements (assumed physical).
+- Contract note (for Coordinator/S2): `ModDefinition` lacks `effects`/numeric values and supreme `spell`/`revelation`/
+  `category` detail — engine can read them from `getWheelData()`; consider mapping in `getWheel()`.
+- Tests: `src/data/wheel/wheel.test.ts`; `vitest run src/data` 58/58, `tsc -b` clean. Docs: `docs/modules/wheel-data.md`.
+
+### 2026-11-18 — S3 UI (iteration 2)
+- Fight context panel (Hunt/Boss, Solo/Team-lure/Team-box, Avatar hint) → `optimize({ context })`; persisted in
+  localStorage + URL (`f`, `h`). `InputState` gained `mode`/`huntStyle` (one-line fix in `src/integration.test.ts`).
+- "My gems" collapsible editor: quality → slots, mods filtered from `wheel.mods`, inline grade I–IV, edit/remove;
+  stored per vocation (`wheel-optimizer:gems:v1:<voc>`), not in URL → `optimize({ gems })`.
+- Results "Vessels & gems": vessels, recommended gems, best upgrades, collapsible spells — empty states until S2.
+- PL/EN i18n in `src/i18n/` (typed dicts, `useT()`, `<html lang>`, default from `navigator.language`).
+- Dev-only mod fixture `src/lib/devFixtures.ts` (stripped from prod) — remove once `wheel.mods` is filled.
+- Gates: `tsc -b` 0 errors, 126 tests (incl. i18n key parity, gem slot rules, gem/context persistence), lint 0, build OK.
+
 ## In progress / Next
 
 - [x] S1 Data — scraper + monster dataset + search API.

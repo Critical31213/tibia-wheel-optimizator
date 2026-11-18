@@ -2,6 +2,7 @@ import { useId, useMemo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { Monster } from '../types';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
+import { useT } from '../i18n';
 import { searchMonsters } from '../lib/api';
 import { cx, formatNumber } from '../lib/labels';
 import { MonsterCard } from './MonsterCard';
@@ -16,6 +17,7 @@ interface MonsterSearchProps {
 
 /** ARIA 1.2 combobox (list autocomplete) over the monster dataset. */
 export function MonsterSearch({ value, ready, onChange }: MonsterSearchProps) {
+  const t = useT();
   const id = useId();
   const listId = `${id}-list`;
   const [query, setQuery] = useState('');
@@ -55,20 +57,20 @@ export function MonsterSearch({ value, ready, onChange }: MonsterSearchProps) {
 
   return (
     <Panel
-      title="Target monster"
+      title={t('monster.title')}
       step={3}
       headingId="monster-heading"
       aside={
         value && (
           <button type="button" onClick={() => select(null)} className="text-xs text-gold-400 hover:underline">
-            Clear
+            {t('monster.clear')}
           </button>
         )
       }
     >
       <div className="relative">
         <label htmlFor={`${id}-input`} className="sr-only">
-          Search monsters
+          {t('monster.searchLabel')}
         </label>
         <input
           id={`${id}-input`}
@@ -76,7 +78,7 @@ export function MonsterSearch({ value, ready, onChange }: MonsterSearchProps) {
           role="combobox"
           autoComplete="off"
           spellCheck={false}
-          placeholder="Search a monster, e.g. Dragon Lord"
+          placeholder={t('monster.placeholder')}
           aria-autocomplete="list"
           aria-expanded={expanded}
           aria-controls={listId}
@@ -95,13 +97,13 @@ export function MonsterSearch({ value, ready, onChange }: MonsterSearchProps) {
         <ul
           id={listId}
           role="listbox"
-          aria-label="Monsters"
+          aria-label={t('monster.list')}
           hidden={!expanded}
           className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-lg border border-ink-600 bg-ink-850 py-1 shadow-xl shadow-black/60"
         >
           {results.length === 0 ? (
             <li className="px-3 py-2 text-sm text-parchment-400" role="presentation">
-              {ready ? 'No monsters found.' : 'Loading monster data…'}
+              {ready ? t('monster.notFound') : t('monster.loading')}
             </li>
           ) : (
             results.map((m, i) => (
@@ -120,7 +122,7 @@ export function MonsterSearch({ value, ready, onChange }: MonsterSearchProps) {
               >
                 <span className="truncate">{m.name}</span>
                 {m.hitpoints !== undefined && (
-                  <span className="shrink-0 text-xs tabular-nums text-parchment-400">{formatNumber(m.hitpoints)} HP</span>
+                  <span className="shrink-0 text-xs tabular-nums text-parchment-400">{t('monster.hp', { hp: formatNumber(m.hitpoints) })}</span>
                 )}
               </li>
             ))
@@ -132,7 +134,7 @@ export function MonsterSearch({ value, ready, onChange }: MonsterSearchProps) {
           <MonsterCard monster={value} />
         ) : (
           <p className="rounded-xl border border-dashed border-ink-600 px-3 py-2.5 text-sm text-parchment-300">
-            No monster (generic build)
+            {t('monster.generic')}
           </p>
         )}
       </div>

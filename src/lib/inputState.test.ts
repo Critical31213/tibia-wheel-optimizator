@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_INPUTS, fromQuery, sanitize, toQuery } from './inputState';
+import { contextOf, DEFAULT_INPUTS, fromQuery, sanitize, toQuery } from './inputState';
 
 describe('inputState', () => {
   it('round-trips through the query string', () => {
-    const state = { vocation: 'druid' as const, points: 420, monsterId: 'demon', priority: 75 };
+    const state = { ...DEFAULT_INPUTS, vocation: 'druid' as const, points: 420, monsterId: 'demon', priority: 75 };
     expect(fromQuery(toQuery(state))).toEqual(state);
   });
 
@@ -17,5 +17,14 @@ describe('inputState', () => {
   it('ignores invalid values and clamps ranges', () => {
     expect(fromQuery('?v=wizard&p=abc&prio=500')).toEqual({ priority: 100 });
     expect(sanitize({ points: -5, monsterId: '  ' })).toEqual({ points: 0 });
+  });
+
+  it('persists the fight context', () => {
+    const state = { ...DEFAULT_INPUTS, mode: 'boss' as const, huntStyle: 'teamBox' as const };
+    expect(new URLSearchParams(toQuery(state)).get('f')).toBe('boss');
+    expect(fromQuery(toQuery(state))).toMatchObject({ mode: 'boss', huntStyle: 'teamBox' });
+    expect(fromQuery('?f=raid&h=duo')).toEqual({});
+    expect(sanitize({ mode: 'hunt', huntStyle: 'teamLure' })).toEqual({ mode: 'hunt', huntStyle: 'teamLure' });
+    expect(contextOf(DEFAULT_INPUTS)).toEqual({ mode: 'hunt', huntStyle: 'solo' });
   });
 });

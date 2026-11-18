@@ -1,5 +1,7 @@
 /** Display labels and colours shared by UI components (no React here). */
-import type { Domain, Element, PerkCategory, Vocation } from '../types';
+import type { Domain, Element, GemQuality, ModGrade, PerkCategory, Vocation } from '../types';
+import { en } from '../i18n/en';
+import type { MessageKey } from '../i18n/en';
 
 export const VOCATION_LABELS: Record<Vocation, string> = {
   knight: 'Knight',
@@ -80,14 +82,41 @@ export function modifierKind(percent: number): ModifierKind {
   return 'neutral';
 }
 
-/** Human label for the priority slider value (0 = DPS, 100 = survivability). */
-export function priorityLabel(value: number): string {
-  if (value <= 10) return 'Max DPS';
-  if (value < 40) return 'DPS-leaning';
-  if (value <= 60) return 'Balanced';
-  if (value < 90) return 'Defense-leaning';
-  return 'Max Survivability';
+/** Dictionary key for the priority slider value (0 = DPS, 100 = survivability). */
+export function priorityKey(value: number): MessageKey {
+  if (value <= 10) return 'priority.maxDps';
+  if (value < 40) return 'priority.dps';
+  if (value <= 60) return 'priority.balanced';
+  if (value < 90) return 'priority.defense';
+  return 'priority.maxSurvival';
 }
+
+/** English label for the priority slider value. */
+export function priorityLabel(value: number): string {
+  return en[priorityKey(value)];
+}
+
+/** Vocation-specific gem item names (game terms, English). */
+const GEM_BASE_NAMES: Record<Vocation, string> = {
+  knight: 'Guardian Gem',
+  paladin: 'Marksman Gem',
+  sorcerer: 'Mage Gem',
+  druid: 'Sage Gem',
+  monk: 'Spiritualist Gem',
+};
+
+export function gemName(vocation: Vocation, quality: GemQuality): string {
+  const base = GEM_BASE_NAMES[vocation];
+  return quality === 'lesser' ? `Lesser ${base}` : quality === 'greater' ? `Greater ${base}` : base;
+}
+
+export const QUALITY_COLORS: Record<GemQuality, string> = {
+  lesser: '#8fc7a0',
+  regular: '#6fb7e8',
+  greater: '#c58ef0',
+};
+
+export const ROMAN: Record<ModGrade, string> = { 1: 'I', 2: 'II', 3: 'III', 4: 'IV' };
 
 export function formatNumber(n: number): string {
   return n.toLocaleString('en-US');

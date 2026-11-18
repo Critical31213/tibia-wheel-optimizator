@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import type { OptimizerResult, Slice, WheelDefinition } from '../types';
 import { annularSectorPath, fillRadius, ringBounds, sectorCentroid, sliceAngles } from '../lib/geometry';
-import { CATEGORY_LABELS, DOMAIN_COLORS, DOMAIN_LABELS, DOMAINS, formatNumber } from '../lib/labels';
+import { useT } from '../i18n';
+import { DOMAIN_COLORS, DOMAINS, formatNumber } from '../lib/labels';
 
 const SIZE = 400;
 const C = SIZE / 2;
@@ -24,6 +25,7 @@ interface SliceShape {
 
 /** SVG Wheel of Destiny: rings of slices, filled proportionally to points. */
 export function WheelChart({ wheel, result }: WheelChartProps) {
+  const t = useT();
   const [hover, setHover] = useState<string | null>(null);
 
   const shapes = useMemo<SliceShape[]>(() => {
@@ -50,7 +52,7 @@ export function WheelChart({ wheel, result }: WheelChartProps) {
   return (
     <div>
       <div className="relative mx-auto aspect-square w-full max-w-[440px]">
-        <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="size-full" role="group" aria-label="Wheel of Destiny allocation">
+        <svg viewBox={`0 0 ${SIZE} ${SIZE}`} className="size-full" role="group" aria-label={t('wheel.aria')}>
           <circle cx={C} cy={C} r={OUTER + 4} fill="#0d0a07" stroke="#6b4f19" strokeWidth={2} />
           {shapes.map(({ slice, points, bg, fill }) => {
             const col = DOMAIN_COLORS[slice.domain];
@@ -60,7 +62,7 @@ export function WheelChart({ wheel, result }: WheelChartProps) {
                 key={slice.id}
                 tabIndex={0}
                 role="img"
-                aria-label={`${DOMAIN_LABELS[slice.domain]} ring ${slice.ring}: ${slice.conviction.name}, ${points} of ${slice.capacity} points`}
+                aria-label={t('wheel.sliceAria', { domain: t(`domain.${slice.domain}`), ring: slice.ring, name: slice.conviction.name, points, capacity: slice.capacity })}
                 onMouseEnter={() => setHover(slice.id)}
                 onMouseLeave={() => setHover((h) => (h === slice.id ? null : h))}
                 onFocus={() => setHover(slice.id)}
@@ -86,7 +88,7 @@ export function WheelChart({ wheel, result }: WheelChartProps) {
             {result ? formatNumber(result.pointsUsed) : 0}
           </text>
           <text x={C} y={C + 12} textAnchor="middle" className="fill-parchment-400" fontSize={8}>
-            points
+            {t('wheel.points')}
           </text>
           {shapes
             .filter((s) => s.order > 0)
@@ -114,31 +116,31 @@ export function WheelChart({ wheel, result }: WheelChartProps) {
             <p className="mt-0.5 text-parchment-300">{active.slice.conviction.description}</p>
             <p className="mt-1.5 flex justify-between gap-2 text-parchment-200">
               <span style={{ color: DOMAIN_COLORS[active.slice.domain].text }}>
-                {DOMAIN_LABELS[active.slice.domain]} · ring {active.slice.ring}
+                {t(`domain.${active.slice.domain}`)} · {t('wheel.ring', { ring: active.slice.ring })}
               </span>
               <span className="tabular-nums">
                 {active.points}/{active.slice.capacity}
               </span>
             </p>
             <p className="mt-0.5 text-parchment-400">
-              {CATEGORY_LABELS[active.slice.conviction.category]} · {active.slice.dedicationLabel}
-              {active.order > 0 && ` · step ${active.order}`}
+              {t(`category.${active.slice.conviction.category}`)} · {active.slice.dedicationLabel}
+              {active.order > 0 && ` · ${t('wheel.step', { n: active.order })}`}
             </p>
           </div>
         )}
       </div>
 
-      <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:grid-cols-4" aria-label="Domain legend">
+      <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:grid-cols-4" aria-label={t('wheel.legend')}>
         {DOMAINS.map((d) => (
           <li key={d} className="flex items-center gap-2">
             <span aria-hidden="true" className="size-3 rounded-sm" style={{ background: DOMAIN_COLORS[d].base }} />
-            <span className="text-parchment-300">{DOMAIN_LABELS[d]}</span>
+            <span className="text-parchment-300">{t(`domain.${d}`)}</span>
             <span className="ml-auto tabular-nums text-parchment-100">{formatNumber(result?.domainPoints[d] ?? 0)}</span>
           </li>
         ))}
       </ul>
       <p className="mt-2 text-xs text-parchment-400">
-        Numbers on the wheel show the fill order. Hover or focus a slice for details.
+        {t('wheel.hint')}
       </p>
     </div>
   );

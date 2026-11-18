@@ -2,7 +2,8 @@ import { useRef } from 'react';
 import type { KeyboardEvent } from 'react';
 import { VOCATIONS } from '../types';
 import type { Vocation } from '../types';
-import { cx, VOCATION_BLURBS, VOCATION_LABELS } from '../lib/labels';
+import { useT } from '../i18n';
+import { cx, VOCATION_LABELS } from '../lib/labels';
 import { Panel } from './Panel';
 import { VocationIcon } from './VocationIcon';
 
@@ -13,6 +14,7 @@ interface VocationPickerProps {
 
 /** Five toggle cards with radiogroup semantics (roving tabindex, arrow keys). */
 export function VocationPicker({ value, onChange }: VocationPickerProps) {
+  const t = useT();
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
@@ -29,7 +31,7 @@ export function VocationPicker({ value, onChange }: VocationPickerProps) {
   };
 
   return (
-    <Panel title="Vocation" step={1} headingId="vocation-heading">
+    <Panel title={t('vocation.title')} step={1} headingId="vocation-heading">
       <div
         role="radiogroup"
         aria-labelledby="vocation-heading"
@@ -48,7 +50,7 @@ export function VocationPicker({ value, onChange }: VocationPickerProps) {
               role="radio"
               aria-checked={checked}
               tabIndex={checked ? 0 : -1}
-              title={VOCATION_BLURBS[v]}
+              title={t(`vocation.blurb.${v}`)}
               onClick={() => onChange(v)}
               className={cx(
                 'flex flex-col items-center gap-1 rounded-xl border px-1 py-2.5 text-xs font-medium transition-colors',
