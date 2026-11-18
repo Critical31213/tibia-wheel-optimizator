@@ -59,6 +59,11 @@ describe('mitigation (D19, calibrated on in-game Cyclopedia values)', () => {
     expect(mitigationPercent('druid', 781)).toBeCloseTo(d.shielding + d.offhand, 10);
   });
 
+  it("Elite Knight 119 shielding: 1.34 %; Ectoplasmic Shield (def 49) adds 1.27 %", () => {
+    near(mitigationBreakdown("knight", 1000, { shielding: 119, offhand: "none" }).shielding, 1.34);
+    near(mitigationBreakdown("knight", 1000, { shielding: 119, offhand: "shield", offhandDefense: 49 }).offhand, 1.27);
+  });
+
   it('defaults: paladin quiver, mages spellbook, knight/monk none; bracket offhand defense', () => {
     expect(DEFAULT_OFFHAND).toEqual({ knight: 'none', paladin: 'quiver', sorcerer: 'spellbook', druid: 'spellbook', monk: 'none' });
     expect(mitigationBreakdown('knight', 800).offhand).toBe(0);

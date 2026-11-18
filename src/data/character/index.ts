@@ -122,7 +122,7 @@ export type Offhand = 'shield' | 'spellbook' | 'quiver' | 'none';
 
 /** % per 100 shielding = Canary vocation multiplier × 0.883 (fitted on RP: 108 × 1.13 % = 1.22 % with a shield). */
 export const MITIGATION_SHIELDING_FACTOR: Record<Vocation, number> = {
-  knight: 1.148,
+  knight: 1.126, // EK Cyclopedia: 119 shielding → 1.34 %
   paladin: 1.13,
   sorcerer: 1.112,
   druid: 1.112,

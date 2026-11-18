@@ -203,7 +203,6 @@ const CONTEXTS: FightContext[] = [
 ];
 const BUDGETS = [100, 500, 1000, 2000, 4000];
 const ctxName = (c: FightContext) => c.mode;
-const QUALITY_RANK: Record<GemQuality, number> = { lesser: 0, regular: 1, greater: 2 };
 
 /** Directed unlock rule from the planner graph: a slice needs a full predecessor (or starts unlocked). */
 function assertDirectedPath(vocation: Vocation, r: OptimizerResult) {
@@ -287,7 +286,7 @@ describe('integration: vocation × fight context × points', () => {
     for (const v of r.vessels) {
       if (!v.unlocked) expect(v).toMatchObject({ gem: null, source: 'empty' });
       if (v.source === 'owned') expect(gems.some((g) => g.id === v.gem!.id)).toBe(true);
-      if (v.source === 'recommended') expect(QUALITY_RANK[v.gem!.quality]).toBeLessThanOrEqual(QUALITY_RANK[v.quality]);
+      expect(v.source).not.toBe('recommended');
     }
     if (r.vessels.some((v) => v.unlocked && v.quality === 'greater')) {
       expect(r.vessels.find((v) => v.gem?.id === 'greater')?.quality, 'greater gem in a greater vessel').toBe('greater');
@@ -578,7 +577,7 @@ describe('integration: character stats', () => {
     expect(charMsg(low).level).toBe(400);
     expect(Number(charMsg(high).hp)).toBeGreaterThan(Number(charMsg(low).hp));
     const gains = (character: CharacterStats) =>
-      optimize({ vocation: 'paladin', points: 600, monster: null, priority: 30, character }).gemRecommendations.map((g) => g.gain);
+      optimize({ vocation: 'paladin', points: 600, monster: null, priority: 30, character }).gemRecommendations.map((g) => [g.gain, ...g.mods.map((m) => m.name)]);
     expect(gains({ level: 650, mainSkill: 60 })).not.toEqual(gains({ level: 650, mainSkill: 130 }));
   });
 

@@ -135,7 +135,7 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 - It is worth 0 unless it reaches the next stage.
 - Owned RM gems count in the search. They are assigned to greater vessels (largest first), and their points are added to the domain as soon as the vessel unlocks.
 
-**Gem Vessel slices** are valued as the Hungarian placement gain of the next vessel plus 1 flat bonus.
+**Gem Vessel slices** (D23) are valued as the slice's own +1 flat bonus plus the Hungarian placement gain of *owned* gems that the newly unlocked vessel lets the placement use. Recommended (hypothetical) gems are never assumed, so without owned gems a vessel slice is worth only its flat bonus.
 
 ## 3. Optimizer (`optimizer.ts`)
 
@@ -159,9 +159,9 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
    - An alternative is accepted only if it differs by at least `max(50, 0.1 · budget)` points (Σ|Δ| / 2) from the main build and from every alternative already accepted.
    - Each alternative picks its own best plan. `rationale.rotationAuto`, `rotationManual` and `rotationRequires` explain the rotation.
    - `relativeScore = 100 · objective(alt) / objective(main)`, under the main valuation. If any candidate search beats the main build (the beam is heuristic; seen up to 106 %), it is promoted to main in the same pass (alternatives too close to it are dropped), so `relativeScore ≤ 100`. Alternatives are sorted by `relativeScore` (desc).
-   - The `alt.revelationFocus` label names every revelation at the alternative's highest stage (`A + B focus`), so two focus alternatives never share a label.
+   - The `alt.revelationFocus` label names every revelation at the alternative's highest stage (`A + B focus`); if two focus alternatives would still share a label, each lists all its active revelations (highest stage first).
    - `tradeoffMsg` (`alt.tradeoff`) lists the offense and defense deltas and the revelations.
-6. **Planner code.** `encodePlannerCode` (strict) of the allocation (`gridForSliceId`) plus the vessel gems.
+6. **Planner code.** `encodePlannerCode` (strict) of the allocation (`gridForSliceId`) plus the owned vessel gems (D23).
    - Only slots matching the vessel quality are exported; vessels with `plannerVesselIssues` are skipped.
    - Tests decode the code, replay `path` against the unlock graph, and load it in the official planner WASM.
 7. **Scores.** Offense and defense are normalised to the full wheel at stage 3 (0–100).
@@ -179,10 +179,11 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 
 - **Placement rule.** Maximise Σ blend(gem value in vessel) over a one-to-one assignment (Hungarian algorithm), using only each vessel's active slots.
   - Because active slots follow `min(gem, vessel)` quality, strong supreme gems end up in greater vessels and basic-only gems fill the lower vessels.
-  - Unplaced vessels that are unlocked get `source: 'recommended'`: the best gem of that vessel's quality at grade IV, with id `recommended-<quality>`.
+  - D23: a vessel holds only a gem the player owns. Unlocked vessels without an owned gem have `gem: null` and `source: 'empty'`; the engine never emits `source: 'recommended'`.
   - Locked vessels have `unlocked: false`, `gem: null` and `source: 'empty'`.
 - **`gemRecommendations`.**
   - Per quality, at grade IV: the best `basic1` (HP or Mitigation Multiplier only), the best distinct `basic2`, and the top-2 supreme variants for greater gems. Only mods with positive value are listed. Healing supreme gems (healing spell augments and cooldowns) are 0 for sorcerer and druid, and valued as EHP for the others.
+  - Advice only (D23): computed for all three qualities (with or without owned gems) and never placed into a vessel or used by the search.
   - Each has `reason` and `reasonMsg` from the dominant mod (spell share, avatar in boss, RM stage gained, resistance vs monster, and so on), sorted by gain.
 - **`upgradeRecommendations`.**
   - Only owned gems, only active slots, and only +1 grade.
@@ -216,4 +217,5 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 | `gems.test.ts` | Hungarian vs brute force, active slots, placement, recommendations, upgrades, Mitigation Multiplier scaling with real base mitigation. |
 | `optimizer.test.ts` | Path validity on random inputs, RM, vessel unlock order, augments, determinism, edge budgets, priority, perf < 50 ms (best of 3 per input), planner reference builds. |
 | `iteration3.test.ts` | Character level and skills, HP > mitigation (RP 400), HP still beats Mitigation Multiplier for EK 1500 at priority 100 (D18), leech devalued, RM look-ahead and owned RM gem, multi-monster weighting, distinct alternatives, planner code decode and unlock path, official planner WASM round-trip (`skipIf` when `scripts/.cache/wod/skillgrid.cjs` is missing). |
+| `iteration5.test.ts` | D23: no `recommended` vessel source (main + alternatives, planner code carries only owned gems), recommendations without owned gems, vessel slice = flat bonus without gems, owned-gem vessel valuation matches the placement, owned gems placed in the build; distinct focus labels. |
 | `iteration4.test.ts` | D18 (RP 600 lesser = HP, no capacity/mana gems, HP > mitigation for all vocations 200–1500, no healing gems for mages); D20 (non-beam rotation for a low-level sorcerer, beams only with Beam Mastery, Wrath of Nature vs an earth-weak spot, Divine Grenade in the rotation iff active, manual rotation); transit augments = 0; forced augment taken or reported impossible. |

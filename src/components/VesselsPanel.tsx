@@ -1,9 +1,10 @@
-import { useId, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { ModDefinition, ModGrade, OwnedGem, Vocation } from '../types';
 import type { BuildResult } from '../lib/api';
 import { engineText, useT } from '../i18n';
-import { findMod, slotKind, slotsForQuality } from '../lib/gems';
+import { findMod, GEM_QUALITIES, slotKind, slotsForQuality } from '../lib/gems';
+import { recommendationsByQuality } from '../lib/vessels';
 import { cx, formatNumber, gemName, ROMAN } from '../lib/labels';
 import { GemIcon } from './GemIcon';
 
@@ -54,6 +55,7 @@ export function VesselsPanel({ vocation, result, mods }: VesselsPanelProps) {
   const t = useT();
   const spellsId = useId();
   const [spellsOpen, setSpellsOpen] = useState(false);
+  const recs = useMemo(() => recommendationsByQuality(result.gemRecommendations), [result.gemRecommendations]);
 
   return (
     <div>
@@ -76,25 +78,18 @@ export function VesselsPanel({ vocation, result, mods }: VesselsPanelProps) {
                   {v.unlocked ? t('vessels.unlocked') : t('vessels.locked')}
                 </span>
               </div>
-              {v.gem ? (
+              {v.gem && v.source === 'owned' ? (
                 <div className="mt-1.5">
                   <div className="flex items-center gap-2 text-sm text-parchment-200">
                     <span className="min-w-0 flex-1 truncate">{gemName(vocation, v.gem.quality)}</span>
-                    {v.source !== 'empty' && (
-                      <span
-                        className={cx(
-                          'shrink-0 rounded-full px-1.5 py-0.5 text-[10px] uppercase',
-                          v.source === 'owned' ? 'bg-weak/15 text-weak' : 'bg-gold-700/30 text-gold-300',
-                        )}
-                      >
-                        {v.source === 'owned' ? t('vessels.owned') : t('vessels.recommended')}
-                      </span>
-                    )}
+                    <span className="shrink-0 rounded-full bg-weak/15 px-1.5 py-0.5 text-[10px] text-weak uppercase">{t('vessels.owned')}</span>
                   </div>
                   <GemMods gem={v.gem} mods={mods} />
                 </div>
               ) : (
-                <p className="mt-1.5 text-xs text-parchment-400">{t('vessels.empty')}</p>
+                <p className={cx('mt-1.5 text-xs', v.unlocked ? 'text-amber-300' : 'text-parchment-400')}>
+                  {v.unlocked ? t('vessels.emptyAdd') : t('vessels.empty')}
+                </p>
               )}
             </li>
           ))}
@@ -102,33 +97,41 @@ export function VesselsPanel({ vocation, result, mods }: VesselsPanelProps) {
       )}
 
       <SubHeading>{t('recs.title')}</SubHeading>
-      {result.gemRecommendations.length === 0 ? (
-        <Empty>{t('recs.none')}</Empty>
-      ) : (
-        <ol className="space-y-2">
-          {result.gemRecommendations.map((r, i) => (
-            <li key={i} className="rounded-lg border border-ink-700 p-2.5">
-              <div className="flex items-center gap-2 text-sm">
-                <GemIcon quality={r.quality} />
-                <span className="min-w-0 flex-1 truncate text-parchment-100">{gemName(vocation, r.quality)}</span>
-                <span className="shrink-0 text-xs tabular-nums text-weak">{t('recs.gain', { gain: gain(r.gain) })}</span>
-              </div>
-              <ul className="mt-1 flex flex-wrap gap-1">
-                {r.mods.map((m) => (
-                  <ModChip key={`${m.kind}-${m.modId}`} name={m.name} grade={m.grade} />
+      <div className="flex flex-col gap-3">
+        {GEM_QUALITIES.map((q) => (
+          <section key={q} aria-label={gemName(vocation, q)}>
+            <h4 className="mb-1 flex items-center gap-2 text-sm font-medium text-parchment-100">
+              <GemIcon quality={q} />
+              {gemName(vocation, q)}
+            </h4>
+            {recs[q].length === 0 ? (
+              <p className="text-sm text-parchment-400">—</p>
+            ) : (
+              <ol className="space-y-2">
+                {recs[q].map((r, i) => (
+                  <li key={i} className="rounded-lg border border-ink-700 p-2.5">
+                    <div className="flex items-center gap-2 text-sm">
+                      <ul className="flex min-w-0 flex-1 flex-wrap gap-1">
+                        {r.mods.map((m) => (
+                          <ModChip key={`${m.kind}-${m.modId}`} name={m.name} grade={m.grade} />
+                        ))}
+                      </ul>
+                      <span className="shrink-0 text-xs tabular-nums text-weak">{t('recs.gain', { gain: gain(r.gain) })}</span>
+                    </div>
+                    {r.reason && <p className="mt-1 text-xs text-parchment-400">{engineText(t, r.reasonMsg, r.reason)}</p>}
+                    {!!r.similar?.length && (
+                      <p className="mt-1 text-xs text-parchment-300">
+                        {t('recs.similar')}{' '}
+                        {r.similar.map((s) => `${s.name} (${t(`slot.${s.slot}`)}, ${s.relative}%)`).join(' · ')}
+                      </p>
+                    )}
+                  </li>
                 ))}
-              </ul>
-              {r.reason && <p className="mt-1 text-xs text-parchment-400">{engineText(t, r.reasonMsg, r.reason)}</p>}
-              {!!r.similar?.length && (
-                <p className="mt-1 text-xs text-parchment-300">
-                  {t('recs.similar')}{' '}
-                  {r.similar.map((s) => `${s.name} (${t(`slot.${s.slot}`)}, ${s.relative}%)`).join(' · ')}
-                </p>
-              )}
-            </li>
-          ))}
-        </ol>
-      )}
+              </ol>
+            )}
+          </section>
+        ))}
+      </div>
 
       <SubHeading>{t('upgrades.title')}</SubHeading>
       {result.upgradeRecommendations.length === 0 ? (

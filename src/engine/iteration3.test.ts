@@ -80,7 +80,7 @@ describe('Revelation Mastery look-ahead', () => {
 
   it('an owned RM gem lets the search reach a stage with fewer slice points', () => {
     const w = getEngineWheel('knight');
-    const base: OptimizerInput = { vocation: 'knight', points: 1000, monster: null, priority: 20, alternatives: 0 };
+    const base: OptimizerInput = { vocation: 'knight', points: 1200, monster: null, priority: 20, alternatives: 0 };
     const plain = optimize(base);
     const top = plain.revelations.reduce((a, b) => (b.stage > a.stage ? b : a));
     const rm = w.supremeMods.find((m) => m.category === 'revelationMastery' && m.revelation === top.perk.name)!;
@@ -147,7 +147,8 @@ describe('alternatives', () => {
       expect(a.label).toBeTruthy();
       expect(a.labelMsg?.key).toMatch(/^alt\./);
       expect(a.tradeoffMsg?.key).toBe('alt.tradeoff');
-      expect(a.relativeScore).toBeGreaterThan(50);
+      // D23: without phantom vessel value the objective ratio is wider (paladin 600 boss: ~35 %).
+      expect(a.relativeScore).toBeGreaterThan(25);
       expect(a.result.plannerCode).toBeTruthy();
       expect(a.result.pointsUsed).toBeLessThanOrEqual(points);
     }

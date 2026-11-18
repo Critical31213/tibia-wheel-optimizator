@@ -1,14 +1,17 @@
 import { useMemo, useState } from 'react';
-import type { Slice, WheelDefinition } from '../types';
+import type { Domain, ModGrade, Slice, WheelDefinition } from '../types';
 import type { BuildResult } from '../lib/api';
 import { annularSectorPath, fillRadius, ringBounds, sectorCentroid, sliceAngles } from '../lib/geometry';
 import { useT } from '../i18n';
-import { DOMAIN_COLORS, DOMAINS, formatNumber } from '../lib/labels';
+import { cx, DOMAIN_COLORS, formatNumber, ROMAN } from '../lib/labels';
+import { activeRevelationsByDomain } from '../lib/vessels';
 
 const SIZE = 400;
 const C = SIZE / 2;
 const HUB = 34;
 const OUTER = 192;
+/** Grid order matching the wheel quadrants (2 columns). */
+const QUADRANTS: readonly Domain[] = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
 
 interface WheelChartProps {
   wheel: WheelDefinition;
@@ -48,6 +51,7 @@ export function WheelChart({ wheel, result }: WheelChartProps) {
     });
   }, [wheel, result]);
 
+  const revelations = useMemo(() => activeRevelationsByDomain(result?.revelations ?? []), [result]);
   const active = shapes.find((s) => s.slice.id === hover);
 
   return (
@@ -131,15 +135,26 @@ export function WheelChart({ wheel, result }: WheelChartProps) {
         )}
       </div>
 
-      <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs sm:grid-cols-4" aria-label={t('wheel.legend')}>
-        {DOMAINS.map((d) => (
-          <li key={d} className="flex items-center gap-2">
-            <span aria-hidden="true" className="size-3 rounded-sm" style={{ background: DOMAIN_COLORS[d].base }} />
-            <span className="text-parchment-300">{t(`domain.${d}`)}</span>
-            <span className="ml-auto tabular-nums text-parchment-100">{formatNumber(result?.domainPoints[d] ?? 0)}</span>
-          </li>
-        ))}
-      </ul>
+      {Object.keys(revelations).length > 0 && (
+        <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs" aria-label={t('wheel.revelations')}>
+          {QUADRANTS.map((d) => {
+            const r = revelations[d];
+            return r ? (
+              <li key={d} className={cx('flex min-w-0 items-center gap-2', (d === 'topRight' || d === 'bottomRight') && 'justify-end text-right')}>
+                <span aria-hidden="true" className="size-3 shrink-0 rounded-sm" style={{ background: DOMAIN_COLORS[d].base }} />
+                <span className="min-w-0" title={r.perk.description}>
+                  <span style={{ color: DOMAIN_COLORS[d].text }}>
+                    {r.perk.name} {ROMAN[r.stage as ModGrade] ?? r.stage}
+                  </span>
+                  <span className="text-parchment-300"> · {t('wheel.revelationPts', { n: formatNumber(r.domainPoints) })}</span>
+                </span>
+              </li>
+            ) : (
+              <li key={d} aria-hidden="true" />
+            );
+          })}
+        </ul>
+      )}
       <p className="mt-2 text-xs text-parchment-400">
         {t('wheel.hint')}
       </p>

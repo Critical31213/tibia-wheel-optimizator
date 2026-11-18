@@ -24,16 +24,17 @@ screens it is two columns (controls left, results right).
 | `src/lib/planner.ts` | Re-exports `PLANNER_URL`/`plannerUrl(code)` from `src/data/wheel/plannerCode` (single source); `copyText` (Clipboard API → `execCommand` fallback) (tested). |
 | `src/components/MonsterCard.tsx` | Name, HP/exp, element chips, damage types. |
 | `src/components/PrioritySlider.tsx` | 0–100 range slider. |
-| `src/components/WheelChart.tsx` | SVG wheel, fill-order badges, tooltip, legend. |
+| `src/components/WheelChart.tsx` | SVG wheel, fill-order badges, tooltip, active revelation perks per domain. |
 | `src/components/ResultsPanel.tsx` | Scores, revelations, convictions, stats, rationale, fill order. |
 | `src/components/SegmentedControl.tsx` | Generic compact `radiogroup` (roving tabindex, arrows/Home/End, `disabled`). |
 | `src/components/FightContextPanel.tsx` | Hunt / Boss toggle (hunt style removed, D20); Avatar / single-target hints. |
 | `src/components/RotationPanel.tsx` | Rotation select (Auto + vocation presets, note / requirements), used rotation of the viewed build (share %, ★ = revelation spell, auto-picked), forced spell augments (select + removable chips). |
 | `src/hooks/usePersistentSpellPrefs.ts` | `rotationId` + `forcedSpells` per vocation (localStorage) mirrored to URL `r` / `fs`. |
 | `src/lib/spellPrefs.ts` | Spell-prefs sanitising + URL / JSON codec (tested). |
-| `src/components/GemsPanel.tsx` | Collapsible "My gems" editor (quality, mods per slot, grade I–IV). |
+| `src/components/GemsPanel.tsx` | Collapsible "My gems" editor in Lesser / Regular / Greater subsections (mods per slot, grade I–IV), empty-vessel highlight. |
 | `src/components/GemIcon.tsx` | Diamond icon tinted by gem/vessel quality. |
-| `src/components/VesselsPanel.tsx` | Vessels, recommended gems, best upgrades, collapsible spell usage. |
+| `src/components/VesselsPanel.tsx` | Vessels, recommended gems per quality, best upgrades, collapsible spell usage. |
+| `src/lib/vessels.ts` | `emptyUnlockedByQuality`, `recommendationsByQuality`, `activeRevelationsByDomain` (tested). |
 | `src/components/LanguageSwitch.tsx` | PL / EN segmented toggle. |
 | `src/hooks/usePersistentGems.ts` | Owned gems per vocation in localStorage (not in the URL). |
 | `src/lib/gems.ts` | Gem slot rules, mod filtering, gem (de)serialisation (tested). |
@@ -57,7 +58,7 @@ App
 │  └─ MonsterCard      monster
 ├─ FightContextPanel   value: FightContext, onChange(patch)
 ├─ PrioritySlider      value, onChange(priority)
-├─ GemsPanel           vocation, gems, mods, onChange(updater)
+├─ GemsPanel           vocation, gems, mods, emptyVessels (viewed build, per quality), onChange(updater)
 ├─ Panel › BuildSwitcher alternatives, value (0 = best), onChange   (only when the engine returns alternatives)
 ├─ Panel › RotationPanel presets, spells (forceable), value: SpellPrefs, onChange(patch), usage = viewed build `rotation`
 ├─ Panel › WheelChart  wheel, result | null   (the *viewed* build: best or alternative)
@@ -225,3 +226,16 @@ the selected monster resolves. The engine is bundled eagerly (it is small).
   rounded `share` % and ★ when `fromRevelation`.
 - Forced spells: `getForceableSpells(vocation)` (augment slices + supreme-mod spells from the wheel data, sorted) in an
   "Add spell…" select; chips with × remove; max 8; passed as `forcedSpells` (undefined when empty).
+
+## Iteration 5 (D23: vessels hold only owned gems)
+
+- **Wheel**: the domain-caption legend under the wheel is replaced by the viewed build's active revelation perks
+  (`activeRevelationsByDomain`, stage ≥ 1), in a 2×2 grid matching the quadrants: "Beam Mastery II · 520 pts".
+  A domain without an active revelation leaves its cell empty; no active revelation → no list.
+- **My gems**: three subsections (vocation gem names via `gemName`), each with its own list and "+ Add gem" for that
+  quality. `App` passes `emptyVessels = emptyUnlockedByQuality(shown.vessels)` (unlocked vessels whose `source` is not
+  `owned`; legacy `recommended` counts as empty). A quality with empty vessels gets an amber border + "N unlocked
+  vessels for X gems are empty — add your gems"; the collapsed panel header shows "N empty vessels".
+- **Vessels**: only owned gems are shown inside a vessel; any other unlocked vessel reads "Empty — add a gem".
+- **Recommended gems**: grouped by quality (`recommendationsByQuality`), each with mods, gain, reason and
+  near-equal substitutes, or "—".

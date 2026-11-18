@@ -27,7 +27,6 @@ import { BALLISTIC_MASTERY, healingAverage, pierceDamageMod, POSITIONAL_TACTICS 
 import { getRotationPresets } from '../data/damage/rotations';
 import {
   activeSlots,
-  bestGems,
   type GemEnv,
   gemParts,
   placedRmPoints,
@@ -348,21 +347,19 @@ function factsFor(revPoints: number[], wheelEffects: Map<string, SpellEffect[]>,
   return { revPoints, stages, wheelEffects };
 }
 
-/** Value of vessels 0..7 when unlocked one by one (owned gems first, else a grade-I recommendation). */
-function vesselTable(env: GemEnv, gems: OwnedGem[]): Parts[] {
+/**
+ * Value of vessels 0..7 when unlocked one by one (D23): the slice's own flat bonus plus the owned gems the
+ * newly unlocked vessel lets the optimal placement use. Recommended (hypothetical) gems are never assumed.
+ */
+export function vesselTable(env: GemEnv, gems: OwnedGem[]): Parts[] {
   const vessels = env.wheel.definition.vessels;
-  const rec = new Map(
-    (['lesser', 'regular', 'greater'] as const).map((q) => [q, bestGems(env, q, 1)[0]?.parts ?? ZERO] as const),
-  );
   const prefix: Parts[] = [ZERO];
   for (let c = 1; c <= vessels.length; c++) {
     const placed = gems.length ? placeGems(env, gems, c) : [];
     let total = ZERO;
     for (let i = 0; i < c; i++) {
-      const recP = rec.get(vessels[i].quality)!;
       const g = placed[i];
-      const own = g ? gemParts(env, g, vessels[i].quality) : null;
-      total = add(total, own && env.blend(own) > env.blend(recP) ? own : recP);
+      if (g) total = add(total, gemParts(env, g, vessels[i].quality));
     }
     prefix.push(total);
   }
@@ -938,7 +935,7 @@ function prepare(input: OptimizerInput, priority = input.priority, base?: Prepar
   const budget = Math.min(wheel.definition.totalCapacity, pointsOf(input));
   const gems = input.gems ?? [];
   const blend = blendWith(weightsFor(priority));
-  // Pre-search gem estimate: revelation spells at the stage ~60 % of the budget reaches; RM gems are handled by gemRm.
+  // Pre-search owned-gem estimate (D23: no recommended gems): revelation spells at the stage ~60 % of the budget reaches; RM gems are handled by gemRm.
   const assumed = stageFor(Math.min(1000, Math.round(budget * 0.6)));
   const preEnv: GemEnv = { v, wheel, blend, facts: factsFor([1e9, 1e9, 1e9, 1e9], new Map(), [assumed, assumed, assumed, assumed]) };
   const vesselP = vesselTable(preEnv, gems);
@@ -1147,13 +1144,20 @@ function alternatives(p: Prepared, plans: Prepared[], main: State, count: number
   }
   const mainResult = assemble(p, main);
   const out: AlternativeBuild[] = [];
-  for (const { c, st, plan } of found) {
+  const revNameOf = (stages: number[], st: State, all: boolean) => {
+    const altTop = topDomain(stages, DOMAIN_ORDER.map((_, d) => st.domainPts[d]));
+    if (altTop < 0) return '';
+    const ds = DOMAIN_ORDER.map((_, d) => d).filter((d) => (all ? stages[d] > 0 : stages[d] === stages[altTop]));
+    return ds.sort((a, b) => stages[b] - stages[a] || a - b).map((d) => p.wheel.revelations[d].data.name).join(' + ');
+  };
+  // All revelations at the alternative's highest stage, so e.g. 'A + B focus' and 'B focus' stay distinguishable;
+  // when two focus alternatives would share that name, every active revelation is listed.
+  const shortNames = found.map(({ st }) => revNameOf(gridStages(p, st), st, false));
+  for (const [k, { c, st, plan }] of found.entries()) {
     const qa = c.priority === prio ? plan.p : prepare(p.input, c.priority, plan.p);
     const result = assemble(qa, st);
-    const altStages = gridStages(p, st);
-    const altTop = topDomain(altStages, DOMAIN_ORDER.map((_, d) => st.domainPts[d]));
-    // All revelations at the alternative's highest stage, so e.g. 'A + B focus' and 'B focus' stay distinguishable.
-    const revName = DOMAIN_ORDER.map((_, d) => d).filter((d) => altTop >= 0 && altStages[d] === altStages[altTop]).map((d) => p.wheel.revelations[d].data.name).join(' + ');
+    const clash = shortNames.some((n, j) => j !== k && n === shortNames[k] && found[j].c.kind === 'revelationFocus');
+    const revName = clash ? revNameOf(gridStages(p, st), st, true) : shortNames[k];
     const label =
       c.kind === 'avatarFocus'
         ? text('alt.avatarFocus', { revelation: p.wheel.revelations[avatar].data.name })

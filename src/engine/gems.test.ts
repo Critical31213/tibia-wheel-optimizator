@@ -77,7 +77,7 @@ describe('gem placement', () => {
     }
   });
 
-  it('owned gems are placed, free vessels get a recommendation, locked ones stay empty', () => {
+  it('owned gems are placed; other unlocked and locked vessels stay empty (D23)', () => {
     const e = env('sorcerer');
     const owned = toOwnedGem('mine', bestGems(e, 'regular', 2)[0], 2);
     const res = optimize({ vocation: 'sorcerer', points: 1500, monster: null, priority: 50, gems: [owned] });
@@ -85,9 +85,8 @@ describe('gem placement', () => {
     expect(open.length).toBeGreaterThan(1);
     expect(open.filter((v) => v.source === 'owned').map((v) => v.gem!.id)).toEqual(['mine']);
     for (const v of open.filter((x) => x.source !== 'owned')) {
-      expect(v.source).toBe('recommended');
-      expect(v.gem!.id).toBe(`recommended-${v.quality}`);
-      expect(v.gem!.quality).toBe(v.quality);
+      expect(v.source).toBe('empty');
+      expect(v.gem).toBeNull();
     }
   });
 

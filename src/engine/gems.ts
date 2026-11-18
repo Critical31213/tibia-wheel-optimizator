@@ -4,6 +4,7 @@
  *
  * Vessel rule: any gem fits any vessel; a vessel activates only the mods its quality allows
  * (lesser → basic 1, regular → basic 1+2, greater → basic 1+2+supreme). Vessel ids are 0-based.
+ * D23: vessels hold only owned gems; recommendations are advice and never fill a vessel.
  */
 import type {
   EngineMessage,
@@ -305,25 +306,17 @@ export function recommendations(env: GemEnv): GemRecommendation[] {
 // ---------------------------------------------------------------------------
 // Vessels + upgrades
 
+/** D23: a vessel holds only a gem the player owns; unlocked vessels without one stay empty. */
 export function vesselAssignments(
   env: GemEnv,
   unlocked: number,
   placed: (OwnedGem | null)[],
 ): VesselAssignment[] {
-  const recCache = new Map<GemQuality, OwnedGem | null>();
-  const recommended = (q: GemQuality) => {
-    if (!recCache.has(q)) {
-      const best = bestGems(env, q, 4)[0];
-      recCache.set(q, best && best.score > 0 ? toOwnedGem(`recommended-${q}`, best, 4) : null);
-    }
-    return recCache.get(q)!;
-  };
   return env.wheel.definition.vessels.map((vs, i) => {
-    if (i >= unlocked) return { vesselId: vs.id, quality: vs.quality, unlocked: false, gem: null, source: 'empty' };
-    const own = placed[i];
-    if (own) return { vesselId: vs.id, quality: vs.quality, unlocked: true, gem: own, source: 'owned' };
-    const rec = recommended(vs.quality);
-    return { vesselId: vs.id, quality: vs.quality, unlocked: true, gem: rec, source: rec ? 'recommended' : 'empty' };
+    const own = i < unlocked ? placed[i] : null;
+    return own
+      ? { vesselId: vs.id, quality: vs.quality, unlocked: true, gem: own, source: 'owned' }
+      : { vesselId: vs.id, quality: vs.quality, unlocked: i < unlocked, gem: null, source: 'empty' };
   });
 }
 

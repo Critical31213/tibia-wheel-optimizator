@@ -21,6 +21,7 @@ import { getForceableSpells, getMonsterById, getRotationPresets, getWheel, optim
 import type { BuildResult } from './lib/api';
 import { characterOf, contextOf } from './lib/inputState';
 import { resolveMonsters } from './lib/monsters';
+import { emptyUnlockedByQuality } from './lib/vessels';
 import { VOCATION_LABELS } from './lib/labels';
 
 export default function App() {
@@ -75,6 +76,10 @@ export default function App() {
   const alternatives = result?.alternatives ?? [];
   const viewIndex = view <= alternatives.length ? view : 0;
   const shown: BuildResult | null = result && viewIndex > 0 ? alternatives[viewIndex - 1].result : result;
+  const emptyVessels = useMemo(
+    () => (shown && deferred.vocation === inputs.vocation ? emptyUnlockedByQuality(shown.vessels) : null),
+    [shown, deferred.vocation, inputs.vocation],
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
@@ -91,7 +96,7 @@ export default function App() {
           <MonsterSearch value={spot} ready={monstersReady} onChange={(monsters) => update({ monsters })} />
           <FightContextPanel value={context} onChange={update} />
           <PrioritySlider value={inputs.priority} onChange={(priority) => update({ priority })} />
-          <GemsPanel vocation={inputs.vocation} gems={gems} mods={wheel.mods} onChange={setGems} />
+          <GemsPanel vocation={inputs.vocation} gems={gems} mods={wheel.mods} emptyVessels={emptyVessels} onChange={setGems} />
         </div>
 
         <div className="flex flex-col gap-4">

@@ -39,6 +39,7 @@ Roles:
 | D20 | 2026-11-18 | Hunt styles removed (hunt targets = tibiapal averages; boss = 1). Damage based on rotation presets (`src/data/damage/rotations.ts`): engine auto-picks the best preset for the spot/build (user may override); revelation-unlocked spells (Divine Grenade, Executioner's Throw, Ice/Terra Burst, Spiritual Outburst; Avatars in boss) are added when the revelation is active; druid ultimate area spell (Eternal Winter / Wrath of Nature) chosen by resistance. Augments of spells outside the rotation (transit slices) have no value. | User guidance. |
 | D21 | 2026-11-18 | Forced spells: the user can force wheel augments of chosen spells (utility, e.g. Divine Dazzle, Mystic Repulse, Heal Friend). Healing gems excluded for ED/MS; for RP/EK/Monk valued on the defense side. Ballistic Mastery (bow: +4 % physical/holy pierce; crossbow: +10 % crit extra damage) and Positional Tactics (+3 distance 70 % of the time, else +3 holy/healing mlvl) valued exactly. | User guidance + planner texts. |
 | D22 | 2026-11-18 | tibiapal hunt target averages already include the wheel's area augment (Expanded Shape); without it a spell hits 0.5 fewer. Gem picks maximise overall damage; mods within 10 % of the chosen one's gain are listed as near-equal substitutes (`GemRecommendation.similar`); greater gem shown once with substitutes. | User guidance (EK Front Sweep vs Fierce Berserk tie). |
+| D23 | 2026-11-18 | A vessel holds only a gem the player added; unlocked vessels without an owned gem stay empty (never a recommended gem). The search values Gem Vessel slices only by the slice's own effects (+1 flat) and owned gems the new vessel can hold; gem recommendations stay advice (all qualities) and do not affect the allocation. | User: priority 50 sorcerer chose "no revelation" because 3 vessel slices were worth ~20 pp EHP from assumed grade-IV gems. |
 
 ---
 
@@ -338,6 +339,23 @@ Max mana was scored as offense, so at DPS-leaning priority lesser gems for every
   - Worst case is 45 ms (druid, 3200 points, boss).
 - **Tests:** 3 new tests in `iteration4.test.ts`.
 
+### 2026-11-18 — S3 UI (iteration 5)
+
+- **Wheel:** domain captions under the wheel replaced by active revelation perks per quadrant ("Beam Mastery II · 520 pts"); empty when a domain has none.
+- **My gems:** split into Lesser / Regular / Greater subsections, each with its own list and "+ Add gem". Amber highlight + note when the viewed build has unlocked vessels of that quality left empty (D23).
+- **Vessels:** non-owned unlocked vessels show "Empty — add a gem" (a legacy `recommended` source is treated as empty).
+- **Recommended gems:** grouped by quality with gain, reason and near-equal substitutes, or "—".
+- **New:** `src/lib/vessels.ts` (`emptyUnlockedByQuality`, `recommendationsByQuality`, `activeRevelationsByDomain`) + 4 tests. tsc, vitest (49), lint, build clean.
+
+### 2026-11-18 — S2 Engine (iteration 5)
+- **D23 implemented:** `vesselAssignments` emits only `owned` or `empty`; `vesselTable` values a vessel slice as flat +1 plus the owned-gem placement gain (no recommended-gem assumption). `gemRecommendations` / `upgradeRecommendations` unchanged; planner code carries only owned gems.
+- **Alternative labels:** focus alternatives that would share a name now list all active revelations (paladin 1200 hunt: "Gift of Life + Divine Empowerment focus" vs "Gift of Life focus").
+- **Sorcerer L300 hunt, no monster:** priority 20 → Beam Mastery 1, `ms-echo-gdb` at 250/300/350 (1–2 vessels). Priority 50 → 250: no revelation (`ms-gfw-echo`, 2 vessels); 300/350: Gift of Life 1 (`ms-gfw-echo`). Beam Mastery still loses at 50 (alt "Lord of Destruction focus" 90/94/83 %).
+- **Test expectations changed:** gems.test free unlocked vessels → `empty`; iteration3 owned-RM-gem test at 1200 points (at 1000 the gem now helps a second revelation instead of raising the top stage); iteration3 alternatives `relativeScore > 25` (was 50; paladin 600 boss alts ≈ 35 % once phantom vessel value is gone).
+- **Tests:** new `iteration5.test.ts` (6). Engine 173 passed; perf worst ≈ 39 ms (sorcerer 3200 boss).
+- **For S4:** `src/integration.test.ts` "character level and skills change the output" compares only gem `gain`s, now equal (3.2/1.8/1.4) although the supreme mod differs (Divine Caldera vs Ethereal Barrage); compare mods too. The `source === 'recommended'` branch there is dead code.
+
+### 2026-11-18 — EK mitigation calibrationUser Cyclopedia (EK): 119 shielding → 1.34 % (knight shielding factor 1.148 → 1.126); Ectoplasmic Shield (def 49) → +1.27 % (fits factor 2.56); with Sanguine Hatchet +1.51 % total (one-handed weapon defense not modelled yet, ~+0.24 %). Test added.
 ## In progress / Next
 
 - [x] S1 Data — scraper + monster dataset + search API.
