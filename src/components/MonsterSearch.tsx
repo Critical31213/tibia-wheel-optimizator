@@ -9,18 +9,20 @@ import { Panel } from './Panel';
 
 interface MonsterSearchProps {
   value: Monster | null;
+  /** False while the monster dataset chunk is still loading. */
+  ready: boolean;
   onChange: (m: Monster | null) => void;
 }
 
 /** ARIA 1.2 combobox (list autocomplete) over the monster dataset. */
-export function MonsterSearch({ value, onChange }: MonsterSearchProps) {
+export function MonsterSearch({ value, ready, onChange }: MonsterSearchProps) {
   const id = useId();
   const listId = `${id}-list`;
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const debounced = useDebouncedValue(query, 150);
-  const results = useMemo(() => searchMonsters(debounced, 12), [debounced]);
+  const results = useMemo(() => (ready ? searchMonsters(debounced, 12) : []), [debounced, ready]);
   const expanded = open && query.trim() !== '' && debounced === query;
 
   const select = (m: Monster | null) => {
@@ -99,7 +101,7 @@ export function MonsterSearch({ value, onChange }: MonsterSearchProps) {
         >
           {results.length === 0 ? (
             <li className="px-3 py-2 text-sm text-parchment-400" role="presentation">
-              No monsters found.
+              {ready ? 'No monsters found.' : 'Loading monster data…'}
             </li>
           ) : (
             results.map((m, i) => (

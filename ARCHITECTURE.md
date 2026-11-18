@@ -41,19 +41,27 @@ promotion points for a Tibia character, given:
 
 ```
 /
-├── WORKLOG.md            # workflow journal
-├── ARCHITECTURE.md       # this file
-├── README.md             # user-facing quick start
-├── docs/modules/         # one .md per module (owned by each subagent)
-├── scripts/              # offline tooling (monster scraper)
-├── public/               # static assets
+├── WORKLOG.md              # workflow journal
+├── ARCHITECTURE.md         # this file
+├── README.md               # user-facing quick start
+├── assets/icon.svg         # project icon (README)
+├── docs/modules/           # data.md, engine.md, ui.md, integration.md
+├── scripts/
+│   └── scrape-monsters.ts  # offline tibiopedia.pl scraper → src/data/monsters.json
+├── public/favicon.svg
+├── index.html
+├── vite.config.ts          # React + Tailwind plugins, chunk size limit
 └── src/
-    ├── types/            # shared contract (all modules)
-    ├── data/             # monster dataset + search API
-    ├── engine/           # wheel model + optimizer
-    ├── components/       # React UI components
-    ├── App.tsx           # top-level state and layout
-    └── main.tsx
+    ├── types/index.ts      # shared contract (all modules)
+    ├── data/               # monsters.json (2006) + search API (lazy-loaded chunk)
+    ├── engine/             # wheel model (wheel/), scoring.ts, optimizer.ts, index.ts
+    ├── components/         # React UI components
+    ├── hooks/              # usePersistentInputs, useDebouncedValue
+    ├── lib/                # api.ts facade, geometry, inputState, labels (pure, tested)
+    ├── integration.test.ts # end-to-end tests (data + engine + input parsing)
+    ├── App.tsx             # top-level state and layout
+    ├── main.tsx            # entry; starts loading monster data
+    └── index.css           # Tailwind v4 theme tokens
 ```
 
 ## 4. Module contracts
@@ -63,7 +71,10 @@ All cross-module types live in `src/types/index.ts`.
 | Module | Public API (`index.ts`) | Consumers |
 |--------|-------------------------|-----------|
 | `src/data` | `MONSTERS`, `searchMonsters(query, limit)`, `getMonsterById(id)` | UI |
-| `src/engine` | `getWheel(vocation)`, `optimize(input)`, `pointsForLevel(level)` | UI |
+| `src/engine` | `getWheel(vocation)`, `optimize(input)`, `pointsForLevel(level, scrollPoints = 0)` | UI |
+
+The UI reaches both modules only through `src/lib/api.ts`, which re-exports the engine and loads
+`src/data` with a dynamic `import()` (separate chunk; `useMonsterData()` signals readiness).
 
 Data flow: UI collects `OptimizerInput` → `optimize()` returns
 `OptimizerResult` (allocation per slice, fill path, activated perks, stat
@@ -111,12 +122,29 @@ Inputs (vocation, points/level, monster, priority) live in `usePersistentInputs`
 (localStorage + URL query) and feed a memoized `optimize()` call — no Calculate button.
 Results render as an SVG wheel (`WheelChart`, area-proportional slice fill, fill-order
 badges, tooltips) and a `ResultsPanel` (scores, revelations, convictions, stats, rationale,
-fill order). Components use only the `src/lib/api.ts` facade, which temporarily falls back
-to demo fixtures while the engine is a stub. Dark Tibian theme via Tailwind v4 `@theme` tokens.
+fill order). Components use only the `src/lib/api.ts` facade (real engine; monster dataset
+lazy-loaded). Points are clamped to the 4000-point wheel capacity; the level helper uses
+`pointsForLevel(level, scrollPoints)`. Dark Tibian theme via Tailwind v4 `@theme` tokens.
 Details: [docs/modules/ui.md](docs/modules/ui.md).
 
 ## 8. Quality gates (S4 Integration)
 
-- `npm run typecheck` — zero TypeScript errors.
-- `npm test` — Vitest unit tests.
-- `npm run build` — production build succeeds.
+| Gate | Command | Status (2026-11-18) |
+|------|---------|---------------------|
+| Types | `npm run typecheck` (`tsc -b`, strict) | 0 errors |
+| Tests | `npm test` (Vitest) | 7 files, 115 tests |
+| Lint | `npm run lint` (oxlint) | 0 warnings |
+| Build | `npm run build` | main 267 kB (84 kB gzip) + lazy data 699 kB (76 kB gzip) |
+
+### Testing strategy
+
+- **Unit, per module:** `src/data/index.test.ts` (dataset shape, spot checks, search ranking, 20),
+  `src/engine/geometry.test.ts` (layout, capacities, adjacency, 35), `src/engine/optimizer.test.ts`
+  (path validity on random inputs, priority/monster effects, `pointsForLevel`, 13), `src/lib/*.test.ts`
+  (SVG geometry, input serialisation, labels, 16).
+- **Integration:** `src/integration.test.ts` (31) runs the real dataset through the UI facade and the real
+  engine: every vocation at levels 100/300/600/1000, priority extremes, real monsters (Fury, Demon,
+  Dragon Lord), edge budgets, determinism and untrusted URL/localStorage input. Matrix in
+  [`docs/modules/integration.md`](docs/modules/integration.md).
+- **Smoke:** `vite build` + `vite preview`, page and both chunks served with HTTP 200.
+- Not covered: DOM/component tests (no jsdom) — UI logic is kept in pure, tested helpers instead.

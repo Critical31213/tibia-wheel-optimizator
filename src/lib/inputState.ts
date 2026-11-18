@@ -17,8 +17,8 @@ export const DEFAULT_INPUTS: InputState = {
   priority: 50,
 };
 
-/** Upper bound for typed point values before the wheel capacity is known. */
-export const MAX_POINTS = 100_000;
+/** Upper bound for point values: total wheel capacity (5 rings, 36 slices, 4000 points) for every vocation. */
+export const MAX_POINTS = 4000;
 
 const isVocation = (v: unknown): v is Vocation =>
   typeof v === 'string' && (VOCATIONS as readonly string[]).includes(v);
@@ -55,7 +55,12 @@ export function fromQuery(search: string): Partial<InputState> {
   });
 }
 
-/** Writes the state into `search`, preserving unrelated params (e.g. `?demo`). */
+/** Drops a monster id that does not exist in the dataset (stale link / storage). */
+export function withKnownMonster<T extends Partial<InputState>>(state: T, exists: (id: string) => boolean): T {
+  return state.monsterId && !exists(state.monsterId) ? { ...state, monsterId: null } : state;
+}
+
+/** Writes the state into `search`, preserving unrelated params. */
 export function toQuery(state: InputState, search = ''): string {
   const q = new URLSearchParams(search);
   q.set(KEYS.vocation, state.vocation);

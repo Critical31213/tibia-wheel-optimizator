@@ -30,6 +30,9 @@ and committed as JSON (see decision D2 in `WORKLOG.md`).
 | `getWeakestElements(monster, elements = ATTACK_ELEMENTS)` | Elements sorted by damage taken, highest first; immunities (0) dropped. |
 | `getStrongestElements(monster, elements = ATTACK_ELEMENTS)` | Only resisted elements (< 100), strongest resistance first. |
 | `getBestAttackElement(monster)` | First entry of `getWeakestElements`, or `physical`. |
+
+The module itself is synchronous. The UI never imports it statically: `src/lib/api.ts` loads it with a
+dynamic `import('../data')`, so the dataset ships as a separate ~700 kB (76 kB gzip) chunk.
 | `normalizeText(s)` | The normalisation used by search (lowercase, no diacritics, non-alphanumerics → space). |
 
 ## Data source and page structure

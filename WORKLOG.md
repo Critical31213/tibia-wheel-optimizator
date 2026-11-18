@@ -67,6 +67,18 @@ Roles:
 - Tests: `geometry.test.ts` + `optimizer.test.ts` (48 tests) green; `tsc -b` clean. Docs: `docs/modules/engine.md`.
 - Approximate: perk value units, monk spell elements/passives, Vessel Resonance value; gems not modelled.
 
+### 2026-11-18 — S4 Integration
+- Removed the UI fixture fallback (`src/lib/fixtures.ts`, `FIXTURE FALLBACK` branches, `isDemoWheel` + demo banner).
+- `MAX_POINTS` 100 000 → 4000 (5-ring wheel capacity, asserted against `getWheel().totalCapacity`); UI ring
+  geometry was already generic. Added promotion-scroll points (0–50) to `PointsInput` → `pointsForLevel(level, scrolls)`.
+- Bundle: 964 kB single chunk → 267 kB main + 699 kB lazy `data` chunk (dynamic `import('../data')` in
+  `src/lib/api.ts`, `useMonsterData()`); `src/data` contract unchanged.
+- Bug fixes: unknown monster ids from URL/localStorage were kept forever (now dropped via `withKnownMonster`
+  once data loads); URL points could exceed wheel capacity; oxlint `set-state-in-effect` in `PointsInput`.
+- `src/integration.test.ts` (31 tests). Gates: typecheck 0 errors, 115 tests pass, lint 0 warnings, build OK,
+  `vite preview` serves page + chunks (HTTP 200).
+- Docs: README rewritten, ARCHITECTURE unified (layout, gates, testing strategy), `docs/modules/integration.md`.
+
 ---
 
 ## In progress / Next
@@ -74,4 +86,13 @@ Roles:
 - [x] S1 Data — scraper + monster dataset + search API.
 - [x] S2 Engine — wheel model for 5 vocations + optimizer.
 - [x] S3 UI — components, dark Tibian theme, wheel visualization.
-- [ ] S4 Integration — wire everything, zero TS errors, tests, docs, README.
+- [x] S4 Integration — wire everything, zero TS errors, tests, docs, README.
+
+## Known limitations / Next steps
+
+- Perk value units are heuristic; calibrate against real damage/healing formulas.
+- Monk wheel data and Vessel Resonance values are approximate; gems are not modelled.
+- Some legacy monsters lack damage types / max damage on tibiopedia.pl.
+- No DOM/component tests — add jsdom + Testing Library for `App`, `MonsterSearch`, `PointsInput`.
+- Scroll points are not persisted; consider adding them to the URL state.
+- Consider a Web Worker for `optimize()` if the beam width is increased.

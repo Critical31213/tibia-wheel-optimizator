@@ -1,51 +1,57 @@
 /**
  * Thin UI-facing facade over the engine and data modules.
+ * Components import from here, never from `../engine` / `../data` directly.
  *
- * Components import from here, never from `../engine` / `../data` directly,
- * so the temporary fixture fallback lives in exactly one place.
- *
- * TO REMOVE THE FALLBACK: delete `./fixtures.ts`, delete every branch marked
- * `FIXTURE FALLBACK` below and re-export the real functions directly.
+ * The monster dataset (~950 kB JSON) is code-split: `loadMonsterData()` pulls
+ * `src/data` in a separate chunk. Until it resolves, `searchMonsters` returns
+ * [] and `getMonsterById` returns undefined; `useMonsterData()` re-renders
+ * subscribers once the data is ready.
  */
-import { getMonsterById as realGetMonsterById, MONSTERS, searchMonsters as realSearchMonsters } from '../data';
-import { getWheel as realGetWheel, optimize as realOptimize, pointsForLevel } from '../engine';
-import type { Monster, OptimizerInput, OptimizerResult, Vocation, WheelDefinition } from '../types';
-import { FIXTURE_MONSTERS, fixtureOptimize, fixtureWheel } from './fixtures';
+import { useEffect, useSyncExternalStore } from 'react';
+import type { Monster } from '../types';
 
-export { pointsForLevel };
+export { getWheel, MAX_SCROLL_POINTS, optimize, pointsForLevel } from '../engine';
 
-// FIXTURE FALLBACK — true while the corresponding real module is still a stub.
-export const usingFixtureMonsters = MONSTERS.length === 0;
+type DataModule = typeof import('../data');
 
-function realWheelAvailable(vocation: Vocation): boolean {
-  return realGetWheel(vocation).slices.length > 0;
+let data: DataModule | null = null;
+let pending: Promise<DataModule> | null = null;
+const listeners = new Set<() => void>();
+
+export function loadMonsterData(): Promise<DataModule> {
+  pending ??= import('../data').then(
+    (mod) => {
+      data = mod;
+      listeners.forEach((l) => l());
+      return mod;
+    },
+    (err: unknown) => {
+      pending = null;
+      throw err;
+    },
+  );
+  return pending;
 }
 
-export function isDemoWheel(vocation: Vocation): boolean {
-  return !realWheelAvailable(vocation); // FIXTURE FALLBACK
+export const isMonsterDataLoaded = (): boolean => data !== null;
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
 }
 
-export function getWheel(vocation: Vocation): WheelDefinition {
-  const wheel = realGetWheel(vocation);
-  return wheel.slices.length > 0 ? wheel : fixtureWheel(vocation); // FIXTURE FALLBACK
-}
-
-export function optimize(input: OptimizerInput): OptimizerResult {
-  if (!realWheelAvailable(input.vocation)) return fixtureOptimize(input); // FIXTURE FALLBACK
-  return realOptimize(input);
+/** True once the monster dataset is loaded; triggers the load on first use. */
+export function useMonsterData(): boolean {
+  useEffect(() => {
+    if (!data) loadMonsterData().catch(() => undefined);
+  }, []);
+  return useSyncExternalStore(subscribe, isMonsterDataLoaded, () => false);
 }
 
 export function searchMonsters(query: string, limit = 10): Monster[] {
-  if (usingFixtureMonsters) {
-    // FIXTURE FALLBACK
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return FIXTURE_MONSTERS.filter((m) => m.name.toLowerCase().includes(q)).slice(0, limit);
-  }
-  return realSearchMonsters(query, limit);
+  return data ? data.searchMonsters(query, limit) : [];
 }
 
 export function getMonsterById(id: string): Monster | undefined {
-  if (usingFixtureMonsters) return FIXTURE_MONSTERS.find((m) => m.id === id); // FIXTURE FALLBACK
-  return realGetMonsterById(id);
+  return data?.getMonsterById(id);
 }

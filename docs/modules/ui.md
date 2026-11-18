@@ -16,7 +16,7 @@ screens it is two columns (controls left, results right).
 | `src/components/Panel.tsx` | Bordered section card with numbered heading. |
 | `src/components/VocationPicker.tsx` | 5 toggle cards, `radiogroup`. |
 | `src/components/VocationIcon.tsx` | Stroke icon per vocation. |
-| `src/components/PointsInput.tsx` | Points input + "or character level" helper. |
+| `src/components/PointsInput.tsx` | Points input + "or character level" helper + promotion-scroll points (0–50). |
 | `src/components/MonsterSearch.tsx` | Debounced ARIA combobox + selected `MonsterCard`. |
 | `src/components/MonsterCard.tsx` | Name, HP/exp, element chips, damage types. |
 | `src/components/PrioritySlider.tsx` | 0–100 range slider. |
@@ -24,8 +24,7 @@ screens it is two columns (controls left, results right).
 | `src/components/ResultsPanel.tsx` | Scores, revelations, convictions, stats, rationale, fill order. |
 | `src/hooks/useDebouncedValue.ts` | Generic debounce hook. |
 | `src/hooks/usePersistentInputs.ts` | Inputs state persisted to localStorage + URL. |
-| `src/lib/api.ts` | UI facade over `src/engine` + `src/data` (holds the fixture fallback). |
-| `src/lib/fixtures.ts` | Demo wheel/optimizer/monsters (temporary). |
+| `src/lib/api.ts` | UI facade over `src/engine` + lazily loaded `src/data` (`loadMonsterData`, `useMonsterData`). |
 | `src/lib/geometry.ts` | Pure SVG geometry helpers (tested). |
 | `src/lib/inputState.ts` | Input (de)serialisation + validation (tested). |
 | `src/lib/labels.ts` | Labels, colours, `clamp`, `cx`, `modifierKind`, `priorityLabel` (tested). |
@@ -37,7 +36,7 @@ screens it is two columns (controls left, results right).
 App
 ├─ VocationPicker      value, onChange(vocation)
 ├─ PointsInput         value, max (= wheel.totalCapacity), onChange(points)
-├─ MonsterSearch       value: Monster | null, onChange(monster | null)
+├─ MonsterSearch       value: Monster | null, ready (dataset loaded), onChange(monster | null)
 │  └─ MonsterCard      monster
 ├─ PrioritySlider      value, onChange(priority)
 ├─ Panel › WheelChart  wheel, result | null
@@ -52,7 +51,9 @@ Components never import `src/engine` / `src/data` directly — only `src/lib/api
    Initial value = defaults ← localStorage (`wheel-optimizer:inputs:v1`) ← URL query
    (`?v=druid&p=420&m=demon&prio=75`; URL wins). Every change is written back to
    localStorage (try/catch) and to the URL with `history.replaceState`.
-   All values are sanitised (`sanitize`) — unknown vocation dropped, numbers clamped.
+   All values are sanitised (`sanitize`) — unknown vocation dropped, points clamped to 0–`MAX_POINTS` (4000 = wheel
+   capacity), priority to 0–100. Once the monster dataset is loaded, an unknown monster id is reset to `null`
+   (`withKnownMonster`).
 2. `App` derives `wheel = getWheel(vocation)` (memo) and clamps points to `wheel.totalCapacity`.
 3. `useDeferredValue(inputs)` keeps the slider/typing responsive; `optimize()` runs in a
    `useMemo` keyed on the deferred vocation/points/monster/priority. `points = 0` → `result = null` → empty state.
@@ -92,16 +93,13 @@ Angles are degrees clockwise from 12 o'clock, matching `Slice.indexInRing`:
 - Fill-order badges sit at the sector centroid (mid angle, mid radius) and show the 1-based
   index of the slice in `result.path`.
 
-## Fixture fallback & removal
+## Monster data loading
 
-`src/lib/api.ts` checks the real modules: if `getWheel(v).slices` is empty it uses
-`fixtureWheel` / `fixtureOptimize` (and the app shows a "Demo mode" banner); if
-`MONSTERS` is empty it searches `FIXTURE_MONSTERS`. Every such branch is marked
-`// FIXTURE FALLBACK`.
-
-To remove: delete `src/lib/fixtures.ts`, delete the `FIXTURE FALLBACK` branches in
-`api.ts` (make `getWheel`/`optimize`/`searchMonsters`/`getMonsterById` plain re-exports,
-`isDemoWheel` → remove and drop the banner in `App.tsx`).
+The monster dataset (~950 kB JSON) is code-split. `main.tsx` calls `loadMonsterData()` before the first
+render so the `data` chunk downloads in parallel; `useMonsterData()` (a `useSyncExternalStore` hook) flips
+to `true` when it resolves. Until then `searchMonsters` returns `[]` (the listbox says "Loading monster
+data…") and `getMonsterById` returns `undefined`, so the first build is generic and is recomputed once
+the selected monster resolves. The engine is bundled eagerly (it is small).
 
 ## Work log
 
@@ -110,3 +108,4 @@ To remove: delete `src/lib/fixtures.ts`, delete the `FIXTURE FALLBACK` branches 
 - 2026-11-18 — All components (`VocationPicker`, `PointsInput`, `MonsterSearch`, `MonsterCard`,
   `PrioritySlider`, `WheelChart`, `ResultsPanel`) and `App` layout; fixed `-0` / full-circle arc
   rounding in `geometry.ts`. `tsc -b`, `vitest run src/lib` (16 tests) and `npm run build` pass.
+- 2026-11-18 — (S4) Fixture fallback removed; monster data lazy-loaded; scroll points field; `MAX_POINTS` = 4000.

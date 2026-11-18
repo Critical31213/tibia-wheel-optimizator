@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { DEFAULT_INPUTS, fromQuery, sanitize, toQuery } from '../lib/inputState';
+import { getMonsterById, loadMonsterData } from '../lib/api';
+import { DEFAULT_INPUTS, fromQuery, sanitize, toQuery, withKnownMonster } from '../lib/inputState';
 import type { InputState } from '../lib/inputState';
 
 const STORAGE_KEY = 'wheel-optimizer:inputs:v1';
@@ -43,6 +44,13 @@ export function usePersistentInputs() {
       /* sandboxed iframe etc. — ignore */
     }
   }, [state]);
+
+  // Once the (lazy) monster dataset is in, drop an unknown monster id from a stale link / storage.
+  useEffect(() => {
+    loadMonsterData()
+      .then(() => setState((s) => withKnownMonster(s, (id) => getMonsterById(id) !== undefined)))
+      .catch(() => undefined);
+  }, []);
 
   const update = useCallback((patch: Partial<InputState>) => {
     setState((prev) => ({ ...prev, ...patch }));

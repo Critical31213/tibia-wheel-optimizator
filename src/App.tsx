@@ -7,26 +7,25 @@ import { ResultsPanel } from './components/ResultsPanel';
 import { VocationPicker } from './components/VocationPicker';
 import { WheelChart } from './components/WheelChart';
 import { usePersistentInputs } from './hooks/usePersistentInputs';
-import { getMonsterById, getWheel, isDemoWheel, optimize } from './lib/api';
-import { MAX_POINTS } from './lib/inputState';
+import { getMonsterById, getWheel, optimize, useMonsterData } from './lib/api';
 import { VOCATION_LABELS } from './lib/labels';
 
 export default function App() {
   const [inputs, update] = usePersistentInputs();
+  const monstersReady = useMonsterData();
   const deferred = useDeferredValue(inputs);
 
   const wheel = useMemo(() => getWheel(inputs.vocation), [inputs.vocation]);
-  const maxPoints = wheel.totalCapacity > 0 ? wheel.totalCapacity : MAX_POINTS;
+  const maxPoints = wheel.totalCapacity;
   const monster = useMemo(
-    () => (inputs.monsterId ? (getMonsterById(inputs.monsterId) ?? null) : null),
-    [inputs.monsterId],
+    () => (monstersReady && inputs.monsterId ? (getMonsterById(inputs.monsterId) ?? null) : null),
+    [inputs.monsterId, monstersReady],
   );
-  const demo = isDemoWheel(inputs.vocation);
 
   const points = Math.min(deferred.points, maxPoints);
   const deferredMonster = useMemo(
-    () => (deferred.monsterId ? (getMonsterById(deferred.monsterId) ?? null) : null),
-    [deferred.monsterId],
+    () => (monstersReady && deferred.monsterId ? (getMonsterById(deferred.monsterId) ?? null) : null),
+    [deferred.monsterId, monstersReady],
   );
   const result = useMemo(
     () =>
@@ -48,18 +47,11 @@ export default function App() {
         </p>
       </header>
 
-      {demo && (
-        <p role="status" className="mb-4 rounded-lg border border-gold-700 bg-gold-700/15 px-3 py-2 text-xs text-gold-300">
-          Demo mode: the real wheel data for {VOCATION_LABELS[inputs.vocation]} is not available yet, so a placeholder
-          wheel and optimizer are shown.
-        </p>
-      )}
-
       <div className="grid gap-4 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-start lg:gap-6">
         <div className="flex flex-col gap-4">
           <VocationPicker value={inputs.vocation} onChange={(vocation) => update({ vocation })} />
           <PointsInput value={inputs.points} max={maxPoints} onChange={(p) => update({ points: p })} />
-          <MonsterSearch value={monster} onChange={(m) => update({ monsterId: m?.id ?? null })} />
+          <MonsterSearch value={monster} ready={monstersReady} onChange={(m) => update({ monsterId: m?.id ?? null })} />
           <PrioritySlider value={inputs.priority} onChange={(priority) => update({ priority })} />
         </div>
 

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { pointsForLevel } from '../lib/api';
+import { useState } from 'react';
+import { MAX_SCROLL_POINTS, pointsForLevel } from '../lib/api';
 import { clamp, formatNumber } from '../lib/labels';
 import { Panel } from './Panel';
 
@@ -14,11 +14,15 @@ interface PointsInputProps {
 export function PointsInput({ value, max, onChange }: PointsInputProps) {
   const [text, setText] = useState(String(value));
   const [level, setLevel] = useState('');
+  const [scrolls, setScrolls] = useState(0);
+
+  const [synced, setSynced] = useState(value);
 
   // Keep the field in sync when the value changes from outside (level helper, clamp, URL).
-  useEffect(() => {
-    setText((t) => (Number(t) === value && t !== '' ? t : String(value)));
-  }, [value]);
+  if (synced !== value) {
+    setSynced(value);
+    if (!(Number(text) === value && text !== '')) setText(String(value));
+  }
 
   const commit = (raw: string) => {
     setText(raw);
@@ -27,13 +31,19 @@ export function PointsInput({ value, max, onChange }: PointsInputProps) {
     if (Number.isFinite(n)) onChange(clamp(Math.round(n), 0, max));
   };
 
-  const onLevel = (raw: string) => {
-    setLevel(raw);
+  const levelToPoints = (raw: string, sc: number) => {
     const lv = Number(raw);
-    if (raw.trim() !== '' && Number.isFinite(lv)) onChange(clamp(pointsForLevel(Math.round(lv)), 0, max));
+    return raw.trim() !== '' && Number.isFinite(lv) ? pointsForLevel(Math.round(lv), sc) : null;
   };
 
-  const levelPoints = level.trim() !== '' && Number.isFinite(Number(level)) ? pointsForLevel(Math.round(Number(level))) : null;
+  const onLevel = (raw: string, sc = scrolls) => {
+    setLevel(raw);
+    setScrolls(sc);
+    const pts = levelToPoints(raw, sc);
+    if (pts !== null) onChange(clamp(pts, 0, max));
+  };
+
+  const levelPoints = levelToPoints(level, scrolls);
 
   return (
     <Panel title="Promotion points" step={2} headingId="points-heading">
@@ -68,6 +78,19 @@ export function PointsInput({ value, max, onChange }: PointsInputProps) {
           />
         </label>
       </div>
+      <label className="mt-2 flex items-center justify-between gap-2 text-xs text-parchment-300">
+        Promotion scroll points (0–{MAX_SCROLL_POINTS}, added to level)
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          max={MAX_SCROLL_POINTS}
+          step={1}
+          value={scrolls}
+          onChange={(e) => onLevel(level, clamp(Math.round(Number(e.target.value) || 0), 0, MAX_SCROLL_POINTS))}
+          className="field w-20 tabular-nums"
+        />
+      </label>
       <p id="points-help" className="mt-2 text-xs text-parchment-400">
         {levelPoints !== null && (
           <>
