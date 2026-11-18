@@ -97,6 +97,7 @@ export interface SearchOpts {
 }
 export const FULL_SEARCH: SearchOpts = { width: BEAM_WIDTH, complete: COMPLETE_TOP };
 export const LIGHT_SEARCH: SearchOpts = { width: 12, complete: 2 };
+const SCREEN_SEARCH: SearchOpts = { width: 8, complete: 1 };
 /** Fraction of the next revelation stage credited proportionally to progress (ranking only). */
 const LOOKAHEAD_WEIGHT = 0.6;
 const UTIL_WEIGHT = 0.1;
@@ -972,6 +973,20 @@ function planValid(p: Prepared, stages: number[]): boolean {
 
 const runSearch = (p: Prepared, tables = p.tables, opts = FULL_SEARCH) => search(p.wheel, tables, p.budget, p.gemRm, p.forced.seed, opts);
 
+const GATED_BOOST = 10;
+
+/**
+ * Search for one rotation plan. A plan gated on a revelation (D20) whose search misses that revelation gets a
+ * second (full) run with the revelation boosted, so it is judged on a valid build; the better valid state wins.
+ */
+function searchPlan(p: Prepared, opts = FULL_SEARCH): State {
+  const st = runSearch(p, p.tables, opts);
+  const d = revelationIndex(p.wheel.revelations, p.v.model.plan.requires);
+  if (d < 0 || planValid(p, gridStages(p, st))) return st;
+  const boosted = runSearch(p, blendTables(p.parts, p.blend, [0, 1, 2, 3].map((x) => (x === d ? GATED_BOOST : 1))), FULL_SEARCH);
+  return planValid(p, gridStages(p, boosted)) ? boosted : st;
+}
+
 type BuildResult = Omit<OptimizerResult, 'alternatives'>;
 
 function assemble(p: Prepared, best: State): BuildResult {
@@ -1084,15 +1099,12 @@ function bestPlan(plans: Prepared[], st: State): { p: Prepared; obj: number } {
   return best ?? { p: plans[0], obj: objective(plans[0], st) };
 }
 
-/** Alternatives to `main`; returns `better` instead when a candidate beats the main build on the main objective. */
-function alternatives(
-  p: Prepared,
-  plans: Prepared[],
-  main: State,
-  mainResult: BuildResult,
-  count: number,
-): { alts: AlternativeBuild[]; better?: { st: State; p: Prepared } } {
-  if (count <= 0 || p.budget < 100) return { alts: [] };
+/**
+ * Alternatives to `main`. A candidate that beats the main build on the main objective (the beam is heuristic)
+ * is promoted to main in place; alternatives too close to the new main are dropped.
+ */
+function alternatives(p: Prepared, plans: Prepared[], main: State, count: number): OptimizerResult {
+  if (count <= 0 || p.budget < 100) return { ...assemble(p, main), alternatives: [] };
   const prio = clampPriority(p.input.priority);
   const stages = gridStages(p, main);
   const pts = DOMAIN_ORDER.map((_, d) => main.domainPts[d]);
@@ -1115,31 +1127,38 @@ function alternatives(
   for (let d = 0; d < 4; d++) if (d !== top && d !== avatar && stages[d] < 3) cands.push({ kind: 'revelationFocus', priority: prio, revScale: scale([d], 4) });
 
   const minDiff = Math.max(50, Math.round(0.1 * p.budget));
-  const accepted: State[] = [main];
-  const out: AlternativeBuild[] = [];
-  const mainObj = objective(p, main);
+  const base = p;
+  let mainObj = objective(p, main);
+  let found: { c: AltCandidate; st: State; plan: { p: Prepared; obj: number } }[] = [];
   for (const c of cands) {
-    if (out.length >= count) break;
-    const q = c.priority === prio ? p : prepare(p.input, c.priority, p);
-    const tables = c.revScale.every((x) => x === 1) ? q.tables : blendTables(q.parts, q.blend, c.revScale);
-    const st = runSearch(p, tables, LIGHT_SEARCH);
+    if (found.length >= count) break;
+    const q = c.priority === prio ? base : prepare(base.input, c.priority, base);
+    const st = runSearch(base, c.revScale.every((x) => x === 1) ? q.tables : blendTables(q.parts, q.blend, c.revScale), LIGHT_SEARCH);
     const plan = bestPlan(plans, st);
-    if (plan.obj > mainObj + 1e-9) return { alts: [], better: { st, p: plan.p } };
-    if (accepted.some((a) => allocDistance(a.alloc, st.alloc) < minDiff)) continue;
-    accepted.push(st);
+    if (plan.obj > mainObj + 1e-9) {
+      main = st;
+      p = plan.p;
+      mainObj = plan.obj;
+      found = found.filter((f) => allocDistance(f.st.alloc, st.alloc) >= minDiff);
+      continue;
+    }
+    if (allocDistance(main.alloc, st.alloc) < minDiff || found.some((f) => allocDistance(f.st.alloc, st.alloc) < minDiff)) continue;
+    found.push({ c, st, plan });
+  }
+  const mainResult = assemble(p, main);
+  const out: AlternativeBuild[] = [];
+  for (const { c, st, plan } of found) {
     const qa = c.priority === prio ? plan.p : prepare(p.input, c.priority, plan.p);
     const result = assemble(qa, st);
     const altStages = gridStages(p, st);
     const altTop = topDomain(altStages, DOMAIN_ORDER.map((_, d) => st.domainPts[d]));
     // All revelations at the alternative's highest stage, so e.g. 'A + B focus' and 'B focus' stay distinguishable.
-    const revName = altTop >= 0
-      ? DOMAIN_ORDER.map((_, d) => d).filter((d) => altStages[d] === altStages[altTop]).map((d) => p.wheel.revelations[d].data.name).join(' + ')
-      : '-';
+    const revName = DOMAIN_ORDER.map((_, d) => d).filter((d) => altTop >= 0 && altStages[d] === altStages[altTop]).map((d) => p.wheel.revelations[d].data.name).join(' + ');
     const label =
       c.kind === 'avatarFocus'
         ? text('alt.avatarFocus', { revelation: p.wheel.revelations[avatar].data.name })
         : c.kind === 'revelationFocus'
-          ? text('alt.revelationFocus', { revelation: revName })
+          ? revName ? text('alt.revelationFocus', { revelation: revName }) : text('alt.noRevelation')
           : text(c.kind === 'defensive' ? 'alt.defensive' : 'alt.offensive');
     const relativeScore = mainObj > 0 ? Math.round((1000 * plan.obj) / mainObj) / 10 : 100;
     const revList = result.revelations.filter((r) => r.stage > 0).map((r) => `${r.perk.name} ${r.stage}`).join(', ') || '-';
@@ -1151,7 +1170,7 @@ function alternatives(
     });
     out.push({ label: label.text, labelMsg: label.msg, tradeoff: tradeoff.text, tradeoffMsg: tradeoff.msg, relativeScore, result });
   }
-  return { alts: out.sort((a, b) => b.relativeScore - a.relativeScore) };
+  return { ...mainResult, alternatives: out.sort((a, b) => b.relativeScore - a.relativeScore) };
 }
 
 /**
@@ -1179,13 +1198,15 @@ function refine(p: Prepared, best: State): State {
  * Rotation plans to evaluate: the chosen preset, or (auto) every preset of the vocation plus the greedy
  * schedule in boss mode. All share one reference T0 (best plan without a revelation requirement).
  */
-function planSpecs(input: OptimizerInput): PlanSpec[] {
+export function planSpecs(input: OptimizerInput): PlanSpec[] {
   const chosen = presetById(input.vocation, input.rotationId);
   const boss = input.context?.mode === 'boss';
   const all = getRotationPresets(input.vocation);
-  const presets: (RotationPreset | null)[] = chosen ? [chosen] : [...all, ...(boss || !all.length ? [null] : [])];
+  const autoPlans: (RotationPreset | null)[] = [...all, ...(boss || !all.length ? [null] : [])];
+  const presets = chosen ? [chosen] : autoPlans;
   const base = modelInputs(input).model;
-  const reference = Math.max(1, ...presets.filter((x) => !x?.requires?.revelation).map((x) => planTotal(base, x)));
+  // Same reference in manual and auto mode, so offense values stay comparable.
+  const reference = Math.max(1, ...autoPlans.filter((x) => !x?.requires?.revelation).map((x) => planTotal(base, x)));
   const wheel = getEngineWheel(input.vocation);
   const forced = forcedSeed(wheel, input.forcedSpells ?? [], Math.min(wheel.definition.totalCapacity, pointsOf(input)));
   return presets.map((preset) => ({ preset, reference, auto: !chosen, forced }));
@@ -1210,23 +1231,16 @@ export function runOptimizer(input: OptimizerInput): OptimizerResult {
   let finalists = plans;
   if (plans.length > 2) {
     const screened = plans.map((q) => {
-      const st = runSearch(q, q.tables, LIGHT_SEARCH);
+      const st = searchPlan(q, SCREEN_SEARCH);
       consider(q, st);
       return { q, obj: planValid(q, gridStages(q, st)) ? objective(q, st) : -Infinity };
     });
     screened.sort((a, b) => b.obj - a.obj);
     finalists = screened.filter((x, i) => i === 0 || (i === 1 && x.obj >= screened[0].obj - 0.02 * Math.abs(screened[0].obj))).map((x) => x.q);
   }
-  for (const q of finalists) consider(q, runSearch(q));
-  let main = refine(p, best ?? runSearch(p));
+  for (const q of finalists) consider(q, searchPlan(q));
+  const main = refine(p, best ?? runSearch(p));
   const n = Math.max(0, Math.min(5, Math.floor(input.alternatives ?? DEFAULT_ALTERNATIVES)));
   const count = Number.isFinite(n) ? n : DEFAULT_ALTERNATIVES;
-  // An alternative search may beat the main one (objective is not convex): promote it and retry.
-  for (let k = 0; ; k++) {
-    const result = assemble(p, main);
-    const { alts, better } = alternatives(p, plans, main, result, count);
-    if (!better || k >= 3) return { ...result, alternatives: alts };
-    main = better.st;
-    p = better.p;
-  }
+  return alternatives(p, plans, main, count);
 }

@@ -141,7 +141,7 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 
 0. **Plans and forced spells.** One prepared valuation per plan (see Rotation). Forced spells (`input.forcedSpells`, D21) are seeded with a Dijkstra over slice capacities to their cheapest stage I augment, and every search starts from that seed. Messages: `rationale.forced`, `rationale.forcedImpossible`, `rationale.forcedNoAugment`.
 1. **Tables.** Parts for each dedication point, conviction, augment I/II, revelation[domain][stage] and vessel[k], blended by priority. `blendTables` can rescale revelations for alternatives.
-2. **Beam search.** `FULL_SEARCH` = width 24 with 8 completions; `LIGHT_SEARCH` = 12 with 2. With more than 2 plans, every plan is screened with the light search, then the best plan (and a runner-up within 2 %) gets the full search. Refine and alternatives use the light search. Fills are full slices, deduplicated by allocation key.
+2. **Beam search.** `FULL_SEARCH` = width 24 with 8 completions; `LIGHT_SEARCH` = 12 with 2. With more than 2 plans, every plan is screened with the light search, then the best plan (and a runner-up within 2 %) gets the full search. A plan gated on a revelation whose search misses it gets a second full search with that revelation boosted ×10, so it is compared on a valid build (no bias: the choice uses the shared objective). Manual and auto mode share the offense reference. Screening uses width 8 / 1 completion. Refine and alternatives use the light search. Fills are full slices, deduplicated by allocation key.
    - Candidates are ranked without allocating (`rankOf` with a precomputed delta). Only the top 24 are materialised, and only the top 8 are greedily completed per level.
    - Rank = score + revelation-stage look-ahead + greedy-completion estimate. A partial last slice uses the remainder.
    - A budget ≥ total capacity has only one allocation, so the search returns the full wheel and no alternatives.
@@ -158,7 +158,7 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
    Acceptance and scoring:
    - An alternative is accepted only if it differs by at least `max(50, 0.1 · budget)` points (Σ|Δ| / 2) from the main build and from every alternative already accepted.
    - Each alternative picks its own best plan. `rationale.rotationAuto`, `rotationManual` and `rotationRequires` explain the rotation.
-   - `relativeScore = 100 · objective(alt) / objective(main)`, under the main valuation. If any candidate search beats the main build (the beam is heuristic; seen up to 106 %), it is promoted to main and alternatives are recomputed (≤ 3 rounds), so `relativeScore ≤ 100`. Alternatives are sorted by `relativeScore` (desc).
+   - `relativeScore = 100 · objective(alt) / objective(main)`, under the main valuation. If any candidate search beats the main build (the beam is heuristic; seen up to 106 %), it is promoted to main in the same pass (alternatives too close to it are dropped), so `relativeScore ≤ 100`. Alternatives are sorted by `relativeScore` (desc).
    - The `alt.revelationFocus` label names every revelation at the alternative's highest stage (`A + B focus`), so two focus alternatives never share a label.
    - `tradeoffMsg` (`alt.tradeoff`) lists the offense and defense deltas and the revelations.
 6. **Planner code.** `encodePlannerCode` (strict) of the allocation (`gridForSliceId`) plus the vessel gems.

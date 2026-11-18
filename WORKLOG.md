@@ -325,6 +325,19 @@ Max mana was scored as offense, so at DPS-leaning priority lesser gems for every
   - `docs/modules/integration.md`.
 
 ### 2026-11-18 — D22 area augments + gem substitutesArea-augmented spells use the tibiapal average only with the augment (else −0.5 targets; `SpellEval.areaGap`). Gem recommendations carry `similar` (≥90 % of the chosen mod's gain; UI line "Near-equal substitutes"). EK 1200 pts max DPS: greater gem now Augmented Fierce Berserk, Front Sweep listed at 93 %. 487 tests.
+
+### 2026-11-18 — S2 Engine (iteration 4 follow-up)
+- **Fair search for revelation-gated presets (`searchPlan`):** when a preset's search misses its required revelation, the engine runs a second full search with that revelation boosted ×10. This only gives the preset a valid build; plans are still compared on the shared objective, with no bias toward beams.
+- **Sorcerer at level 300, no monster:** priority 20 now picks Beam Mastery 1 with `ms-echo-gdb` at 250, 300 and 350 points. At 250 points it was missed before: the objective was 8.60 vs 8.52.
+- **Priority 50 keeps no revelation:** about 20 pp EHP from the 3 Gem Vessel slices (recommended grade-IV HP gems) outweighs Beam Mastery's +5.5 % damage.
+- **Manual mode:** uses the same offense reference as auto mode. Before, it was 1 for gated presets.
+- **Alternative labels:** an alternative with no revelation is labelled `alt.noRevelation` ("No revelation" / "Bez objawienia") instead of "- focus".
+- **Perf:**
+  - Alternatives promote a better build in a single pass instead of up to 3 recompute rounds.
+  - Plan screening uses width 8 with 1 completion.
+  - Worst case is 45 ms (druid, 3200 points, boss).
+- **Tests:** 3 new tests in `iteration4.test.ts`.
+
 ## In progress / Next
 
 - [x] S1 Data — scraper + monster dataset + search API.
@@ -346,6 +359,6 @@ Open issues:
 - No alternatives near a full wheel (no room for a ≥ 10 % different build).
 - Some legacy monsters lack damage types / max damage.
 - **Pending user decision:** at priority 50, the RP 500–800 hunt build picks Gift of Life instead of the meta Divine Grenade + Divine Empowerment. The cause is that 1 % EHP is weighted like 1 % damage, and the offense/defense exchange rate is not decided yet. Divine Grenade wins at priority ≤ 20–35.
-- Paladin mitigation calibration assumes shield defense 50, and the quiver factor (0.877) comes from a single data pair.
+- Paladin mitigation: shield defense 50 confirmed (Gnome Shield); the quiver factor (0.877) still comes from a single data pair.
 - Rotation preset notes are English-only data strings (not translated in PL).
 - Consider a Web Worker for `optimize()` if the beam width or alternative count grows.

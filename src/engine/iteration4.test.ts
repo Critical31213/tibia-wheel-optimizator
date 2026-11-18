@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { type Monster, type OptimizerResult, VOCATIONS } from '../types';
 import { getRotationPresets } from '../data/damage/rotations';
 import { optimize } from './index';
-import { valuationFor } from './optimizer';
+import { planSpecs, valuationFor } from './optimizer';
 import { augmentParts } from './values';
 import { getEngineWheel } from './wheel/build';
 import { buildSpellModel, targetsAt } from './spells';
@@ -140,5 +140,40 @@ describe('D22: area augments and near-equal gem substitutes', () => {
     const sup = greater.mods.find((x) => x.kind === 'supreme')!;
     for (const s of greater.similar ?? []) expect(s.relative).toBeGreaterThanOrEqual(90);
     expect(sup.name === 'Augmented Fierce Berserk' || greater.similar?.some((s) => s.name === 'Augmented Fierce Berserk')).toBe(true);
+  });
+});
+
+describe('iteration 4 follow-up', () => {
+  const sorc = (points: number, priority: number, rotationId?: string) =>
+    optimize({ vocation: 'sorcerer', points, character: { level: 300 }, monster: null, priority, context: HUNT, alternatives: 0, rotationId });
+
+  it('auto mode finds Beam Mastery for a 250–300 point sorcerer when the objective prefers it (priority 20)', () => {
+    for (const points of [250, 300]) {
+      const r = sorc(points, 20);
+      expect(revStage(r, 'Beam Mastery'), `${points}`).toBe(1);
+      expect(r.rotation?.presetId).toBe('ms-echo-gdb');
+      expect(r.rotation?.auto).toBe(true);
+    }
+  });
+
+  it('manual and auto mode share the offense reference', () => {
+    for (const context of [HUNT, { mode: 'boss' } as const]) {
+      const input = { vocation: 'sorcerer' as const, points: 300, monster: null, priority: 50, context };
+      const auto = planSpecs(input)[0].reference;
+      expect(auto).toBeGreaterThan(1);
+      for (const rotationId of ['ms-echo-gdb', 'ms-gfw-echo']) expect(planSpecs({ ...input, rotationId })[0].reference).toBe(auto);
+    }
+  });
+
+  it('alternative labels never use a "-" placeholder', () => {
+    for (const vocation of VOCATIONS) {
+      for (const points of [100, 250, 400]) {
+        const r = optimize({ vocation, points, monster: null, priority: 50, context: HUNT, alternatives: 5 });
+        for (const a of r.alternatives ?? []) {
+          expect(a.label).not.toMatch(/^-|\s-\s/);
+          expect(a.labelMsg?.params?.revelation ?? 'x').not.toBe('');
+        }
+      }
+    }
   });
 });

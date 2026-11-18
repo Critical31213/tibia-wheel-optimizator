@@ -284,6 +284,7 @@ export const pl: Dictionary = {
   'engine.stat.vessels': 'Odblokowane naczynia na gemy',
   'engine.stat.gemMod': '{name} (gemy)',
   'engine.alt.revelationFocus': 'Nastawiony na {revelation}',
+  'engine.alt.noRevelation': 'Bez objawienia',
   'engine.alt.avatarFocus': 'Nastawiony na Avatara ({revelation})',
   'engine.alt.defensive': 'Bardziej defensywny',
   'engine.alt.offensive': 'Bardziej ofensywny',

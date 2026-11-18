@@ -175,7 +175,7 @@ Full details: [`docs/modules/engine.md`](docs/modules/engine.md).
   - **Revelation Mastery** (slices, owned and recommended gems) is valued with look-ahead to the next stage.
 - **Search** (`optimizer.ts`):
   - One beam search per rotation plan: a light screening pass (width 12) for every plan, then a full search (width 24) for the best plan and a runner-up within 2 %. Beam search (allocation-free ranking) over full-slice fills with revelation look-ahead and a partial last slice, plus a refine pass that damps one revelation at a time.
-  - Returns `plannerCode` and `input.alternatives ?? 2` distinct alternatives (revelation focus, Avatar focus, priority shift), each with `relativeScore`, sorted best first. If an alternative search beats the main build on the main objective, it is promoted to main and the alternatives are recomputed (≤ 3 rounds).
+  - Returns `plannerCode` and `input.alternatives ?? 2` distinct alternatives (revelation focus, Avatar focus, priority shift), each with `relativeScore`, sorted best first. If an alternative search beats the main build on the main objective, it is promoted to main in the same pass.
   - Deterministic; worst case ~35–45 ms with alternatives.
 - **Gems** (`gems.ts`):
   - Owned gems are placed with the Hungarian algorithm; active slots = min(gem, vessel) quality.

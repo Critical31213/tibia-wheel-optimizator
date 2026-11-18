@@ -83,9 +83,9 @@ How the constants were inferred:
 - **Mage default shielding** was raised to 28/31/33/36/37/39/40 (levels 200…1500). The ED's 0.40 % implies about
   36 shielding at level 781.
 
-**Uncertainty.** We do not know the RP's shield, the RP's level, or the ED's shielding. The fit assumes a
-defense-50 shield and the default ED stats. With a different shield (46–55), the offhand factor would fall
-between 2.33 and 2.78. The quiver factor rests on a single pair of observations. Any bow or crossbow paladin
+**Uncertainty.** The RP shield is a **Gnome Shield (defense 50, TibiaTools meta), confirmed by the user**, so the offhand factor 2.56 is
+fitted on a known item. The RP level and the ED shielding are still unknown (the fit uses the default ED stats).
+The quiver factor rests on a single pair of observations. Any bow or crossbow paladin
 without a quiver is treated like `'none'` (factor 1), which is untested. Monk weapon defense is ignored.
 
 **Defaults (`DEFAULT_OFFHAND`)**

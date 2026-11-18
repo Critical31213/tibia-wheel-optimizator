@@ -81,6 +81,7 @@ export const ENGINE_MESSAGES = {
 
   // Alternatives
   'alt.revelationFocus': '{revelation} focus',
+  'alt.noRevelation': 'No revelation',
   'alt.avatarFocus': 'Avatar focus ({revelation})',
   'alt.defensive': 'More defensive',
   'alt.offensive': 'More offensive',
