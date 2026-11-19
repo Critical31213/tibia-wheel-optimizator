@@ -12,12 +12,14 @@ import { Tip } from './Tip';
 
 interface WeaponSearchProps {
   vocation: Vocation;
+  /** D53: knights with a trained melee skill only see weapons of that type. */
+  meleeSkill: MeleeSkill | null;
   owned: ReadonlySet<string>;
   onAdd: (w: Weapon) => void;
 }
 
 /** ARIA 1.2 combobox adding a weapon of the vocation. */
-function WeaponSearch({ vocation, owned, onAdd }: WeaponSearchProps) {
+function WeaponSearch({ vocation, meleeSkill, owned, onAdd }: WeaponSearchProps) {
   const t = useT();
   const id = useId();
   const listId = `${id}-list`;
@@ -26,8 +28,11 @@ function WeaponSearch({ vocation, owned, onAdd }: WeaponSearchProps) {
   const [active, setActive] = useState(-1);
   const debounced = useDebouncedValue(query, 120);
   const results = useMemo(
-    () => searchWeapons(debounced, vocation, 12 + owned.size).filter((w) => !owned.has(w.id)).slice(0, 12),
-    [debounced, vocation, owned],
+    () =>
+      searchWeapons(debounced, vocation, Infinity)
+        .filter((w) => !owned.has(w.id) && (vocation !== 'knight' || !meleeSkill || w.type === meleeSkill))
+        .slice(0, 12),
+    [debounced, vocation, meleeSkill, owned],
   );
   const expanded = open && query.trim() !== '' && debounced === query;
 
@@ -382,7 +387,7 @@ export function WeaponsPanel({ vocation, meleeSkill, prefs, onChange }: WeaponsP
       }
     >
       <div id={bodyId} hidden={!open} className="flex flex-col gap-3">
-        <WeaponSearch vocation={vocation} owned={owned} onAdd={(w) => update((all) => [...all, ownWeapon(w)])} />
+        <WeaponSearch vocation={vocation} meleeSkill={meleeSkill} owned={owned} onAdd={(w) => update((all) => [...all, ownWeapon(w)])} />
         {prefs.weapons.length === 0 ? (
           <p className="text-sm text-parchment-300">{t('weapons.empty')}</p>
         ) : (
