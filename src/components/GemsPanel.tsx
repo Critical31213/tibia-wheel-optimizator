@@ -131,6 +131,13 @@ export function GemsPanel({ vocation, gems, mods, emptyVessels, onChange }: Gems
   const t = useT();
   const bodyId = useId();
   const [open, setOpen] = useState(() => gems.length > 0);
+  const [closed, setClosed] = useState<ReadonlySet<GemQuality>>(new Set());
+  const toggle = (q: GemQuality) =>
+    setClosed((s) => {
+      const n = new Set(s);
+      if (!n.delete(q)) n.add(q);
+      return n;
+    });
   const totalEmpty = emptyVessels ? GEM_QUALITIES.reduce((n, q) => n + emptyVessels[q], 0) : 0;
 
   return (
@@ -160,16 +167,35 @@ export function GemsPanel({ vocation, gems, mods, emptyVessels, onChange }: Gems
             const empty = emptyVessels?.[q] ?? 0;
             const name = gemName(vocation, q);
             const list = gems.flatMap((gem, index) => (gem.quality === q ? [{ gem, index }] : []));
+            // Collapsing only pays off with several gems.
+            const collapsible = list.length > 1;
+            const hidden = collapsible && closed.has(q);
             return (
               <section
                 key={q}
                 aria-label={name}
                 className={cx('rounded-xl border p-2.5', empty > 0 ? 'border-amber-500/80 bg-amber-500/5' : 'border-ink-700')}
               >
-                <h3 className="mb-2 flex items-center gap-2 text-sm font-medium text-parchment-100">
-                  <GemIcon quality={q} />
-                  <span className="min-w-0 flex-1 truncate">{name}</span>
-                  {list.length > 0 && <span className="text-xs font-normal text-parchment-400">{list.length}</span>}
+                <h3 className="mb-2 text-sm font-medium text-parchment-100">
+                  {collapsible ? (
+                    <button
+                      type="button"
+                      aria-expanded={!hidden}
+                      onClick={() => toggle(q)}
+                      className="flex w-full items-center gap-2 text-left hover:text-gold-300"
+                    >
+                      <span aria-hidden="true" className="w-3 text-xs text-parchment-400">{hidden ? '▸' : '▾'}</span>
+                      <GemIcon quality={q} />
+                      <span className="min-w-0 flex-1 truncate">{name}</span>
+                      <span className="text-xs font-normal text-parchment-400">{list.length}</span>
+                    </button>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <GemIcon quality={q} />
+                      <span className="min-w-0 flex-1 truncate">{name}</span>
+                      {list.length > 0 && <span className="text-xs font-normal text-parchment-400">{list.length}</span>}
+                    </span>
+                  )}
                 </h3>
                 {empty > 0 && (
                   <p className="mb-2 text-xs text-amber-300">
@@ -179,7 +205,7 @@ export function GemsPanel({ vocation, gems, mods, emptyVessels, onChange }: Gems
                     })}
                   </p>
                 )}
-                {list.length === 0 ? (
+                {hidden ? null : list.length === 0 ? (
                   <p className="mb-2 text-xs text-parchment-400">{t('gems.sectionEmpty')}</p>
                 ) : (
                   <ul className="mb-2 flex flex-col gap-2">
