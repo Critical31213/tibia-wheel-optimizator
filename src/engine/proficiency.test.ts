@@ -4,7 +4,7 @@ import { getWeapon, type Perk } from '../data/proficiency';
 import type { OptimizerInput } from '../types';
 import { runOptimizer } from './optimizer';
 import { applyLoadout, choosePerks, levelOptions, loadoutCharacter, loadoutParts, type Loadout } from './proficiency';
-import { buildSpellModel, castDamage, NO_BONUS, rotationTotal } from './spells';
+import { buildSpellModel, castDamage, elementMultiplier, NO_BONUS, rotationTotal } from './spells';
 
 const dragonLord = MONSTERS.find((m) => m.id === 'dragon-lord')!;
 const epee = getWeapon('stellar-moonsilver-epee')!;
@@ -173,5 +173,25 @@ describe('weapon choice in the optimizer (D45)', () => {
       suggestWeapons: true,
     }));
     expect(performance.now() - t).toBeLessThan(1500);
+  });
+});
+
+describe('D62: weapon element in weapon spells', () => {
+  it('splits knight weapon spells by the physical and elemental attack shares', () => {
+    const fire = getWeapon('impaler-of-the-igniter')!;
+    const base = knight('hunt');
+    const phys = base.spells.get('Groundshaker')!.elem;
+    const m = applyLoadout(base, lo([], fire));
+    // dragon lords are immune to fire: only the physical share (25 of 51 attack) hits
+    expect(m.spells.get('Groundshaker')!.elem).toBeCloseTo((phys * 25) / 51, 2);
+    expect(applyLoadout(base, lo([], getWeapon('blacksteel-sword')!)).spells.get('Groundshaker')!.elem).toBeCloseTo(phys);
+  });
+
+  it('uses the monk elemental bond for weapon spells and auto attacks', () => {
+    const monk = buildSpellModel('monk', { mode: 'hunt' }, dragonLord, char);
+    const m = applyLoadout(monk, lo([], getWeapon('inferniarch-claws')!));
+    const energy = elementMultiplier(dragonLord, 'energy');
+    expect(energy).not.toBeCloseTo(elementMultiplier(dragonLord, 'physical'));
+    expect(m.spells.get('Flurry of Blows')!.elem).toBeCloseTo(energy, 3);
   });
 });

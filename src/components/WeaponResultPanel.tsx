@@ -14,9 +14,14 @@ import { WeaponMeta } from './WeaponsPanel';
 const SoloNote = ({ kind, t }: { kind?: string; t: TFunction }) =>
   kind === 'alphaStrike' ? <span className="text-weak"> ({t('weaponResult.solo')})</span> : null;
 
+const ammoLabel = (id: string, t: TFunction) => {
+  const a = getAmmo(id);
+  return a ? `${a.name} (${t(`element.${a.element}`).toLowerCase()})` : id;
+};
+
 const AmmoNote = ({ pick, t }: { pick: WeaponPick; t: TFunction }) => {
   const a = pick.ammo ? getAmmo(pick.ammo) : undefined;
-  return a ? <p className="text-xs text-parchment-300">{t('weaponResult.ammo', { name: a.name })}</p> : null;
+  return a ? <p className="text-xs text-parchment-300">{t('weaponResult.ammo', { name: a.name, element: t(`element.${a.element}`).toLowerCase() })}</p> : null;
 };
 
 interface WeaponResultPanelProps {
@@ -149,7 +154,7 @@ export function WeaponResultPanel({ result, owned, suggest, busy, onSuggestChang
               <li key={p.weaponId} className="flex items-baseline justify-between gap-2 text-sm">
                 <span className="min-w-0 truncate text-parchment-100">
                   {getWeapon(p.weaponId)?.name ?? p.weaponId}
-                  {p.ammo && <span className="text-xs text-parchment-400"> · {getAmmo(p.ammo)?.name}</span>}
+                  {p.ammo && <span className="text-xs text-parchment-400"> · {ammoLabel(p.ammo, t)}</span>}
                 </span>
                 <Gain effect={p.effect} score={p.delta} />
               </li>

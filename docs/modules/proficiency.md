@@ -120,3 +120,8 @@ the level that beat the chosen one (all levels unlocked; Ice Rapier excluded, it
 
 When the chosen weapon has manual perks, `weaponResult` also ranks it with every perk free (same scorer, ammunition
 re-chosen) and returns `WeaponResult.better` if that beats the manual loadout by more than `MIN_WEAPON_GAIN`.
+
+D62: weapon damage types. Auto attacks and weapon spells (`weaponElement` in the spell data: knight exori…, monk spells)
+deal the weapon's main element (`element`: monk elemental bond, amber weapons; physical otherwise) plus its elemental
+part (`elementAttack`), split by attack shares, each with its pierce perks; ammunition still turns the whole shot into its
+element. Monk bonds in the data match TibiaWiki's `elementalbond`.

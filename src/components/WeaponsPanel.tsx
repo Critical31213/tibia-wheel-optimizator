@@ -128,6 +128,24 @@ export function WeaponMeta({ weapon }: { weapon: Weapon }) {
     <span className="shrink-0 text-xs text-parchment-400">
       {t(`weapons.type.${weapon.type}`)} · {t('weapons.minLevel', { n: weapon.minLevel })}
       {weapon.hands === 2 && vocationUsesShield(weapon) ? ` · ${t('weapons.hands2')}` : ''}
+      <WeaponElement weapon={weapon} />
+    </span>
+  );
+}
+
+/** D62: damage types of knight and monk weapons (auto attacks and weapon spells). */
+function WeaponElement({ weapon: w }: { weapon: Weapon }) {
+  const t = useT();
+  if (!w.vocations.some((v) => v === 'knight' || v === 'monk')) return null;
+  const el = (e: string) => t(`element.${e}` as 'element.fire').toLowerCase();
+  const main = w.element ?? 'physical';
+  const text = w.elementAttack && w.attack !== undefined
+    ? t('weapons.elementSplit', { main: el(main), a: w.attack, element: el(w.elementAttack.element), b: w.elementAttack.value })
+    : el(main);
+  return (
+    <span title={t('weapons.elementTip')} className={main === 'physical' && !w.elementAttack ? '' : 'text-gold-300'}>
+      {' · '}
+      {text}
     </span>
   );
 }
@@ -330,7 +348,7 @@ function WeaponCard({ owned, vocation, meleeSkill, onChange, onRemove }: WeaponC
           value={owned.level}
           title={t('weapons.level')}
           onChange={(e) => onChange({ ...owned, level: Number(e.target.value) })}
-          className="field w-16 shrink-0 py-0.5 text-xs"
+          className="field w-auto shrink-0 py-0.5 pr-7 text-xs"
         >
           {Array.from({ length: weapon.levels.length + 1 }, (_, n) => (
             <option key={n} value={n}>

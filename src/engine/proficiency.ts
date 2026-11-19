@@ -160,6 +160,18 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
     (mode === 'boss' ? 1 + sum(perks, (p) => p.kind === 'boss') : 1) *
     (1 + PROF.ALPHA_SHARE[mode] * sum(perks, (p) => p.kind === 'alphaStrike')) *
     (1 + PROF.OMEGA_SHARE[mode] * sum(perks, (p) => p.kind === 'omegaStrike'));
+  // D62: auto attacks and weapon spells (knight exori…, monk) deal the weapon's damage types: its main element
+  // (monk elemental bond, amber weapons) and the elemental part, split by attack shares.
+  const attack = loadoutAttack(model.vocation, lo) ?? 0;
+  const mainElement: Element = isMage(model.vocation) ? 'physical' : (w.element ?? 'physical');
+  const elemental = w.elementAttack && attack > 0 ? w.elementAttack : null;
+  const weaponMix =
+    mainElement === 'physical' && !elemental
+      ? null
+      : elemental
+      ? ((attack - elemental.value) / attack) * piercedOr(model, mainElement, pierce(mainElement)) +
+        (elemental.value / attack) * piercedOr(model, elemental.element, pierce(elemental.element))
+      : piercedOr(model, mainElement, pierce(mainElement));
   const flat = perks.reduce((a, p) => a + (p.kind === 'spellSkillScaling' ? p.value * scalingSkill(c, p) : 0), 0);
 
   const spells = new Map<string, SpellEval>();
@@ -183,7 +195,8 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
     s.critChance = (s.critChance ?? 0) + critChance + ec + 100 * aug('critChance');
     s.critExtra = (s.critExtra ?? 0) + critExtra + ed + 100 * aug('critDamage');
     const pc = pierce(s.element);
-    if (pc) s.elem *= piercedElem(model, s.element, (model.pierce ?? 0) + pc) / Math.max(1e-9, piercedElem(model, s.element, model.pierce ?? 0));
+    if (weaponMix !== null && s.dmg?.weaponElement) s.elem = weaponMix;
+    else if (pc) s.elem *= piercedElem(model, s.element, (model.pierce ?? 0) + pc) / Math.max(1e-9, piercedElem(model, s.element, model.pierce ?? 0));
     s.mult = (s.mult ?? 1) * mult;
     spells.set(n, s);
   }
@@ -191,16 +204,12 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
   let base = model.base;
   let targets: number | undefined;
   if (!isMage(model.vocation)) {
-    const attack = loadoutAttack(model.vocation, lo) ?? 0;
-    const physical = w.elementAttack ? attack - w.elementAttack.value : attack;
     // Elemental ammunition turns the whole shot into its element.
     const ammoElement = lo.ammo && lo.ammo.element !== 'physical' ? lo.ammo.element : null;
-    const autoElement = ammoElement ?? 'physical';
+    const autoElement = ammoElement ?? mainElement;
     const autoMix = ammoElement
       ? piercedOr(model, ammoElement, pierce(ammoElement))
-      : w.elementAttack && attack > 0
-      ? (physical / attack) * piercedOr(model, 'physical', pierce('physical')) + (w.elementAttack.value / attack) * piercedOr(model, w.elementAttack.element, pierce(w.elementAttack.element))
-      : piercedOr(model, 'physical', pierce('physical'));
+      : (weaponMix ?? piercedOr(model, 'physical', pierce('physical')));
     const range = perks.reduce((a, p) => a + (p.kind === 'rangeDamage' ? p.value : 0), 0) + (w.specials?.perfectShot?.value ?? 0);
     const hit =
       autoAttackHit(model.vocation, c, attack) +
