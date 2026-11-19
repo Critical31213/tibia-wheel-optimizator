@@ -42,8 +42,8 @@ export const K = {
   HEAL_EHP: 0.5,
   /** Leech is strongly devalued (D14). Per +1 % leech. */
   LIFE_LEECH_DEF: 0.15,
-  /** D29: imbuement life leech % (EK/RP/MS: 2× Powerful Vampirism; ED/monk: sometimes, so half). */
-  LIFE_LEECH_IMBUE: { knight: 50, paladin: 50, sorcerer: 50, druid: 25, monk: 25 } as Record<Vocation, number>,
+  /** D29: imbuement life leech % (EK/RP/monk: 2× Powerful Vampirism; ED/MS: sometimes, so half). */
+  LIFE_LEECH_IMBUE: { knight: 50, paladin: 50, monk: 50, sorcerer: 25, druid: 25 } as Record<Vocation, number>,
   MANA_LEECH_OFF: 0.1,
   MANA_LEECH_DEF: 0.05,
   MANA_COST_UTIL: 0.05,
