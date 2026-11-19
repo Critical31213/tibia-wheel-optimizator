@@ -7,7 +7,7 @@ Owner: **S2 Engine** (iteration 3). Every number comes from the official test-se
 
 | Export | Purpose |
 |---|---|
-| `optimize(input): OptimizerResult` | The best allocation, path, revelations, convictions, stats, vessels, gem and upgrade recommendations, and spells. Also `plannerCode` and `alternatives`. Deterministic; ~65 ms worst case (2500 points), test budget 100 ms, including RM re-optimization and D34 pair tries. |
+| `optimize(input): OptimizerResult` | The best allocation, path, revelations, convictions, stats, vessels, gem and upgrade recommendations, and spells. Also `plannerCode` and `alternatives`. Deterministic; ~58 ms worst case without weapons (2500 points), ~90 ms with weapons in boss mode; test budget 150 ms (parallel test workers), including RM re-optimization and D34 pair tries. |
 | `getWheel(vocation): WheelDefinition` | Contract view: 36 slices, 4 revelations, 8 `vessels`, and `mods` (basic and supreme). |
 | `pointsForLevel`, `MIN_LEVEL_FOR_POINTS`, `MAX_SCROLL_POINTS` | Unchanged. |
 | `ENGINE_MESSAGES`, `renderMessage`, `EngineMessageKey` | i18n templates for `rationaleMsgs`, `reasonMsg` and `labelMsg`. |
