@@ -46,7 +46,7 @@ src/engine/
   - Flat damage and healing bonus = Σ over domains of [0, 4, 9, 20][stage], plus 1 per full Gem Vessel slice.
 - **Vessels.** There are 8 vessels, numbered with a **0-based** `vesselId` in planner order (lesser, regular, greater, lesser, greater, regular, greater, greater). Vessel *n* (0-based) unlocks when *n + 1* Gem Vessel slices are full, in any domain.
 - **Gems and slots.** A lesser gem has `basic1`. A regular gem has `basic1` and `basic2`. A greater gem has both basics and `supreme`.
-  - Any gem fits any vessel. Active slots = `SLOTS_BY_QUALITY[min(gem quality, vessel quality)]`.
+  - D28: a gem fits only a vessel of its own quality (lesser → lesser, regular → regular, greater → greater); then all its slots are active (`fits`, `activeSlots`). Placement gives mismatched pairs weight 0.
 - **Momentum.** Supreme cooldown mods add 0, 0.33, 0.66 or 1 % momentum by grade.
 
 ## 2. Valuation (`spells.ts`, `values.ts`)

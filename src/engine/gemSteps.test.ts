@@ -3,6 +3,9 @@ import type { OwnedGem } from '../types';
 import { optimize } from './index';
 
 const HUNT = { mode: 'hunt' } as const;
+/** One recommended gem per vessel, each of the vessel's quality (D28). */
+const fullSet = (r: ReturnType<typeof optimize>): OwnedGem[] =>
+  r.vessels.map((v, i) => gemOf(`v${i}`, r.gemRecommendations.find((g) => g.quality === v.quality)!));
 const gemOf = (id: string, r: { quality: OwnedGem['quality']; mods: { kind: string; modId: number; grade: number }[] }): OwnedGem => {
   const basics = r.mods.filter((m) => m.kind === 'basic');
   const sup = r.mods.find((m) => m.kind === 'supreme');
@@ -17,7 +20,7 @@ describe('gem steps: new gems at grade I, upgrades after vessels are full', () =
     const one = optimize({ vocation: 'sorcerer', points: 4000, monster: null, priority: 50, context: HUNT, alternatives: 0, gems: [gemOf('g0', greater)] });
     expect(one.vessels.some((v) => v.unlocked && !v.gem)).toBe(true);
     expect(one.upgradeRecommendations).toEqual([]);
-    const all = Array.from({ length: 8 }, (_, i) => gemOf(`g${i}`, greater));
+    const all = fullSet(base);
     const full = optimize({ vocation: 'sorcerer', points: 4000, monster: null, priority: 50, context: HUNT, alternatives: 0, gems: all });
     expect(full.vessels.every((v) => !v.unlocked || v.gem)).toBe(true);
     expect(full.upgradeRecommendations.length).toBeGreaterThan(0);
@@ -42,9 +45,8 @@ describe('D27: shared mod grades, cooldown gems in a full rotation', () => {
 
   it('a mod has the highest owned grade in every gem; upgrades are per mod', () => {
     const rec = greaterRec();
-    const a = gemOf('a', rec);
     const b = gemOf('b', { ...rec, mods: rec.mods.map((m) => ({ ...m, grade: m.kind === 'basic' ? 3 : 1 })) });
-    const r = optimize({ ...sorc, gems: [a, b, ...Array.from({ length: 6 }, (_, i) => gemOf(`c${i}`, rec))] });
+    const r = optimize({ ...sorc, gems: [b, ...fullSet(optimize(sorc))] });
     const hp = rec.mods.find((m) => m.kind === 'basic')!;
     for (const v of r.vessels) if (v.gem?.basic1?.modId === hp.modId) expect(v.gem.basic1.grade).toBe(3);
     const up = r.upgradeRecommendations.filter((u) => u.kind === 'basic' && u.modId === hp.modId);

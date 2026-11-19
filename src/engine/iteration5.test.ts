@@ -85,7 +85,8 @@ describe('D23: vessels hold only owned gems', () => {
     const withGems = optimize({ ...input, gems });
     const owned = withGems.vessels.filter((v) => v.source === 'owned');
     expect(owned.length).toBeGreaterThan(0);
-    expect(owned.length).toBe(Math.min(gems.length, withGems.vessels.filter((v) => v.unlocked).length));
+    expect(owned.length).toBe(Math.min(gems.length, withGems.vessels.filter((v) => v.unlocked && v.quality === 'regular').length));
+    expect(owned.every((v) => v.gem!.quality === v.quality)).toBe(true);
     expect(withGems.vessels.filter((v) => v.unlocked).length).toBeGreaterThanOrEqual(plain.vessels.filter((v) => v.unlocked).length);
     expect(withGems.stats.some((s) => s.labelMsg?.key === 'stat.gemMod')).toBe(true);
     expect(plain.stats.some((s) => s.labelMsg?.key === 'stat.gemMod')).toBe(false);

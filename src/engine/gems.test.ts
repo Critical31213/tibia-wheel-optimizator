@@ -40,11 +40,13 @@ describe('assignment', () => {
 });
 
 describe('gem placement', () => {
-  it('only the mods both gem and vessel support are active', () => {
-    expect(activeSlots('greater', 'lesser')).toEqual(['basic1']);
-    expect(activeSlots('greater', 'regular')).toEqual(['basic1', 'basic2']);
-    expect(activeSlots('lesser', 'greater')).toEqual(['basic1']);
-    expect(activeSlots('regular', 'greater')).toEqual(['basic1', 'basic2']);
+  it('D28: a gem fits only a vessel of its own quality', () => {
+    expect(activeSlots('greater', 'lesser')).toEqual([]);
+    expect(activeSlots('greater', 'regular')).toEqual([]);
+    expect(activeSlots('lesser', 'greater')).toEqual([]);
+    expect(activeSlots('regular', 'greater')).toEqual([]);
+    expect(activeSlots('lesser', 'lesser')).toEqual(['basic1']);
+    expect(activeSlots('regular', 'regular')).toEqual(['basic1', 'basic2']);
     expect(activeSlots('greater', 'greater')).toEqual(['basic1', 'basic2', 'supreme']);
   });
 
@@ -115,11 +117,11 @@ describe('upgrade recommendations', () => {
       const gv = e.wheel.definition.vessels.findIndex((v) => v.quality === 'greater');
       const vessel = (i: number, gem: OwnedGem) => ({ vesselId: i, quality: e.wheel.definition.vessels[i].quality, unlocked: true, gem, source: 'owned' as const });
 
-      const inLesser = upgrades(e, [vessel(lesserVessel, g)]);
-      expect(inLesser.map((u) => u.slot)).toEqual(['basic1']);
+      expect(upgrades(e, [vessel(lesserVessel, g)])).toEqual([]);
 
       const second = { ...toOwnedGem('two', bestGems(e, 'greater', 2, 2)[1], 2) };
-      const ups = upgrades(e, [vessel(gv, g), vessel(gv === 2 ? 4 : 2, second)]);
+      const gv2 = e.wheel.definition.vessels.findIndex((v, i) => i !== gv && v.quality === 'greater');
+      const ups = upgrades(e, [vessel(gv, g), vessel(gv2, second)]);
       expect(ups.length).toBeGreaterThan(1);
       for (const u of ups) {
         expect(u.toGrade).toBe(u.fromGrade + 1);

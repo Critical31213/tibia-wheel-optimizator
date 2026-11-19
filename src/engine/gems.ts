@@ -2,8 +2,8 @@
  * Gem valuation, optimal vessel placement (Hungarian assignment), best-gem recommendations
  * and mod-grade upgrade ranking.
  *
- * Vessel rule: any gem fits any vessel; a vessel activates only the mods its quality allows
- * (lesser → basic 1, regular → basic 1+2, greater → basic 1+2+supreme). Vessel ids are 0-based.
+ * Vessel rule (D28): a gem fits only a vessel of its own quality (lesser → lesser, regular → regular,
+ * greater → greater) and then all its mods are active. Vessel ids are 0-based.
  * D23: vessels hold only owned gems; recommendations are advice and never fill a vessel.
  */
 import type {
@@ -83,9 +83,12 @@ export function withSharedGrades(gems: readonly OwnedGem[]): OwnedGem[] {
   });
 }
 
-/** Slots of `gem` active in a vessel of quality `vessel`. */
+/** D28: a gem fits only a vessel of the same quality. */
+export const fits = (gem: GemQuality, vessel: GemQuality) => gem === vessel;
+
+/** Slots of `gem` active in a vessel of quality `vessel` (none when it does not fit). */
 export function activeSlots(gem: GemQuality, vessel: GemQuality): GemSlot[] {
-  return SLOTS_BY_QUALITY[QUALITY_RANK[gem] <= QUALITY_RANK[vessel] ? gem : vessel];
+  return fits(gem, vessel) ? SLOTS_BY_QUALITY[gem] : [];
 }
 
 const findBasic = (w: EngineWheel, id: number) => w.basicMods.find((m) => m.id === id);
@@ -169,7 +172,7 @@ export function assign(weights: number[][]): number[] {
 export function placeGems(env: GemEnv, gems: OwnedGem[], unlocked: number): (OwnedGem | null)[] {
   const vessels = env.wheel.definition.vessels.slice(0, unlocked);
   // +ε: an owned gem worth 0 here (e.g. a resistance the spot does not need) still beats an empty vessel.
-  const w = vessels.map((vs) => gems.map((g) => env.blend(gemParts(env, g, vs.quality)) + 1e-6));
+  const w = vessels.map((vs) => gems.map((g) => (fits(g.quality, vs.quality) ? env.blend(gemParts(env, g, vs.quality)) + 1e-6 : 0)));
   const cols = assign(w);
   return vessels.map((_, i) => (cols[i] >= 0 ? gems[cols[i]] : null));
 }
