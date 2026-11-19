@@ -166,6 +166,8 @@ export interface RotationSpell {
   ratio: number;
   /** Element alternatives; the engine uses the best one vs the spot. */
   or?: string[];
+  /** D66: other spells cast in the same slot (e.g. the monk's Harmony spender); best per cast first, within cooldowns. */
+  slot?: string[];
 }
 
 export interface RotationPreset {

@@ -1,0 +1,26 @@
+import { describe, expect, it } from 'vitest';
+import { optimize } from '.';
+
+const at = (rotationId: string) =>
+  optimize({ vocation: 'monk', points: 1000, monster: null, priority: 0, context: { mode: 'hunt' }, alternatives: 0, rotationId, forcedRevelations: [{ name: 'Spiritual Outburst', stage: 1 }] });
+const rates = (r: ReturnType<typeof optimize>) => new Map(r.rotation!.spells.map((s) => [s.name, s.ratio]));
+const reached = (r: ReturnType<typeof optimize>) => r.revelations.find((x) => x.perk.name === 'Spiritual Outburst')!.stage > 0;
+
+describe('D66: monk Harmony spender slot', () => {
+  it('Spiritual Outburst takes the spender slot while off cooldown; builders keep their casts', () => {
+    const so = at('em-voh-so');
+    const plain = at('em-voh');
+    expect(reached(so)).toBe(true);
+    const a = rates(so);
+    const b = rates(plain);
+    expect(a.get('Spiritual Outburst')).toBeGreaterThan(0);
+    expect(a.get('Spiritual Outburst')! + a.get('Sweeping Takedown')!).toBeCloseTo(b.get('Sweeping Takedown')!, 1);
+    expect(a.get('Chained Penance')).toBe(b.get('Chained Penance'));
+  });
+
+  it('a Takedown-only preset never casts Spiritual Outburst, even with the revelation', () => {
+    const r = at('em-voh');
+    expect(reached(r)).toBe(true);
+    expect(rates(r).has('Spiritual Outburst')).toBe(false);
+  });
+});

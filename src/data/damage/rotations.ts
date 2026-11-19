@@ -3,9 +3,10 @@ import type { RotationPreset, Vocation } from '../../types';
 /**
  * Suggested hunting rotations (user-confirmed + community presets).
  * `ratio` = relative casts. `or` = element alternatives, engine picks the best vs the spot.
- * Revelation spells (Divine Grenade, Executioner's Throw, Ice/Terra Burst, Spiritual Outburst,
- * Avatars in boss mode) are added by the engine when the build reaches the revelation;
- * if listed here they are dropped while the revelation is inactive.
+ * Revelation spells (Divine Grenade, Executioner's Throw, Ice/Terra Burst, Avatars in boss mode) are added
+ * by the engine when the build reaches the revelation; if listed here they are dropped while it is inactive.
+ * Monk: 4 Harmony builders, then a spender. Spiritual Outburst is a spender, cast only through `slot`
+ * (in place of Sweeping Takedown while off cooldown, D66).
  */
 export const ROTATION_PRESETS: readonly RotationPreset[] = [
   { id: 'ek-mas', vocation: 'knight', name: 'Fierce Berserk – Groundshaker – Berserk', spells: [{ name: 'Fierce Berserk', ratio: 1 }, { name: 'Groundshaker', ratio: 1 }, { name: 'Berserk', ratio: 1 }] },
@@ -28,7 +29,10 @@ export const ROTATION_PRESETS: readonly RotationPreset[] = [
 
   { id: 'em-voh', vocation: 'monk', name: 'Chain – GFoB – Chain – TFB – Takedown (Harmony)', stance: 'Virtue of Harmony', spells: [{ name: 'Chained Penance', ratio: 2 }, { name: 'Greater Flurry of Blows', ratio: 1 }, { name: 'Thousand Fist Blows', ratio: 1 }, { name: 'Sweeping Takedown', ratio: 1 }] },
   { id: 'em-voj', vocation: 'monk', name: 'Chain – GFoB – Chain – TFB – Chain – Takedown (Justice)', stance: 'Virtue of Justice', spells: [{ name: 'Chained Penance', ratio: 3 }, { name: 'Greater Flurry of Blows', ratio: 1 }, { name: 'Thousand Fist Blows', ratio: 1 }, { name: 'Sweeping Takedown', ratio: 1 }] },
+  { id: 'em-voh-so', vocation: 'monk', name: 'Chain – GFoB – Chain – TFB – Outburst / Takedown (Harmony)', stance: 'Virtue of Harmony', requires: { revelation: 'Spiritual Outburst' }, spells: [{ name: 'Chained Penance', ratio: 2 }, { name: 'Greater Flurry of Blows', ratio: 1 }, { name: 'Thousand Fist Blows', ratio: 1 }, { name: 'Sweeping Takedown', ratio: 1, slot: ['Spiritual Outburst'] }] },
+  { id: 'em-voj-so', vocation: 'monk', name: 'Chain – GFoB – Chain – TFB – Chain – Outburst / Takedown (Justice)', stance: 'Virtue of Justice', requires: { revelation: 'Spiritual Outburst' }, spells: [{ name: 'Chained Penance', ratio: 3 }, { name: 'Greater Flurry of Blows', ratio: 1 }, { name: 'Thousand Fist Blows', ratio: 1 }, { name: 'Sweeping Takedown', ratio: 1, slot: ['Spiritual Outburst'] }] },
   { id: 'em-tfb', vocation: 'monk', name: 'TFB – GFoB – Chain – TFB – Takedown', spells: [{ name: 'Thousand Fist Blows', ratio: 2 }, { name: 'Greater Flurry of Blows', ratio: 1 }, { name: 'Chained Penance', ratio: 1 }, { name: 'Sweeping Takedown', ratio: 1 }] },
+  { id: 'em-tfb-so', vocation: 'monk', name: 'TFB – GFoB – Chain – TFB – Outburst / Takedown', requires: { revelation: 'Spiritual Outburst' }, spells: [{ name: 'Thousand Fist Blows', ratio: 2 }, { name: 'Greater Flurry of Blows', ratio: 1 }, { name: 'Chained Penance', ratio: 1 }, { name: 'Sweeping Takedown', ratio: 1, slot: ['Spiritual Outburst'] }] },
 ];
 
 export function getRotationPresets(vocation: Vocation): RotationPreset[] {

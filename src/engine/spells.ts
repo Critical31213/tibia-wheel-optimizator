@@ -168,7 +168,7 @@ export interface RotationPlan {
   id: string;
   preset: RotationPreset | null;
   /** Preset spells with `or` alternatives resolved vs the spot. */
-  entries: { name: string; ratio: number }[];
+  entries: { name: string; ratio: number; slot?: string[] }[];
   /** Requires a shield (knight mitigation uses the shield offhand). */
   shield: boolean;
   /** Revelation the preset requires (valid only when reached). */
@@ -518,8 +518,11 @@ function presetRotation(model: SpellModel, r: RotationInput): RotationResult {
   let total = model.base;
   let left = 1;
   const rev: Cand[] = [];
+  const inSlot = new Set(model.plan.entries.flatMap((e) => e.slot ?? []));
   for (const s of model.spells.values()) {
-    if (!s.usable || s.revelation < 0) continue;
+    if (!s.usable || s.revelation < 0 || inSlot.has(s.name)) continue;
+    // D66: a Harmony spender is only cast in the spender slot of a preset.
+    if (HARMONY_SPENDERS.has(s.name)) continue;
     const c = candidate(model, s, r);
     if (c) rev.push(c);
   }
@@ -532,11 +535,20 @@ function presetRotation(model: SpellModel, r: RotationInput): RotationResult {
     total += rate * c.perCast;
     rates.set(c.s.name, { rate, perCast: c.perCast });
   }
-  const items: (Cand & { ratio: number })[] = [];
+  const items: (Cand & { ratio: number; alts: Cand[] })[] = [];
   for (const e of model.plan.entries) {
     const s = model.spells.get(e.name);
     const c = s?.usable && s.revelation < 0 ? candidate(model, s, r) : null;
-    if (c && e.ratio > 0) items.push({ ...c, ratio: e.ratio });
+    if (!c || e.ratio <= 0) continue;
+    // D66: slot spells share the entry's turns, best per cast first; the slot's cap is the sum of their caps.
+    const alts = [c];
+    for (const n of e.slot ?? []) {
+      const a = model.spells.get(n);
+      const ac = a?.usable ? candidate(model, a, r) : null;
+      if (ac && ac.perCast > 0) alts.push(ac);
+    }
+    alts.sort((a, b) => b.perCast - a.perCast || a.s.name.localeCompare(b.s.name));
+    items.push({ ...c, cap: alts.reduce((x, a) => x + a.cap, 0), ratio: e.ratio, alts });
   }
   items.sort((a, b) => a.cap / a.ratio - b.cap / b.ratio || a.s.name.localeCompare(b.s.name));
   let ratioSum = items.reduce((a, x) => a + x.ratio, 0);
@@ -544,8 +556,14 @@ function presetRotation(model: SpellModel, r: RotationInput): RotationResult {
     const rate = Math.max(0, Math.min(c.cap, (left * c.ratio) / ratioSum));
     left -= rate;
     ratioSum -= c.ratio;
-    total += rate * c.perCast;
-    rates.set(c.s.name, { rate, perCast: c.perCast });
+    let rest = rate;
+    for (const a of c.alts) {
+      const x = Math.min(a.cap, rest);
+      rest -= x;
+      if (x <= 0 && a !== c) continue;
+      total += x * a.perCast;
+      rates.set(a.s.name, { rate: x, perCast: a.perCast });
+    }
   }
   return { total, rates };
 }
@@ -597,7 +615,7 @@ export function planFor(model: SpellModel, preset: RotationPreset | null): Rotat
     if (revelationSpell(best) || !model.spells.has(best)) continue;
     const prev = entries.find((x) => x.name === best);
     if (prev) prev.ratio += e.ratio;
-    else entries.push({ name: best, ratio: e.ratio });
+    else entries.push({ name: best, ratio: e.ratio, ...(e.slot ? { slot: e.slot } : {}) });
   }
   return { id: preset.id, preset, entries, shield: !!preset.requires?.shield, requires: preset.requires?.revelation ?? null };
 }
