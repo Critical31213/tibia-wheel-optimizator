@@ -334,8 +334,6 @@ export const pl: Dictionary = {
   'results.convictions': 'Perki Conviction',
   'results.stats': 'Statystyki',
   'results.why': 'Dlaczego ten build',
-  'results.fillOrder': 'Kolejność wypełniania',
-  'results.ringOf': '{domain}, pierścień {ring}',
 
   'engine.rationale.priority': 'Priorytet {priority}/100: atak ważony w {offense}%, przeżywalność w {defense}%.',
   'engine.rationale.character': 'Postać na poziomie {level}: {hp} bazowego HP, bazowa mitygacja ≈ {mitigation}%; obrażenia spelli liczone z poziomu i skilli.',

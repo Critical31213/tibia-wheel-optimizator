@@ -8,7 +8,7 @@ import { LanguageSwitch } from './components/LanguageSwitch';
 import { MonsterSearch } from './components/MonsterSearch';
 import { NotesPanel } from './components/NotesPanel';
 import { Panel } from './components/Panel';
-import { ResultsPanel } from './components/ResultsPanel';
+import { BuildRationale, ResultsPanel } from './components/ResultsPanel';
 import { RotationPanel } from './components/RotationPanel';
 import { VesselsPanel } from './components/VesselsPanel';
 import { VocationPicker } from './components/VocationPicker';
@@ -152,7 +152,7 @@ export default function App() {
           <Panel title={t('app.summaryTitle')} headingId="results-heading">
             <div aria-live="polite" aria-busy={optimized.busy} className={optimized.busy ? "opacity-70 transition-opacity" : "transition-opacity"}>
               {shown ? (
-                <ResultsPanel wheel={resultWheel} result={shown} />
+                <ResultsPanel result={shown} />
               ) : (
                 <p className="py-6 text-center text-sm text-parchment-300">{t('app.empty')}</p>
               )}
@@ -176,6 +176,12 @@ export default function App() {
           )}
         </div>
       </div>
+
+      {shown && shown.rationale.length > 0 && (
+        <Panel title={t('results.why')} headingId="why-heading" className="mt-3">
+          <BuildRationale result={shown} />
+        </Panel>
+      )}
 
       <NotesPanel vocation={inputs.vocation} capacity={maxPoints} />
 

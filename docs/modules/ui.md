@@ -27,7 +27,7 @@ screens it is two columns (controls left, results right).
 | `src/components/NotesPanel.tsx` | D54: collapsed "For the curious" section at the end of the page with the descriptive hints (extra points, skills, knight skill, fight mode, monster weight, weapon grid, proficiency assumptions, units, storage); icons credit moved to the footer. |
 | `src/components/PrioritySlider.tsx` | 0–100 range slider (no own panel since D54, rendered inside `FightContextPanel`). |
 | `src/components/WheelChart.tsx` | SVG wheel, tooltip, active revelation perks per domain (no fill-order badges). |
-| `src/components/ResultsPanel.tsx` | Scores, revelations, convictions, stats, rationale, fill order. |
+| `src/components/ResultsPanel.tsx` | Scores, revelations, convictions, stats. D57: `BuildRationale` ("Why this build") is its own full-width panel at the end of the page, above "For the curious"; the fill order list was removed. |
 | `src/components/SegmentedControl.tsx` | Generic compact `radiogroup` (roving tabindex, arrows/Home/End, `disabled`). |
 | `src/components/FightContextPanel.tsx` | D54 "Fight" panel: Hunt / Boss toggle (hunt style removed, D20) and the priority slider. |
 | `src/components/RotationPanel.tsx` | Rotation select (Auto + vocation presets, note / requirements), used rotation of the viewed build (auto-attack share first (D51), then spells: share %, ★ = revelation spell, auto-picked), stance select (Auto / manual set, D32; prefs key `st`), stances of the viewed build (D24), two columns: forced spell augments (select + chips with stage I/II toggle, D35) and forced revelation stages (select per revelation; unreachable stages disabled with an RM gem / upgrade / out-of-reach note). Prefs keys `fs2`, `fr`. |
@@ -70,7 +70,7 @@ App
 ├─ Panel › RotationPanel presets, spells (forceable), value: SpellPrefs, onChange(patch), usage = viewed build `rotation`
 ├─ Panel › WheelChart  wheel, result | null   (the *viewed* build: best or alternative)
 ├─ Panel › WeaponResultPanel result.weapon, owned (weapons of the computed input), suggest, busy, onSuggestChange   (only with weapons)
-├─ Panel › ResultsPanel wheel, result   (empty-state text when points = 0)
+├─ Panel › ResultsPanel result   (empty-state text when points = 0)
 ├─ Panel › ExportPanel  code = viewed build `plannerCode` (empty state when undefined)
 └─ Panel › VesselsPanel vocation, result, mods   (only when result != null)
 ```

@@ -1,4 +1,4 @@
-import type { PerkCategory, WheelDefinition } from '../types';
+import type { PerkCategory } from '../types';
 import type { BuildResult } from '../lib/api';
 import { engineText, useT } from '../i18n';
 import { cx, DOMAIN_COLORS, formatNumber } from '../lib/labels';
@@ -36,14 +36,12 @@ function SubHeading({ children }: { children: string }) {
 }
 
 interface ResultsPanelProps {
-  wheel: WheelDefinition;
   result: BuildResult;
 }
 
 /** Textual breakdown of the optimized build. */
-export function ResultsPanel({ wheel, result }: ResultsPanelProps) {
+export function ResultsPanel({ result }: ResultsPanelProps) {
   const t = useT();
-  const byId = new Map(wheel.slices.map((s) => [s.id, s]));
 
   return (
     <div>
@@ -129,48 +127,18 @@ export function ResultsPanel({ wheel, result }: ResultsPanelProps) {
         </>
       )}
 
-      {result.rationale.length > 0 && (
-        <>
-          <SubHeading>{t('results.why')}</SubHeading>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-parchment-200 marker:text-gold-500">
-            {result.rationale.map((r, i) => (
-              <li key={r}>{engineText(t, result.rationaleMsgs?.[i], r)}</li>
-            ))}
-          </ul>
-        </>
-      )}
-
-      {result.path.length > 0 && (
-        <>
-          <SubHeading>{t('results.fillOrder')}</SubHeading>
-          <ol className="space-y-1 text-sm">
-            {result.path.map((id, i) => {
-              const s = byId.get(id);
-              const pts = result.allocation[id] ?? 0;
-              return (
-                <li key={id} className="flex items-center gap-2">
-                  <span className="grid size-6 shrink-0 place-items-center rounded-full border border-gold-700 text-xs text-gold-300 tabular-nums">
-                    {i + 1}
-                  </span>
-                  <span
-                    aria-hidden="true"
-                    className="size-2.5 shrink-0 rounded-sm"
-                    style={{ background: s ? DOMAIN_COLORS[s.domain].base : undefined }}
-                  />
-                  <span className="min-w-0 flex-1 truncate text-parchment-200">
-                    {s ? s.conviction.name : id}
-                    {s && <span className="text-parchment-400"> · {t('results.ringOf', { domain: t(`domain.${s.domain}`), ring: s.ring })}</span>}
-                  </span>
-                  <span className="shrink-0 tabular-nums text-parchment-300">
-                    {pts}
-                    {s && `/${s.capacity}`}
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
-        </>
-      )}
     </div>
+  );
+}
+
+/** D57: the engine's reasons for the build (own panel at the end of the page). */
+export function BuildRationale({ result }: { result: BuildResult }) {
+  const t = useT();
+  return (
+    <ul className="list-disc space-y-1 pl-5 text-sm text-parchment-200 marker:text-gold-500">
+      {result.rationale.map((r, i) => (
+        <li key={r}>{engineText(t, result.rationaleMsgs?.[i], r)}</li>
+      ))}
+    </ul>
   );
 }

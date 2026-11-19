@@ -340,8 +340,6 @@ export const en = {
   'results.convictions': 'Conviction perks',
   'results.stats': 'Stats',
   'results.why': 'Why this build',
-  'results.fillOrder': 'Fill order',
-  'results.ringOf': '{domain}, ring {ring}',
 
   ...engineEn,
 } as const;

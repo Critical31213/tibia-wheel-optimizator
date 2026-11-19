@@ -17,7 +17,7 @@ export function NotesPanel({ vocation, capacity }: { vocation: Vocation; capacit
     'notes.storage',
   ];
   return (
-    <details className="panel mt-4 group">
+    <details className="panel mt-3 group">
       <summary className="section-title cursor-pointer list-none select-none">
         <span aria-hidden="true" className="mr-1 inline-block transition-transform group-open:rotate-90">▸</span>
         {t('notes.title')}
