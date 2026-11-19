@@ -81,10 +81,12 @@ Components never import `src/engine` / `src/data` directly — only `src/lib/api
    capacity), priority to 0–100. Once the monster dataset is loaded, unknown monster ids are dropped
    (`withKnownMonsters`). A legacy `monsterId` / single `m=id` becomes a one-monster list.
 2. `App` derives `wheel = getWheel(vocation)` (memo) and clamps points to `wheel.totalCapacity`.
-3. `useDeferredValue(inputs)` keeps the slider/typing responsive; `optimize()` runs in a
-   `useMemo` keyed on the deferred vocation/points/spot/priority/context/gems/character with `monster: null`,
+3. `useDeferredValue(inputs)` keeps the slider/typing responsive; the input is built in a
+   `useMemo` and computed by `useOptimizer` in a Web Worker (D42: `src/workers/optimize.worker.ts`, newest input only,
+   main-thread fallback without Worker support or after a worker error; the shown build follows its own input's
+   vocation, results get `aria-busy` while a newer input runs). The input is keyed on the deferred vocation/points/spot/priority/context/gems/character with `monster: null`,
    `monsters = resolveMonsters(entries, getMonsterById)`, `character = characterOf(inputs)` (only the vocation's skill
-   fields; level falls back to `points + 50`; `undefined` when nothing entered) and `alternatives: 2`; `context = contextOf(inputs)` (`{ mode }` only),
+   fields; level falls back to `points + 50`; `undefined` when nothing entered) and `alternatives: 0`; `context = contextOf(inputs)` (`{ mode }` only),
    `rotationId` / `forcedSpells` from `usePersistentSpellPrefs(vocation)` (deferred; auto / none → `undefined`),
    `gems` from `usePersistentGems(vocation)` (also deferred). `points = 0` → `result = null` → empty state.
 4. A local `view` index (0 = best, i = `result.alternatives[i-1]`) picks the *viewed* build (`BuildResult` =

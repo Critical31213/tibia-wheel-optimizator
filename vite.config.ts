@@ -60,4 +60,6 @@ export default defineConfig({
   // (src/data/damage) + fflate's inflate, all needed synchronously for the first optimize().
   // The lazily loaded monster dataset chunk (src/data) is ~700 kB / ~76 kB gzip by design.
   build: { chunkSizeWarningLimit: 800 },
+  // D42: the optimizer runs in a module worker (src/workers/optimize.worker.ts).
+  worker: { format: 'es' },
 })

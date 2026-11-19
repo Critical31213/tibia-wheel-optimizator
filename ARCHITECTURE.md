@@ -119,7 +119,7 @@ The UI reaches both modules only through `src/lib/api.ts`, which re-exports the 
 `src/data` with a dynamic `import()` (separate chunk; `useMonsterData()` signals readiness).
 
 Data flow: UI collects `OptimizerInput` (`characterOf(inputs)`, `resolveMonsters(inputs.monsters)`,
-`monster: null`, `alternatives: 0` (D36), `rotationId` / `forcedSpells` from `usePersistentSpellPrefs`) → `optimize()` returns `OptimizerResult` (allocation per slice, fill
+`monster: null`, `alternatives: 0` (D36), `rotationId` / `forcedSpells` from `usePersistentSpellPrefs`) → `optimize()` (in a Web Worker via `useOptimizer`, D42) returns `OptimizerResult` (allocation per slice, fill
 path, activated perks, stat summary, rationale, vessels, `plannerCode`) → wheel, summary, export code and vessels render the best build.
 
 ## 5. Data integration (S1 Data)
@@ -186,7 +186,7 @@ Full details: [`docs/modules/engine.md`](docs/modules/engine.md).
 
 Single-page React UI (`src/App.tsx`, `src/components/`, `src/hooks/`, `src/lib/`).
 Inputs (vocation, points/level, monster, priority) live in `usePersistentInputs`
-(localStorage + URL query) and feed a memoized `optimize()` call — no Calculate button.
+(localStorage + URL query) and feed `optimize()` in a Web Worker (`useOptimizer`, D42) — no Calculate button.
 Results render as an SVG wheel (`WheelChart`, area-proportional slice fill, fill-order
 badges, tooltips) and a `ResultsPanel` (scores, revelations, convictions, stats, rationale,
 fill order). Components use only the `src/lib/api.ts` facade (real engine; monster dataset

@@ -710,3 +710,15 @@ describe('integration: iteration 4 — EHP gems, rotations, forced spells', () =
     }
   });
 });
+
+describe('D42: worker messages', () => {
+  it('inputs and results survive structured clone unchanged (postMessage to/from the worker)', () => {
+    const monsters = resolveMonsters(MONSTERS.slice(0, 3).map((m) => ({ id: m.id, weight: 1 })), getMonsterById);
+    const gems = parseGems(serializeGems([{ id: 'a', quality: 'greater', basic1: null, basic2: null, supreme: null }]));
+    const input = { vocation: 'paladin' as const, points: 900, monster: null, monsters, priority: 50, context: { mode: 'boss' as const }, gems, alternatives: 0, forcedSpells: ['Divine Caldera'], forcedRevelations: [{ name: 'Divine Grenade', stage: 2 as const }] };
+    expect(structuredClone(input)).toEqual(input);
+    const r = optimize(structuredClone(input));
+    expect(structuredClone(r)).toEqual(r);
+    expect(r).toEqual(optimize(input));
+  });
+});

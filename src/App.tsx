@@ -1,4 +1,5 @@
 import { useDeferredValue, useMemo } from 'react';
+import { useOptimizer } from './hooks/useOptimizer';
 import { CharacterPanel } from './components/CharacterPanel';
 import { ExportPanel } from './components/ExportPanel';
 import { FightContextPanel } from './components/FightContextPanel';
@@ -17,7 +18,7 @@ import { gemFromRecommendation, setModGrade } from './lib/gems';
 import { usePersistentInputs } from './hooks/usePersistentInputs';
 import { usePersistentSpellPrefs } from './hooks/usePersistentSpellPrefs';
 import { useT } from './i18n';
-import { getForceableSpells, getMonsterById, getRotationPresets, getStanceOptions, getWheel, optimize, revelationOptions, useMonsterData } from './lib/api';
+import { getForceableSpells, getMonsterById, getRotationPresets, getStanceOptions, getWheel, revelationOptions, useMonsterData } from './lib/api';
 import { stanceNames } from './lib/spellPrefs';
 import type { BuildResult } from './lib/api';
 import { characterOf, contextOf } from './lib/inputState';
@@ -58,10 +59,10 @@ export default function App() {
     () => revelationOptions({ vocation: deferred.vocation, points, gems: deferredGems, character }),
     [deferred.vocation, points, deferredGems, character],
   );
-  const result = useMemo(
+  const request = useMemo(
     () =>
       points > 0
-        ? optimize({
+        ? {
             vocation: deferred.vocation,
             points,
             monster: null,
@@ -76,16 +77,17 @@ export default function App() {
             forcedStage2: forcedStage2.length ? forcedStage2 : undefined,
             forcedRevelations: forcedRevelations.length ? forcedRevelations : undefined,
             stances: stance === null ? undefined : stanceNames(stance),
-          })
+          }
         : null,
     [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, rotationId, forcedSpells, forcedStage2, forcedRevelations, stance],
   );
-  const resultWheel = useMemo(() => getWheel(deferred.vocation), [deferred.vocation]);
-  const shown: BuildResult | null = result;
-  const emptyVessels = useMemo(
-    () => (shown && deferred.vocation === inputs.vocation ? emptyUnlockedByQuality(shown.vessels) : null),
-    [shown, deferred.vocation, inputs.vocation],
-  );
+  const optimized = useOptimizer(request);
+  // The shown build may lag the inputs while the worker computes; everything below follows its own vocation.
+  const resultVocation = optimized.input?.vocation ?? deferred.vocation;
+  const current = resultVocation === inputs.vocation;
+  const resultWheel = useMemo(() => getWheel(resultVocation), [resultVocation]);
+  const shown: BuildResult | null = request ? optimized.result : null;
+  const emptyVessels = useMemo(() => (shown && current ? emptyUnlockedByQuality(shown.vessels) : null), [shown, current]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
@@ -106,7 +108,7 @@ export default function App() {
         </div>
 
         <div className="flex flex-col gap-4">
-          <Panel title={t('app.wheelTitle', { vocation: VOCATION_LABELS[deferred.vocation] })} headingId="wheel-heading">
+          <Panel title={t('app.wheelTitle', { vocation: VOCATION_LABELS[resultVocation] })} headingId="wheel-heading">
             {gems.length === 0 && (
               <p role="note" className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
                 {t('app.noGems')}{' '}
@@ -123,12 +125,12 @@ export default function App() {
               revelations={revelationReach}
               value={spellPrefs}
               onChange={updateSpellPrefs}
-              usage={deferred.vocation === inputs.vocation ? shown?.rotation : undefined}
-              stances={deferred.vocation === inputs.vocation ? shown?.stances : undefined}
+              usage={current ? shown?.rotation : undefined}
+              stances={current ? shown?.stances : undefined}
             />
           </Panel>
           <Panel title={t('app.summaryTitle')} headingId="results-heading">
-            <div aria-live="polite">
+            <div aria-live="polite" aria-busy={optimized.busy} className={optimized.busy ? "opacity-70 transition-opacity" : "transition-opacity"}>
               {shown ? (
                 <ResultsPanel wheel={resultWheel} result={shown} />
               ) : (
@@ -144,11 +146,11 @@ export default function App() {
           {shown && (
             <Panel title={t('vessels.title')} headingId="vessels-heading">
               <VesselsPanel
-                vocation={deferred.vocation}
+                vocation={resultVocation}
                 result={shown}
                 mods={resultWheel.mods}
-                onAddGem={deferred.vocation === inputs.vocation ? (rec) => setGems((all) => [...all, gemFromRecommendation(rec, all)]) : undefined}
-                onUpgrade={deferred.vocation === inputs.vocation ? (u) => setGems((all) => setModGrade(all, u.kind, u.modId, u.toGrade)) : undefined}
+                onAddGem={current ? (rec) => setGems((all) => [...all, gemFromRecommendation(rec, all)]) : undefined}
+                onUpgrade={current ? (u) => setGems((all) => setModGrade(all, u.kind, u.modId, u.toGrade)) : undefined}
               />
             </Panel>
           )}
