@@ -24,7 +24,7 @@ Roles:
 | D5 | 2026-11-18 | Priority slider is a single number 0–100 (0 = max DPS, 100 = max survivability). | Simplest possible mental model for the user and a single weight for the optimizer. |
 | D6 | 2026-11-18 | Node.js 26 LTS installed portably in `%LOCALAPPDATA%\node-portable` (no admin install). | Node was not present on the dev machine. |
 | D7 | 2026-11-18 | Wheel data source switched to the **official test-server planner** (test.tibia.com, upcoming update). Its WASM module (`skillgrid.js`) + `SkillwheelStringsJsonLibrary.json` are downloaded manually via a browser (Cloudflare blocks scripts) into gitignored `scripts/.cache/wod/`; a Node script runs the WASM and generates static JSON. | Most up-to-date data (new spells, gems, vessels). The CipSoft binary itself is never committed or shipped. |
-| D8 | 2026-11-18 | Fight context: Hunt/Boss toggle (manual only); Avatar revelations valued only in Boss mode. Hunt style Solo / Team-lure (~4–6 mobs) / Team-box (~8–10 mobs); Boss ≈ single target. Baseline spell target counts from tibiapal.com `spell-average-hits` (cached in `scripts/.cache/tibiapal/`). | User requirement; counts are estimates to be verified. |
+| D8 | 2026-11-18 | Fight context: Hunt/Boss toggle (manual only); Avatar revelations valued only in Boss mode. Hunt style Solo / Team-lure (~4–6 mobs) / Team-box (~8–10 mobs); Boss ≈ single target. Baseline spell target counts from community data `spell-average-hits` (cached in `scripts/.cache/hunt-data/`). | User requirement; counts are estimates to be verified. |
 | D9 | 2026-11-18 | Spell augments valued automatically by context: expected targets, spell element vs monster resistances, single-target vs area. | User requirement. |
 | D10 | 2026-11-18 | Gems: user-owned gem inventory (quality, mods, grades I–IV) placed optimally into vessels + recommendations of best gems and most valuable mod-grade upgrades. | User requirement. |
 | D11 | 2026-11-18 | UI language switch PL / EN. | User requirement. |
@@ -33,19 +33,19 @@ Roles:
 | D14 | 2026-11-18 | Flat "Damage and Healing" bonus valued relative to real per-hit damage/healing; consider Revelation Mastery gems that reach the next revelation stage (bigger flat bonus). Leech slices strongly devalued. | User guidance. |
 | D15 | 2026-11-18 | Multiple monsters per hunting spot with weights; best build + 2 alternatives; export-only planner code (incl. gems); gem/upgrade ranking by gain only (no cost). UI polishing postponed until functionality is accepted. | User answers. |
 | D16 | 2026-11-18 | **Hunt mode (AoE hunting) never values single-target spells** (all hunt styles); single-target spells count only in Boss mode. | User rule. |
-| D17 | 2026-11-18 | Damage model calibrated on the public TibiaTools damage API used by tibiapal.com (`https://tibiatools.io/api/v1`: `GET /meta/{vocations,stances,weapons,ammo,shields,perks,spells,creatures,charms}`, `POST /damage`). Datamined **offline** (polite: low rate, cached) into fitted per-spell formulas + perk effects committed as static data; no runtime dependency. | User: tibiapal estimates are very good; avoid hammering a third-party API on every slider move. |
+| D17 | 2026-11-18 | Damage model calibrated on a public damage-calculator API (`GET /meta/{vocations,stances,weapons,ammo,shields,perks,spells,creatures,charms}`, `POST /damage`). Datamined **offline** (polite: low rate, cached) into fitted per-spell formulas + perk effects committed as static data; no runtime dependency. | User: community estimates are very good; avoid hammering a third-party API on every slider move. |
 | D18 | 2026-11-18 | Defense valued as effective HP (EHP = HP / (1 − mitigation)); the arbitrary "spike" factor is removed. Gem slot 1 offers only Hit Points or Mitigation Multiplier; capacity and max mana have no value (potions + mana-leech imbuement assumed). Default resistance: physical unless the spot's monsters favour another. | User discussion; mitigation never beats HP on 200–1500 with real values. |
-| D19 | 2026-11-18 | Real mitigation formula (no fight modes in the current game): ≈ shielding/100 % + shield/spellbook/quiver defense × vocation factor; calibration points: RP shielding 108 → 1.07 %; RP + shield 2.5 % total (shield part 1.28 %); ED 781 → 0.4 % shielding + 0.87 % spellbook. RP: quiver (hunt, bow) / crossbow (boss); mages: spellbook; EK: shield only in the shield rotation. | User data + Canary source. |
-| D20 | 2026-11-18 | Hunt styles removed (hunt targets = tibiapal averages; boss = 1). Damage based on rotation presets (`src/data/damage/rotations.ts`): engine auto-picks the best preset for the spot/build (user may override); revelation-unlocked spells (Divine Grenade, Executioner's Throw, Ice/Terra Burst, Spiritual Outburst; Avatars in boss) are added when the revelation is active; druid ultimate area spell (Eternal Winter / Wrath of Nature) chosen by resistance. Augments of spells outside the rotation (transit slices) have no value. | User guidance. |
+| D19 | 2026-11-18 | Real mitigation formula (no fight modes in the current game): ≈ shielding/100 % + shield/spellbook/quiver defense × vocation factor; calibration points: RP shielding 108 → 1.07 %; RP + shield 2.5 % total (shield part 1.28 %); ED 781 → 0.4 % shielding + 0.87 % spellbook. RP: quiver (hunt, bow) / crossbow (boss); mages: spellbook; EK: shield only in the shield rotation. | User data + game source. |
+| D20 | 2026-11-18 | Hunt styles removed (hunt targets = community averages; boss = 1). Damage based on rotation presets (`src/data/damage/rotations.ts`): engine auto-picks the best preset for the spot/build (user may override); revelation-unlocked spells (Divine Grenade, Executioner's Throw, Ice/Terra Burst, Spiritual Outburst; Avatars in boss) are added when the revelation is active; druid ultimate area spell (Eternal Winter / Wrath of Nature) chosen by resistance. Augments of spells outside the rotation (transit slices) have no value. | User guidance. |
 | D21 | 2026-11-18 | Forced spells: the user can force wheel augments of chosen spells (utility, e.g. Divine Dazzle, Mystic Repulse, Heal Friend). Healing gems excluded for ED/MS; for RP/EK/Monk valued on the defense side. Ballistic Mastery (bow: +4 % physical/holy pierce; crossbow: +10 % crit extra damage) and Positional Tactics (+3 distance 70 % of the time, else +3 holy/healing mlvl) valued exactly. | User guidance + planner texts. |
-| D22 | 2026-11-18 | tibiapal hunt target averages already include the wheel's area augment (Expanded Shape); without it a spell hits 0.5 fewer. Gem picks maximise overall damage; mods within 10 % of the chosen one's gain are listed as near-equal substitutes (`GemRecommendation.similar`); greater gem shown once with substitutes. | User guidance (EK Front Sweep vs Fierce Berserk tie). |
+| D22 | 2026-11-18 | community hunt target averages already include the wheel's area augment (Expanded Shape); without it a spell hits 0.5 fewer. Gem picks maximise overall damage; mods within 10 % of the chosen one's gain are listed as near-equal substitutes (`GemRecommendation.similar`); greater gem shown once with substitutes. | User guidance (EK Front Sweep vs Fierce Berserk tie). |
 | D23 | 2026-11-18 | A vessel holds only a gem the player added; unlocked vessels without an owned gem stay empty (never a recommended gem). The search values Gem Vessel slices only by the slice's own effects (+1 flat) and owned gems the new vessel can hold; gem recommendations stay advice (all qualities) and do not affect the allocation. | User: priority 50 sorcerer chose "no revelation" because 3 vessel slices were worth ~20 pp EHP from assumed grade-IV gems. |
 | D24 | 2026-11-18 | Stances (Vocation Adjustments 2026, TibiaWiki after the 7 July 2026 patch) are modelled and picked automatically per rotation plan by their build-independent value (damage vs the shared reference T0 + % EHP) at the user's priority. One stance per vocation; sorcerers one elemental + one aura. Elemental stances convert the next other-element spell: converted share = min(1, element casts / other casts). Serene uptime 80 %, 30 % of incoming damage from non-adjacent enemies (Divine Defiance dodge); Divine Defiance's healing magic level is valued through healing (e.g. Salvation). Monk presets carry their virtue. Elemental pierce capped at 2× sensitivity. | User request; values confirmed by the user (Q1–Q4). |
-| D25 | 2026-11-18 | Base spell cooldowns follow TibiaWiki where the TibiaTools datamine differs (`COOLDOWN_OVERRIDES`, applied on load): Shield Bash 4, Death Echo 6, Great Death Beam 6, Forked Glacier 6, Forked Thorns 6, Strong Ice Wave 4, Devastating Knockout 8, Mystic Repulse 8, Thousand Fist Blows 8, Intense Wound Cleansing 120 s. The rotation display includes the build's augment mods (cooldowns). | User: the DE – EW – DE – GDB rotation needs Death Echo's −2 s augment (DE was 4 s in the datamine). |
+| D25 | 2026-11-18 | Base spell cooldowns follow TibiaWiki where the damage API datamine differs (`COOLDOWN_OVERRIDES`, applied on load): Shield Bash 4, Death Echo 6, Great Death Beam 6, Forked Glacier 6, Forked Thorns 6, Strong Ice Wave 4, Devastating Knockout 8, Mystic Repulse 8, Thousand Fist Blows 8, Intense Wound Cleansing 120 s. The rotation display includes the build's augment mods (cooldowns). | User: the DE – EW – DE – GDB rotation needs Death Echo's −2 s augment (DE was 4 s in the datamine). |
 | D26 | 2026-11-18 | Gem steps: recommended gems are valued at grade I (a newly revealed gem); Fragment Workshop upgrades (+1 grade) are listed only once every unlocked vessel holds a gem. Revelation Mastery gems are valued by re-optimizing the wheel with the gem owned (greater, grade I): RM value = re-optimized objective with vs without the mod (beam width 16), plus the gem's basics; avatar RM is skipped outside boss mode; a full wheel keeps the static value. | User: players without gems or with small gems need small steps; an RM gem changes the best wheel, not only the stage. |
 | D27 | 2026-11-19 | Mod grades belong to the character: a mod has the highest grade any owned gem shows, in every gem (`withSharedGrades` on load and in `runOptimizer`; grade edits apply to all gems). Upgrades are per mod (gain summed over placed gems). Recommended gems carry the character's grades. Supreme spell gems are valued against the build's wheel augments on the other spells, so a cooldown gem in an already full preset rotation is worth ~0. Shared-cooldown ties (Ice/Terra Burst) prefer the spell the rotation casts. UI: "Add to my gems" on recommendations, "Upgrade" on upgrades. | User: Fragment Workshop grades apply to every gem; cooldown gems change little when the rotation is fixed and already the best. |
 | D28 | 2026-11-19 | A gem fits only a vessel of its own quality (lesser → lesser, regular → regular, greater → greater); previously any gem fitted any vessel with the lower quality's slots active. | User: small gems were placed into every vessel. |
-| D29 | 2026-11-19 | Damage also buys sustain through imbuement life leech: +1 % damage adds leech share × HEAL_EHP × threat % EHP (offense weight += defense weight × that). Leech per hit follows Canary `calculateLeechAmount` (damage × leech × (0.1n + 0.9) / n); imbuement leech 50 % for EK/RP/monk (2× Powerful Vampirism), 25 % for ED/MS; the share is vs the main heal cast every turn. Gift of Life is halved while hunting. | User: players use leech imbuements, so damage is also survivability. |
+| D29 | 2026-11-19 | Damage also buys sustain through imbuement life leech: +1 % damage adds leech share × HEAL_EHP × threat % EHP (offense weight += defense weight × that). Leech per hit follows the game (damage × leech × (0.1n + 0.9) / n); imbuement leech 50 % for EK/RP/monk (2× Powerful Vampirism), 25 % for ED/MS; the share is vs the main heal cast every turn. Gift of Life is halved while hunting. | User: players use leech imbuements, so damage is also survivability. |
 | D30 | 2026-11-19 | A gem recommendation needs room: when every unlocked vessel of its quality holds a gem, it is shown only as a replacement of the weakest one there (gain = difference), otherwise dropped. Recommendation sections per quality are collapsible. | User: with 2× the same gem placed, do not recommend a third if there is no room. |
 
 ---
@@ -81,8 +81,7 @@ Roles:
 
 ### 2026-11-18 — S2 Engine
 - Research: tibia.fandom.com is paywalled (HTTP 402) for automated fetch; used search summaries (fandom
-  *Version 13 Updates*, tibiaqa.com) + canary server sources (`WheelSlots_t`, `getMaxPointsPerSlot`,
-  `canPlayerSelectPointOnSlot`, `io_wheel.cpp` per-slot bonuses, revelation stages, promotion scrolls).
+  *Version 13 Updates*, player reports) + game data.
 - **Finding:** the wheel has 5 rings (4×50, 8×75, 12×100, 8×150, 4×200 = 4000), not 4 rings; a full domain is
   exactly 1000, so revelation stage 3 needs a full domain. UI geometry is generic (ring count derived), no change needed.
 - Implemented `src/engine/wheel/` (geometry builder, perk model, 5 vocation files, build/cache),
@@ -119,7 +118,7 @@ Roles:
   to the named revelation (thresholds only); augments: 2 copies, stage I then II order-independent; vessels
   lesser,regular,greater,lesser,greater,regular,greater,greater, vessel n unlocks at n+1 filled Gem Vessel slices
   (any), +1 dmg/heal per Gem Vessel slice; momentum 0/0.33/0.66/1 % per grade on supreme cooldown mods;
-  mitigation dedication 0.075 %/pt. tibiapal builds are legacy codes (decoded, slice points only).
+  mitigation dedication 0.075 %/pt. community builds are legacy codes (decoded, slice points only).
 - New spells (2026 Vocation Adjustments): Shield Slam, Divine/Ethereal Barrage, Death Echo, Forked Thorns/Glacier,
   Thousand Fist Blows. Approximate: most `maxTargets`, monk elements (assumed physical).
 - Contract note (for Coordinator/S2): `ModDefinition` lacks `effects`/numeric values and supreme `spell`/`revelation`/
@@ -183,8 +182,8 @@ Roles:
 
 ### 2026-11-18 — S1b Damage model (iteration 3)
 
-- `scripts/datamine-tibiatools.mjs` (`npm run datamine:damage`): 279 cached `/damage` + 9 meta requests to the TibiaTools API (2.5 s apart, stop on 429). Fits 144 spell variants on a shared level term g(L) (L/5 to 500, then /6, /7, /8…): ≤ 1.7 damage error, 4 monk spells ≤ 1.44 %.
-- `src/data/damage/`: `spell-formulas.json` + loader (`spellAverageHit` with stage/part, base-damage % [not on level term], flat bonus × bonusFactor; cooldown turns, element, area, `isSingleTarget` D16, tibiapal targets/rotations, crit, Canary healing). Probe rules (crit, creatures, Combat Mastery, Ascetic, Lord of Destruction) in `rules`.
+- `scripts/datamine-damage.mjs` (`npm run datamine:damage`): 279 cached `/damage` + 9 meta requests to the damage API (2.5 s apart, stop on 429). Fits 144 spell variants on a shared level term g(L) (L/5 to 500, then /6, /7, /8…): ≤ 1.7 damage error, 4 monk spells ≤ 1.44 %.
+- `src/data/damage/`: `spell-formulas.json` + loader (`spellAverageHit` with stage/part, base-damage % [not on level term], flat bonus × bonusFactor; cooldown turns, element, area, `isSingleTarget` D16, community targets/rotations, crit, game healing). Probe rules (crit, creatures, Combat Mastery, Ascetic, Lord of Destruction) in `rules`.
 - `src/data/character/`: HP/mana/cap, default skills, `mitigationPercent` (RP ≈ 1 % mid levels); as pure eHP an HP point always beats a Mitigation point at 200–1500, so the engine should value mitigation as sustain.
 - Docs: `docs/modules/damage-model.md`, `docs/modules/character-formulas.md`.
 
@@ -246,7 +245,7 @@ Roles:
 - **Gates.**
   - `tsc -b` 0 errors. `vitest run`: 17 files, 494 tests. Lint 0.
   - Build: main 724 kB (158 kB gzip, incl. damage JSON and fflate inflate), lazy monsters 699 kB (76 kB gzip).
-- **Docs.** README (character, spots, alternatives, export, TibiaTools/tibiapal attribution, `npm run datamine:damage`), ARCHITECTURE (pipeline, contracts, data flow, gates), `docs/modules/integration.md`, `engine.md`, `ui.md`.
+- **Docs.** README (character, spots, alternatives, export, data notes, `npm run datamine:damage`), ARCHITECTURE (pipeline, contracts, data flow, gates), `docs/modules/integration.md`, `engine.md`, `ui.md`.
 
 ### 2026-11-18 — Fix: max mana valued as offense
 
@@ -261,22 +260,22 @@ Max mana was scored as offense, so at DPS-leaning priority lesser gems for every
 
 ### 2026-11-18 — S1 Data (iteration 4)
 - **Mitigation (D19)** in `src/data/character`:
-  - Formula: `(shielding × vocFactor + 2.56 × offhandDefense)/100 × (quiver 0.877) × (1 + wheel%)`. vocFactor is K 1.148, P/M 1.13, S/D 1.112 (the Canary multiplier × 0.883).
+  - Formula: `(shielding × vocFactor + 2.56 × offhandDefense)/100 × (quiver 0.877) × (1 + wheel%)`. vocFactor is K 1.148, P/M 1.13, S/D 1.112 (the vocation multiplier × 0.883).
   - It reproduces the user's in-game values exactly: RP 108 shielding with quiver → 1.07 %; RP with a shield → 2.50 % total, of which the shield is 1.28 % (assumed defense 50); ED level 781 → 0.40 % shielding + 0.87 % spellbook. The ED values use the defaults: shielding 36 and spellbook defense 34.
-  - Canary's own constants do not fit these values.
-  - Defaults: paladin quiver, mages spellbook, knight and monk none. Typical shield and spellbook defense per level bracket comes from TibiaTools item meta, because tibiopedia.pl cannot be scraped.
+  - Generic server constants do not fit these values.
+  - Defaults: paladin quiver, mages spellbook, knight and monk none. Typical shield and spellbook defense per level bracket comes from TibiaWiki item data, because tibiopedia.pl cannot be scraped.
   - New: `mitigationBreakdown` and `effectiveHp`.
   - Changed: the default mage shielding is now 28→40, and the `wielding`/`defense` options were removed.
 - **Paladin weapons (D21)** in `src/data/damage`:
   - `weaponBracket(voc, level, 'bow' | 'crossbow')`. Bow brackets use Diamond Arrow; use `paladinWeaponFor(mode)` to pick the weapon for a mode.
   - `HitOptions.skillBonus`, `magicLevelBonus` and `paladinWeapon` evaluate Positional Tactics (`POSITIONAL_TACTICS`).
   - `BALLISTIC_MASTERY` holds the bow pierce 4 % and the crossbow +10 % crit extra damage.
-  - `pierceDamageMod(mod, pct)`: pierce cancels resistance 1:1 up to a modifier of 1.0, then adds at half rate. This was probed with 6 TibiaTools calls (`scripts/probe-pierce.mjs`, cached) and matched exactly.
+  - `pierceDamageMod(mod, pct)`: pierce cancels resistance 1:1 up to a modifier of 1.0, then adds at half rate. This was probed with 6 damage API calls (`scripts/probe-pierce.mjs`, cached) and matched exactly.
 - **Revelation spells (D20):** `REVELATION_SPELLS` / `revelationSpell(name)`, plus `unlockedBy` on damage spells. A test checks that every spell in `rotations.ts`, including the `or` alternatives, resolves to a formula.
 - Docs: `character-formulas.md` and `damage-model.md` updated.
 
 ### 2026-11-18 — S2 Engine (iteration 4)
-- **Hunt styles removed:** hunt targets are tibiapal averages, and boss mode counts 1 target (area spells 1.2). `huntStyle` is optional and ignored.
+- **Hunt styles removed:** hunt targets are community averages, and boss mode counts 1 target (area spells 1.2). `huntStyle` is optional and ignored.
 - **Defense = % effective HP (D18):**
   - HP +x → x/HP; mitigation or dodge → pp/(100−m); resistance → the same × incoming share.
   - The spike factor and the HP/mana/capacity utility hacks were removed; capacity and max mana are worth 0.
@@ -332,7 +331,7 @@ Max mana was scored as offense, so at DPS-leaning priority lesser gems for every
   - ARCHITECTURE: contracts, gates and tests.
   - `docs/modules/integration.md`.
 
-### 2026-11-18 — D22 area augments + gem substitutesArea-augmented spells use the tibiapal average only with the augment (else −0.5 targets; `SpellEval.areaGap`). Gem recommendations carry `similar` (≥90 % of the chosen mod's gain; UI line "Near-equal substitutes"). EK 1200 pts max DPS: greater gem now Augmented Fierce Berserk, Front Sweep listed at 93 %. 487 tests.
+### 2026-11-18 — D22 area augments + gem substitutesArea-augmented spells use the community average only with the augment (else −0.5 targets; `SpellEval.areaGap`). Gem recommendations carry `similar` (≥90 % of the chosen mod's gain; UI line "Near-equal substitutes"). EK 1200 pts max DPS: greater gem now Augmented Fierce Berserk, Front Sweep listed at 93 %. 487 tests.
 
 ### 2026-11-18 — S2 Engine (iteration 4 follow-up)
 - **Fair search for revelation-gated presets (`searchPlan`):** when a preset's search misses its required revelation, the engine runs a second full search with that revelation boosted ×10. This only gives the preset a valid build; plans are still compared on the shared objective, with no bias toward beams.
@@ -384,7 +383,7 @@ User: is +1 magic level worth more than the second Death Echo augment? No: +1 ML
 
 ### 2026-11-18 — Cooldowns from TibiaWiki (D25)
 
-All 70 non-rune damage/healing spells checked against TibiaWiki; 10 differed (mostly 2026 spells). With Death Echo at 6 s its first augment (−2 s) is worth ~7.6 % damage (was 0) and stage II ~4 %. 850 points, priority 0: Beam Mastery 2 + LoD 1 + both Death Echo augments; DE 14.3 casts/min shown. The askarak/chakoya spot test no longer expects Master of Flames: with Great Death Beam at 6 s the Decay death-beam rotation wins both spots (Flames still wins at T0 without the wheel). Open: the 7 July 2026 patch also lowered base damage (Death Echo 85 → 75, Great Death Beam 170 → 155); check whether the TibiaTools formulas include it.
+All 70 non-rune damage/healing spells checked against TibiaWiki; 10 differed (mostly 2026 spells). With Death Echo at 6 s its first augment (−2 s) is worth ~7.6 % damage (was 0) and stage II ~4 %. 850 points, priority 0: Beam Mastery 2 + LoD 1 + both Death Echo augments; DE 14.3 casts/min shown. The askarak/chakoya spot test no longer expects Master of Flames: with Great Death Beam at 6 s the Decay death-beam rotation wins both spots (Flames still wins at T0 without the wheel). Open: the 7 July 2026 patch also lowered base damage (Death Echo 85 → 75, Great Death Beam 170 → 155); check whether the damage API formulas include it.
 
 ### 2026-11-18 — Damage & healing analysis; gem steps (D26)
 
@@ -407,13 +406,13 @@ All 70 non-rune damage/healing spells checked against TibiaWiki; 10 differed (mo
 - [x] Iteration 2 — official planner data extracted (S1), fight context + gems editor + PL/EN UI (S3).
 - [x] Iteration 2 — engine on planner data: context-aware spells, Avatar boss-only, gems & vessels (S2).
 - [x] Iteration 2 — integration: mitigation fix, engine messages i18n, fixtures removed, E2E matrix (S4).
-- [x] Iteration 3 — planner code (S1a), TibiaTools damage model + character formulas (S1b), rotation engine, D16, alternatives (S2), character / spot / alternatives / export UI (S3), integration + E2E (S4).
+- [x] Iteration 3 — planner code (S1a), damage model + character formulas (S1b), rotation engine, D16, alternatives (S2), character / spot / alternatives / export UI (S3), integration + E2E (S4).
 - [x] Iteration 4 — D18–D21: EHP defense, real mitigation, rotation presets, forced spells, hunt styles removed (S1–S4).
 - [ ] User acceptance of iteration 4 functionality, then UI polish (postponed per D15).
 
 Open issues:
-- Healing formulas are approximate (canary `onGetFormulaValues`); verify against in-game values.
-- Cooldowns of the 2026 spells are approximate (tibiapal rotation presets).
+- Healing formulas are approximate (community healing formulas); verify against in-game values.
+- Cooldowns of the 2026 spells are approximate (community rotation presets).
 - Armor is not modelled; base mitigation assumes default equipment per vocation.
 - UI polish postponed (D15); no DOM/component tests (jsdom + Testing Library).
 - No alternatives near a full wheel (no room for a ≥ 10 % different build).

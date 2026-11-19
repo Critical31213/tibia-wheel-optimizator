@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * Probes how "pierce" perks (Ballistic Mastery bow: +4 % physical & holy pierce) interact with creature
- * resistances in the TibiaTools damage API. 6 requests, >= 2.5 s apart, cached in scripts/.cache/tibiatools/damage
- * (same key scheme as datamine-tibiatools.mjs). Usage: node scripts/probe-pierce.mjs [--offline]
+ * resistances in the damage API. 6 requests, >= 2.5 s apart, cached in scripts/.cache/damage-api/damage
+ * (same key scheme as datamine-damage.mjs). Usage: node scripts/probe-pierce.mjs [--offline]
  */
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -10,7 +10,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const CACHE = join(ROOT, 'scripts/.cache/tibiatools/damage');
+const CACHE = join(ROOT, 'scripts/.cache/damage-api/damage');
+const API = process.env.DAMAGE_API ?? '';
 const OFFLINE = process.argv.includes('--offline');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let lastAt = 0;
@@ -22,7 +23,8 @@ async function damage(req) {
   const wait = lastAt + 2600 - Date.now();
   if (wait > 0) await sleep(wait);
   lastAt = Date.now();
-  const res = await fetch('https://tibiatools.io/api/v1/damage', {
+  if (!API) throw new Error("set DAMAGE_API (base URL of the damage API)");
+  const res = await fetch(`${API}/damage`, {
     method: 'POST',
     headers: { 'User-Agent': 'wheel-optimizer-research', Accept: 'application/json', 'Content-Type': 'application/json' },
     body: JSON.stringify(req),
@@ -35,7 +37,7 @@ async function damage(req) {
 }
 
 const CREATURES = { Behemoth: 0, Demon: 190, 'Dragon Lord': 208 };
-const creatures = JSON.parse(readFileSync(join(ROOT, 'scripts/.cache/tibiatools/meta/creatures.json'), 'utf8')).items;
+const creatures = JSON.parse(readFileSync(join(ROOT, 'scripts/.cache/damage-api/meta/creatures.json'), 'utf8')).items;
 CREATURES.Behemoth = creatures.find((c) => c.name === 'Behemoth').id;
 const base = (id, perks = []) => ({
   stats: { vocation: 'paladin', level: 800, bonus: 0, critChance: 10, critDamage: 50, skill: 120, magicLevel: 30 },

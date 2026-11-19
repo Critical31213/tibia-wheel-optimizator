@@ -14,7 +14,7 @@ export const ENGINE_MESSAGES = {
   'rationale.spot': 'Hunting spot: {list}; element and damage-type modifiers are weighted.',
   'rationale.hpOverMitigation': 'At your level one Hit Points dedication point adds ~{ratio}× more effective HP than a Mitigation point.',
   'rationale.mitigationOverHp': 'At your level one Mitigation point adds ~{ratio}× more effective HP than a Hit Points point.',
-  'rationale.hunt': 'Hunt: area spells are valued for about {targets} targets each (tibiapal averages); single-target spells are ignored.',
+  'rationale.hunt': 'Hunt: area spells are valued for about {targets} targets each (community averages); single-target spells are ignored.',
   'rationale.rotationAuto': 'Damage is based on the rotation {rotation} (picked as the best for this build and spot).',
   'rationale.rotationManual': 'Damage is based on your rotation {rotation}.',
   'rationale.rotationRequires': 'Your rotation needs the {revelation} revelation, which this build does not reach.',

@@ -12,7 +12,7 @@ rules, plus spell metadata used by the engine to value augments in a fight conte
 |------|------|
 | `scripts/extract-wheel.mjs` | `npm run extract:wheel` — runs the official planner WASM in Node, verifies rules empirically (throws on any failed assertion) and writes the JSON. |
 | `scripts/.cache/wod/` (gitignored) | `skillgrid.cjs` (planner WASM module), `SkillwheelStringsJsonLibrary.json` (texts), `wheelofdestinyplanner.min.js` (UI reference only). |
-| `scripts/.cache/tibiapal/` (gitignored) | `spellAverageHitsData.json`, `rotationPresetsData.json`, `wheelTemplatesData.json` from tibiapal.com. |
+| `scripts/.cache/hunt-data/` (gitignored) | `spellAverageHitsData.json`, `rotationPresetsData.json`, `wheelTemplatesData.json` from community data. |
 | `src/data/wheel/wheel-data.json` | Generated dataset (committed; facts only, no CipSoft code). |
 | `src/data/wheel/wheel-data.d.json.ts` | Types the JSON import as `WheelDataFile`. |
 | `src/data/wheel/types.ts` | Internal types (`WheelTile`, `WheelRevelation`, `WheelBasicMod`, `WheelSupremeMod`, `SpellMeta`, …). |
@@ -25,7 +25,7 @@ lazy-loaded monster chunk.
 
 ## Re-downloading the inputs (manual, Cloudflare)
 
-test.tibia.com and tibiapal.com are behind Cloudflare, which blocks scripted downloads. Use a normal browser:
+test.tibia.com and the community data pages are behind Cloudflare, which blocks scripted downloads. Use a normal browser:
 
 1. Open the planner on the test server (`https://test.tibia.com/...subtopic=wheelofdestinyplanner` or the
    live tibia.com library page once released). Open DevTools → Network, reload.
@@ -33,9 +33,9 @@ test.tibia.com and tibiapal.com are behind Cloudflare, which blocks scripted dow
    `scripts/.cache/wod/skillgrid.cjs`, `SkillwheelStringsJsonLibrary.json` and
    `wheelofdestinyplanner.min.js` into `scripts/.cache/wod/`. If the WASM is a separate `.wasm` file, save it
    next to `skillgrid.cjs` with the same name the loader requests.
-3. On tibiapal.com (spell average hits / wheel templates pages) save the JSON responses
+3. On the community data pages (spell average hits / wheel templates pages) save the JSON responses
    `spellAverageHitsData.json`, `rotationPresetsData.json`, `wheelTemplatesData.json` into
-   `scripts/.cache/tibiapal/`.
+   `scripts/.cache/hunt-data/`.
 4. `npm run extract:wheel`, then `npx vitest run src/data`.
 
 Planner API notes: `require('skillgrid.cjs')()` resolves to the module; `new M.SkillwheelPlanner(M.EActiveVocation.Knight)`.
@@ -60,7 +60,7 @@ the planner always uses grade IV for mods. `updateByCode` returns -1 (invalid), 
     (values are vocation-specific, e.g. Hit Points).
   - `mods.supreme[]` — `id, name, category (effect | augDamage | augCrit | augCooldown | augHealing |
     revelationMastery), spell, revelation, gradeValues[4], values[4], momentum?[4]`.
-  - `referenceBuilds` — tibiapal templates: recommended lesser/greater gems and decoded builds
+  - `referenceBuilds` — community templates: recommended lesser/greater gems and decoded builds
     (`points, description, code, legacyCode, spent, tiles {gridId: points}, vessels, revelationStages`).
   - `verification` — raw outputs of the empirical checks.
 
@@ -88,7 +88,7 @@ Texts have HTML stripped; numbers are parsed where possible, display strings kep
 - **Momentum:** supreme cooldown mods: cooldown fixed across grades, momentum chance 0/0.33/0.66/1 % for grades I–IV, additive.
 - **Mods:** 46 basic mods (ids 32, 42, 43 are empty in the config); slot 1 accepts 20 (HP/mana/cap/mitigation and
   their hybrids, single elemental resistances), slot 2 accepts ids 0–29 (resistances). 27 supreme mods per vocation.
-- **Reference builds:** tibiapal codes are in the old format (`legacyCode: true`); the planner still decodes them
+- **Reference builds:** community codes are in the old format (`legacyCode: true`); the planner still decodes them
   (slice points only, no gems). Treat their slice meanings with care.
 
 ## Spells (`spells.ts`)
@@ -98,11 +98,11 @@ Energy Strike, Strong Flame Strike; *Focus Spells* → Hell's Core, Rage of the 
 Thorns, Forked Glacier), a revelation (Twin Bursts → Ice Burst + Terra Burst; Beam Mastery affects both great
 beams) or a supreme mod. `isNew` = introduced by the 2026 Vocation Adjustments update: Shield Slam, Divine
 Barrage, Ethereal Barrage, Death Echo, Forked Thorns, Forked Glacier, Thousand Fist Blows (Lord of Destruction is
-a new *passive* revelation, not a spell). `avgHitsHunt` from tibiapal.com; beams carry `avgHitsHuntOuter`.
+a new *passive* revelation, not a spell). `avgHitsHunt` from community data; beams carry `avgHitsHuntOuter`.
 
 ## Attribution
 
-Average target counts and reference builds: [tibiapal.com](https://tibiapal.com) (spell average hits, wheel
+Average target counts and reference builds: community hunting data (spell average hits, wheel
 templates). Wheel facts: official Tibia Wheel of Destiny planner (CipSoft). The binary and strings are never committed.
 
 ## Limitations
@@ -110,7 +110,7 @@ templates). Wheel facts: official Tibia Wheel of Destiny planner (CipSoft). The 
 - `maxTargets` is an estimate for most area spells; monk spell elements are assumed physical (`approximate: true`).
 - Values come from the **test server** and may change before release; re-run the extraction after updates.
 - The planner uses grade IV for all mods; lower grades come from the strings file only.
-- tibiapal builds predate the new layout (`legacyCode`).
+- community builds predate the new layout (`legacyCode`).
 
 ## Planner export code
 

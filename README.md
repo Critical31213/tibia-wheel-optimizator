@@ -28,15 +28,14 @@ the build in the official planner.
   shield only in the shield rotation).
 - **Defense as effective HP.** HP, mitigation, dodge and resistances are compared as % effective HP
   (EHP = HP / (1 − mitigation)); capacity and max mana have no value (potions and mana leech are assumed).
-- **Damage model.** Spell damage comes from per-spell formulas fitted offline on the TibiaTools damage API used
-  by the tibiapal.com calculator, run through a rotation (cooldowns, crit, augments, flat bonus).
-- **Rotations.** Per-vocation rotation presets (tibiapal); by default the optimizer picks the best one for the
+- **Damage model.** Spell damage comes from per-spell formulas fitted offline on the a public damage-calculator API, run through a rotation (cooldowns, crit, augments, flat bonus).
+- **Rotations.** Per-vocation rotation presets (community); by default the optimizer picks the best one for the
   spot and build, or you choose one. Revelation spells (Divine Grenade, Executioner's Throw, Twin Bursts,
   Spiritual Outburst; Avatars on bosses) join the rotation while their revelation is active. Boss mode also tries
   a greedy single-target plan. Augments of spells outside the rotation are worth nothing.
 - **Forced spells.** Force the wheel augment of utility spells (e.g. Divine Dazzle, Mystic Repulse, Heal Friend);
   the build takes at least their stage I augment.
-- **Fight context.** Hunt or Boss (hunt styles were removed). Area spells use average target counts from tibiapal
+- **Fight context.** Hunt or Boss (hunt styles were removed). Area spells use average target counts from community
   while hunting and ~1 target on bosses; **single-target spells are ignored while hunting**. Avatar revelations
   count only in boss fights.
 - **Hunting spot.** Search 2006 monsters and add up to 10 with relative weights. Builds adapt to the weighted
@@ -70,7 +69,7 @@ npm run dev        # http://localhost:5173
 | `npm run lint` | oxlint. |
 | `npm run scrape:monsters` | Re-scrape tibiopedia.pl into `src/data/monsters.json` (slow and polite; run rarely). |
 | `npm run extract:wheel` | Regenerate `src/data/wheel/wheel-data.json` from the planner files (see below). |
-| `npm run datamine:damage` | Refit `src/data/damage/spell-formulas.json` from the TibiaTools damage API (cached, 2.5 s between requests, stops on HTTP 429; run rarely). |
+| `npm run datamine:damage` | Refit `src/data/damage/spell-formulas.json` from the damage API (base URL in `DAMAGE_API`; cached, 2.5 s between requests, stops on HTTP 429; run rarely). |
 
 ## Refreshing the wheel data
 
@@ -80,7 +79,7 @@ The planner sits behind Cloudflare, so its files must be downloaded **manually i
    save these 3 files into `scripts/.cache/wod/` (gitignored):
    `skillgrid.cjs` (the planner WASM module), `SkillwheelStringsJsonLibrary.json` and
    `wheelofdestinyplanner.min.js`.
-2. Optionally save the tibiapal.com JSON files (spell average hits, wheel templates) into `scripts/.cache/tibiapal/`.
+2. Optionally save the community data JSON files (spell average hits, wheel templates) into `scripts/.cache/hunt-data/`.
 3. Run `npm run extract:wheel`, then `npm test`.
 
 The script runs the planner in Node, checks every rule it relies on, and writes only facts (numbers and texts)
@@ -110,11 +109,10 @@ to JSON. The CipSoft code itself is never committed or shipped. Details: [docs/m
   offline; the app ships only the derived facts.
 - **Monster data:** [tibiopedia.pl](https://tibiopedia.pl) (resistances, damage types, HP, experience). It is
   scraped offline and shipped as static JSON; the app makes no requests to that site.
-- **Average hits per spell:** [tibiapal.com](https://tibiapal.com), used as baseline target counts when hunting.
-- **Spell damage formulas:** fitted offline on the public [TibiaTools](https://tibiatools.io) damage API
-  (`/api/v1/damage`, the engine behind the tibiapal.com damage calculator). Requests are cached and rate-limited;
+- **Average hits per spell:** community hunting data, used as baseline target counts when hunting.
+- **Spell damage formulas:** fitted offline on a public damage-calculator API. Requests are cached and rate-limited;
   the app ships only the fitted coefficients and makes no runtime requests. Cooldowns and healing formulas come
-  from the opentibiabr/canary spell scripts (2026 spells are estimated).
+  from the community spell data (2026 spells are estimated).
 
 Tibia is a registered trademark of CipSoft GmbH. This is an unofficial fan project, not affiliated with or endorsed by CipSoft.
 
@@ -123,7 +121,7 @@ Tibia is a registered trademark of CipSoft GmbH. This is an unofficial fan proje
 ```
 scripts/scrape-monsters.ts   offline monster scraper (tibiopedia.pl)
 scripts/extract-wheel.mjs    offline wheel-data extractor (planner WASM)
-scripts/datamine-*.mjs       offline damage-formula fit (TibiaTools API) + curated spell meta
+scripts/datamine-*.mjs       offline damage-formula fit (damage API) + curated spell meta
 src/types/                   shared type contract
 src/data/                    monsters.json + search API (lazy-loaded chunk)
 src/data/wheel/              wheel-data.json + spell metadata + planner code encoder/decoder
@@ -142,7 +140,7 @@ src/integration.test.ts      end-to-end tests
 - [docs/modules/data.md](docs/modules/data.md) — monster scraper and dataset
 - [docs/modules/wheel-data.md](docs/modules/wheel-data.md) — planner extraction and wheel dataset
 - [docs/modules/planner-code.md](docs/modules/planner-code.md) — official planner code format
-- [docs/modules/damage-model.md](docs/modules/damage-model.md) — fitted damage model (TibiaTools)
+- [docs/modules/damage-model.md](docs/modules/damage-model.md) — fitted damage model (damage API)
 - [docs/modules/character-formulas.md](docs/modules/character-formulas.md) — HP, skills, mitigation
 - [docs/modules/engine.md](docs/modules/engine.md) — wheel model, valuation, search, gems
 - [docs/modules/ui.md](docs/modules/ui.md) — components, state, i18n
@@ -151,10 +149,10 @@ src/integration.test.ts      end-to-end tests
 
 ## Limitations
 
-- Damage formulas are fitted to the TibiaTools calculator (≤ 1.7 damage error), not taken from the game itself.
+- Damage formulas are fitted to the damage API calculator (≤ 1.7 damage error), not taken from the game itself.
 - Healing formulas are approximate, and the cooldowns of the 2026 spells are estimates.
 - Armor is not modelled; base mitigation assumes default equipment per vocation.
-- Hunt target counts are tibiapal averages; the shield defense (50) and quiver factor used for paladin
+- Hunt target counts are community averages; the shield defense (50) and quiver factor used for paladin
   mitigation come from a few in-game data points.
 - Near a full wheel there may be no alternatives (not enough room for a distinct build).
 - Some legacy monsters have incomplete damage or resistance data on the source site.

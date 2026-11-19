@@ -188,7 +188,7 @@ describe('iteration 4: rotations, revelation spells, paladin weapons (D20/D21)',
     expect(POSITIONAL_TACTICS).toEqual({ skillBonus: 3, magicLevelBonus: 3, skillUptime: 0.7 });
   });
 
-  it('Ballistic Mastery: pierce vs creature modifier (TibiaTools probe) and crossbow crit', () => {
+  it('Ballistic Mastery: pierce vs creature modifier (damage API probe) and crossbow crit', () => {
     expect(BALLISTIC_MASTERY.bow.piercePct).toBe(4);
     expect(pierceDamageMod(0.7, 4)).toBeCloseTo(0.74, 10);
     expect(pierceDamageMod(1, 4)).toBeCloseTo(1.02, 10);

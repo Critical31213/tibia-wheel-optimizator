@@ -217,7 +217,7 @@ export interface SpellMeta {
   element: Element | null;
   kind: SpellKind;
   area: SpellArea;
-  /** Average targets hit while hunting (tibiapal.com), if known. */
+  /** Average targets hit while hunting (community data), if known. */
   avgHitsHunt?: number;
   /** Beams: average extra targets hit by the outer beam (Beam Mastery). */
   avgHitsHuntOuter?: number;

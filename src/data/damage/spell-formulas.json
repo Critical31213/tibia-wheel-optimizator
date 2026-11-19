@@ -1,7 +1,7 @@
 {
   "meta": {
-    "source": "TibiaTools damage API (https://tibiatools.io/api/v1), as used by tibiapal.com/damage-calculator",
-    "generatedBy": "npm run datamine:damage (scripts/datamine-tibiatools.mjs)",
+    "source": "public damage-calculator API",
+    "generatedBy": "npm run datamine:damage (scripts/datamine-damage.mjs)",
     "requests": {
       "damageRequests": 279,
       "metaRequests": 9,
@@ -57,7 +57,7 @@
   "critDefaults": {
     "critChance": 10,
     "critDamage": 50,
-    "note": "tibiapal default: Powerful Strike imbuement; expected multiplier 1 + chance*extra"
+    "note": "community default: Powerful Strike imbuement; expected multiplier 1 + chance*extra"
   },
   "weaponBrackets": {
     "knight": {
@@ -4623,7 +4623,7 @@
         "magicLevel": 81
       },
       "note": "linear level (not levelTerm)",
-      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+      "source": "community healing formulas (approximate)"
     },
     {
       "name": "Fair Wound Cleansing",
@@ -4651,7 +4651,7 @@
         "magicLevel": 11.95
       },
       "note": "linear level (not levelTerm)",
-      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+      "source": "community healing formulas (approximate)"
     },
     {
       "name": "Salvation",
@@ -4679,7 +4679,7 @@
         "magicLevel": 16
       },
       "note": "linear level (not levelTerm)",
-      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+      "source": "community healing formulas (approximate)"
     },
     {
       "name": "Ultimate Healing",
@@ -4708,7 +4708,7 @@
         "magicLevel": 9.85
       },
       "note": "linear level (not levelTerm)",
-      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+      "source": "community healing formulas (approximate)"
     },
     {
       "name": "Mass Healing",
@@ -4736,7 +4736,7 @@
         "magicLevel": 8.065
       },
       "note": "linear level (not levelTerm)",
-      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+      "source": "community healing formulas (approximate)"
     },
     {
       "name": "Heal Friend",
@@ -4764,7 +4764,7 @@
         "magicLevel": 12
       },
       "note": "linear level (not levelTerm)",
-      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+      "source": "community healing formulas (approximate)"
     },
     {
       "name": "Nature's Embrace",
@@ -4792,7 +4792,7 @@
         "magicLevel": 24
       },
       "note": "linear level (not levelTerm)",
-      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+      "source": "community healing formulas (approximate)"
     },
     {
       "name": "Spirit Mend",
@@ -4820,7 +4820,7 @@
         "magicLevel": 10.004999999999999
       },
       "note": "linear level (not levelTerm)",
-      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+      "source": "community healing formulas (approximate)"
     },
     {
       "name": "Mass Spirit Mend",
@@ -4848,7 +4848,7 @@
         "magicLevel": 8.065
       },
       "note": "linear level (not levelTerm); Scaled by Harmony in game.",
-      "source": "opentibiabr/canary onGetFormulaValues (approximate)"
+      "source": "community healing formulas (approximate)"
     }
   ],
   "characterPerks": {

@@ -1,7 +1,7 @@
 import type { RotationPreset, Vocation } from '../../types';
 
 /**
- * Suggested hunting rotations (user-confirmed + tibiapal presets).
+ * Suggested hunting rotations (user-confirmed + community presets).
  * `ratio` = relative casts. `or` = element alternatives, engine picks the best vs the spot.
  * Revelation spells (Divine Grenade, Executioner's Throw, Ice/Terra Burst, Spiritual Outburst,
  * Avatars in boss mode) are added by the engine when the build reaches the revelation;

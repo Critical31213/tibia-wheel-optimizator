@@ -234,7 +234,7 @@ export const pl: Dictionary = {
   'engine.rationale.spot': 'Expowisko: {list}; odporności na żywioły i typy obrażeń są uśrednione według wag.',
   'engine.rationale.hpOverMitigation': 'Na twoim poziomie punkt w Hit Points daje ~{ratio}× więcej efektywnego HP niż punkt w Mitigation Multiplier.',
   'engine.rationale.mitigationOverHp': 'Na twoim poziomie punkt w Mitigation Multiplier daje ~{ratio}× więcej efektywnego HP niż punkt w Hit Points.',
-  'engine.rationale.hunt': 'Hunt: spelle obszarowe liczone dla ok. {targets} celów (średnie z tibiapal), spelle na pojedynczy cel są pomijane.',
+  'engine.rationale.hunt': 'Hunt: spelle obszarowe liczone dla ok. {targets} celów (średnie z polowań), spelle na pojedynczy cel są pomijane.',
   'engine.rationale.rotationAuto': 'Obrażenia liczone z rotacji {rotation} (wybranej automatycznie jako najlepsza dla tego buildu i expowiska).',
   'engine.rationale.rotationManual': 'Obrażenia liczone z wybranej przez ciebie rotacji {rotation}.',
   'engine.rationale.rotationRequires': 'Wybrana rotacja wymaga Revelation {revelation}, którego ten build nie osiąga.',

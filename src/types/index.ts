@@ -139,7 +139,7 @@ export interface WheelDefinition {
 /** 'boss' = single target; only here Avatar spells are valued. */
 export type FightMode = 'hunt' | 'boss';
 
-/** @deprecated Ignored since D20 (hunt targets = tibiapal averages); kept for old URLs. */
+/** @deprecated Ignored since D20 (hunt targets = community averages); kept for old URLs. */
 export type HuntStyle = 'solo' | 'teamLure' | 'teamBox';
 
 export interface FightContext {

@@ -36,7 +36,7 @@ describe('expected targets per context', () => {
     }
   });
 
-  it('hunt uses the tibiapal averages capped by maxTargets, boss ~1.2', () => {
+  it('hunt uses the community averages capped by maxTargets, boss ~1.2', () => {
     const fb = meta('Fierce Berserk');
     expect(expectedTargets(fb, HUNT)).toBe(Math.min(fb.maxTargets, fb.avgHitsHunt!));
     expect(expectedTargets(fb, BOSS)).toBe(BOSS_AREA_TARGETS);

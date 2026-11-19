@@ -18,7 +18,7 @@ promotion points for a Tibia character, given:
 
 It returns the best build plus alternatives, each with an official planner export code (gems included).
 Wheel facts come from the official test-server planner (upcoming update) via an offline extraction pipeline;
-spell damage comes from formulas fitted offline on the TibiaTools damage API (tibiapal calculator).
+spell damage comes from formulas fitted offline on the a public damage-calculator API.
 
 ```
 OFFLINE (npm scripts; outputs committed)
@@ -26,9 +26,9 @@ OFFLINE (npm scripts; outputs committed)
   test.tibia.com planner ─┐
    (manual browser save   ├──▶ scripts/.cache/wod/ ──┐
     of 3 files)           │                          ├──▶ scripts/extract-wheel.mjs ─▶ src/data/wheel/wheel-data.json
-  tibiapal.com avg hits ──┴──▶ scripts/.cache/tibiapal/ ┘    (runs WASM in Node,        + src/data/wheel/spells.ts
+  community data avg hits ──┴──▶ scripts/.cache/hunt-data/ ┘    (runs WASM in Node,        + src/data/wheel/spells.ts
                                                               asserts every rule)
-  tibiatools.io /damage ─────▶ scripts/datamine-tibiatools.mjs ─▶ src/data/damage/spell-formulas.json
+  damage API /damage ─────▶ scripts/datamine-damage.mjs ─▶ src/data/damage/spell-formulas.json
    (cached, rate-limited)       (+ datamine-damage-meta.mjs: cooldowns, areas, healing)
 
 RUNTIME (static SPA)
@@ -68,7 +68,7 @@ RUNTIME (static SPA)
 ├── scripts/
 │   ├── scrape-monsters.ts  # offline tibiopedia.pl scraper → src/data/monsters.json
 │   ├── extract-wheel.mjs   # planner WASM → src/data/wheel/wheel-data.json
-│   ├── datamine-tibiatools.mjs  # TibiaTools damage API → src/data/damage/spell-formulas.json
+│   ├── datamine-damage.mjs  # damage API → src/data/damage/spell-formulas.json
 │   └── datamine-damage-meta.mjs # curated cooldowns / areas / healing formulas
 ├── public/favicon.svg
 ├── index.html
@@ -141,11 +141,11 @@ selects the shown build (best or `alternatives[i].result`) → wheel, summary, e
 - **Wheel data (iteration 2):** `scripts/extract-wheel.mjs` (`npm run extract:wheel`) runs the official
   test-server planner WASM in Node (inputs downloaded manually into gitignored `scripts/.cache/wod/`) and writes
   `src/data/wheel/wheel-data.json` (36 slices × 5 vocations, unlock graph, revelations 250/500/1000, vessels,
-  basic/supreme mods, momentum, Revelation Mastery, decoded tibiapal reference builds). `src/data/wheel/spells.ts`
-  holds spell metadata (element, area, tibiapal avg hits, isNew). API: `getWheelData(v)`, `SPELLS`, `getSpell(name)`.
+  basic/supreme mods, momentum, Revelation Mastery, decoded community reference builds). `src/data/wheel/spells.ts`
+  holds spell metadata (element, area, community avg hits, isNew). API: `getWheelData(v)`, `SPELLS`, `getSpell(name)`.
   Details: [`docs/modules/wheel-data.md`](docs/modules/wheel-data.md).
-- **Damage model (iteration 3):** `scripts/datamine-tibiatools.mjs` (`npm run datamine:damage`) fits per-spell
-  formulas offline on the TibiaTools damage API (tibiapal calculator) → `src/data/damage/spell-formulas.json`.
+- **Damage model (iteration 3):** `scripts/datamine-damage.mjs` (`npm run datamine:damage`) fits per-spell
+  formulas offline on the a public damage-calculator API → `src/data/damage/spell-formulas.json`.
   Loader: `spellAverageHit`, `spellCooldownTurns`, `isSingleTarget` (D16), `defaultTargets`, `recommendedRotation`,
   `critMultiplier`, `healingAverage`. Details: [`docs/modules/damage-model.md`](docs/modules/damage-model.md).
 - **Character formulas:** `src/data/character/`: HP/mana/cap by level, default skills 200–1500, `mitigationPercent`
@@ -165,7 +165,7 @@ Full details: [`docs/modules/engine.md`](docs/modules/engine.md).
   - Every source gives `{off, def, util}`, blended as `(1−p)·off + p·def + 0.1·util` (each weight at least 0.05).
   - **Damage:** expected damage per rotation, built on the `src/data/damage` formulas and the character's level and skills (`input.character`; default level = points + 50).
     - **Rotations (D20):** one attack slot per 2 s turn. A preset (`src/data/damage/rotations.ts`) sets the cast ratios: `input.rotationId`, or auto = the best valid preset chosen jointly with the build (`requires.revelation` must be reached, `requires.shield` respected, `or` alternatives resolved by element vs the spot). Active revelation spells are cast on cooldown first; cooldowns and shared cooldowns are respected. Boss mode also tries the greedy plan (`boss`). `result.rotation` reports it for the main build and each alternative.
-    - Per cast = hit × targets (hunt: tibiapal averages; boss: 1, area spells 1.2) × weighted element modifier over `input.monsters` × crit EV.
+    - Per cast = hit × targets (hunt: community averages; boss: 1, area spells 1.2) × weighted element modifier over `input.monsters` × crit EV.
     - Augments, crit, cooldown, the flat bonus, revelation stages and passives are valued as a rotation delta. Augments of spells outside the rotation (transit slices) are worth 0 unless forced or healing.
     - **Forced spells (D21):** the search starts from the cheapest path to each forced spell's stage I augment; a rationale explains when points are insufficient.
   - **D16:** single-target spells are worth 0 in hunt mode. In boss mode, area spells count 1.2 targets.

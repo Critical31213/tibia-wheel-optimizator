@@ -1,5 +1,5 @@
 /**
- * Damage model per context, built on the fitted TibiaTools formulas (`src/data/damage`).
+ * Damage model per context, built on the fitted damage API formulas (`src/data/damage`).
  *
  * damage per turn T = auto-attack + Σ rate(S) × perCast(S)
  * perCast(S)        = hit(S, level, skills, stage) × targets(S, context) × element(S, monsters) × crit EV
@@ -32,7 +32,7 @@ export const DEFAULT_CONTEXT: FightContext = { mode: 'hunt' };
 
 /** Area/chain/beam targets in boss mode (summons, adds). */
 export const BOSS_AREA_TARGETS = 1.2;
-/** Wheel area augments ('Expanded Shape' etc.): tibiapal hunt averages assume them (D22). */
+/** Wheel area augments ('Expanded Shape' etc.): community hunt averages assume them (D22). */
 export const AREA_AUGMENT = /Expanded Shape|area enlarged|Range increased/i;
 export const AREA_AUGMENT_GAP = 0.5;
 const SOLO_FALLBACK: Record<SpellMeta['area'], number> = { single: 1, area: 5, chain: 4, beam: 2.4 };
@@ -66,14 +66,14 @@ export const SHARED_COOLDOWN: string[][] = [
 ];
 /** Beam Mastery: central damage +per target hit (capped), by stage. */
 const BEAM_BONUS = { per: [10, 12, 14], cap: [30, 36, 42] };
-/** Revelation passives that scale spell damage (TibiaTools probes). */
+/** Revelation passives that scale spell damage (damage API probes). */
 const PASSIVE_MULT: Record<string, { mult: number[]; applies: (s: SpellEval) => boolean }> = {
   'Combat Mastery': { mult: [1.0308, 1.0368, 1.045], applies: () => true },
   Ascetic: { mult: [1.0478, 1.0957, 1.1446], applies: (s) => HARMONY_SPENDERS.has(s.name) },
 };
 /**
  * Lord of Destruction boosts the damage type of the elemental stance (wheel data): Flames +2/3/4 % fire damage
- * (TibiaTools probe ×1.0148/1.0222/1.0296), Thunder +2/3/4 pp crit chance, Decay +15/25.5/30 pp crit extra damage.
+ * (damage API probe ×1.0148/1.0222/1.0296), Thunder +2/3/4 pp crit chance, Decay +15/25.5/30 pp crit extra damage.
  * Applies to spells dealing that type (natural + converted share); nothing without an elemental stance.
  */
 export const LORD_OF_DESTRUCTION = { name: 'Lord of Destruction', fireMult: [1.0148, 1.0222, 1.0296], critChance: [2, 3, 4], critExtra: [15, 25.5, 30] };
@@ -142,7 +142,7 @@ export interface SpellEval {
   /** Domain index whose stage changes the spell (granting revelation or Beam Mastery), else -1. */
   stageDomain: number;
   avatar: boolean;
-  /** Hunt: tibiapal averages already include the wheel's area augment (D22); without it the spell hits this many fewer. */
+  /** Hunt: community averages already include the wheel's area augment (D22); without it the spell hits this many fewer. */
   areaGap: number;
   /** Part of the attack rotation (damage spell, not a rune; D16: not single-target in hunt mode). */
   usable: boolean;
@@ -624,7 +624,7 @@ export function healShare(model: SpellModel, name: string): number {
   return ctx.mode === 'boss' ? share : share * 0.5;
 }
 
-/** Average healing of one cast of `name` (Canary formulas). */
+/** Average healing of one cast of `name` (approximate formulas). */
 export function healPerCast(model: SpellModel, name: string): number {
   return healingAverage(name, model.character, { vocation: model.vocation });
 }

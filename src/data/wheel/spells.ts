@@ -1,6 +1,6 @@
 /**
  * Metadata of every spell referenced by wheel augments, revelations and supreme mods.
- * avgHitsHunt: tibiapal.com "spell average hits" (real hunting data).
+ * avgHitsHunt: community data "spell average hits" (real hunting data).
  * isNew: introduced by the 2026 "Vocation Adjustments" update (tibia.com news, June 2026).
  * Entries marked `approximate` contain estimated values (mostly maxTargets / monk elements).
  */

@@ -28,7 +28,7 @@ From level 8 on, each level adds:
 | Sorcerer / Druid | 5 | 30 | 10 |
 | Monk | 10 | 10 | 25 (approximate) |
 
-Same per-level values as tibiapal's `CHARM_STAT_GAIN_BY_VOCATION`.
+Same per-level values as the community calculator's `CHARM_STAT_GAIN_BY_VOCATION`.
 
 ## Default skills (approximate)
 
@@ -43,22 +43,21 @@ are interpolated linearly; above 1500 the last slope is extended, below 200 the 
 | Sorcerer / Druid | – | 85 → 133 | 28 → 40 (D19 calibration) |
 | Monk (fist) | 95 → 128 | 30 → 50 | 60 → 82 |
 
-For comparison, tibiapal pre-fills these end-game values, which **include** the stance bonus: knight 160,
+For comparison, community pre-fills these end-game values, which **include** the stance bonus: knight 160,
 paladin 180, monk 140, paladin magic level 35, caster magic level 120, shielding knight/paladin 110,
 monk 70, mages 30.
 
 ## Mitigation (D19)
 
-There are no fight modes in the current game. The structure follows Canary
-`PlayerWheel::calculateMitigation`:
+There are no fight modes in the current game. The structure follows the in-game mitigation:
 
 ```
 mitigation % = (shielding × vocFactor + offhandFactor × defense) / 100 × distanceFactor × (1 + wheelMultiplier%/100)
 ```
 
-Canary's own constants (vocations.xml: multiplier S/D 1.26, P/M 1.28, K 1.3; primaryShield 2.0–2.08;
+Generic server constants (multiplier S/D 1.26, P/M 1.28, K 1.3; primaryShield 2.0–2.08;
 secondaryShield 1.2–1.25, applied to spellbooks and as a ×1.2 *bonus* for quivers) do **not** reproduce the
-in-game Cyclopedia values. These user-reported values are used for calibration and take priority over Canary:
+in-game Cyclopedia values. These user-reported values are used for calibration and take priority:
 
 | Point | Cyclopedia | Model | Inputs |
 |---|---|---|---|
@@ -71,19 +70,19 @@ in-game Cyclopedia values. These user-reported values are used for calibration a
 How the constants were inferred:
 
 - **Shielding factor.** The RP shield total (2.50 − 1.28) gives a shielding part of 1.22 % for 108 shielding, or
-  1.13 %/100 points. That is the Canary paladin multiplier 1.28 × 0.883. The other vocations use their Canary
+  1.13 %/100 points. That is the paladin vocation multiplier 1.28 × 0.883. The other vocations use their
   multiplier scaled by the same 0.883: K 1.148, P/M 1.13, S/D 1.112.
 - **Quiver factor 0.877.** With a quiver the same RP shows 1.07 % instead of 1.22 %. So the quiver
-  (distance) factor *lowers* mitigation, the opposite of Canary's 1.2.
+  (distance) factor *lowers* mitigation, the opposite of the generic 1.2.
 - **Offhand factor 2.56 %/100 defense**, the same for shields and spellbooks. Item defense values come from the
-  TibiaWiki-sourced TibiaTools item meta (`scripts/.cache/tibiatools/meta/shields.json`). tibiopedia.pl only
+  TibiaWiki item data (`scripts/.cache/damage-api/meta/shields.json`). tibiopedia.pl only
   serves a JS "setup" page to scripts, so it could not be scraped. A typical ~50-defense shield (Great/Gnome
   Shield) gives 1.28 %. A typical ~34-defense spellbook at level 781 (Stag Spellbook, Eldritch Folio) gives 0.87 %:
-  0.87/34 = 0.0256 = 1.28/50. Canary's per-item factors would need defenses of 62–72, which no item has.
+  0.87/34 = 0.0256 = 1.28/50. Generic per-item factors would need defenses of 62–72, which no item has.
 - **Mage default shielding** was raised to 28/31/33/36/37/39/40 (levels 200…1500). The ED's 0.40 % implies about
   36 shielding at level 781.
 
-**Uncertainty.** The RP shield is a **Gnome Shield (defense 50, TibiaTools meta), confirmed by the user**, so the offhand factor 2.56 is
+**Uncertainty.** The RP shield is a **Gnome Shield (defense 50, damage API meta), confirmed by the user**, so the offhand factor 2.56 is
 fitted on a known item. The RP level and the ED shielding are still unknown (the fit uses the default ED stats).
 The quiver factor rests on a single pair of observations. Any bow or crossbow paladin
 without a quiver is treated like `'none'` (factor 1), which is untested. Monk weapon defense is ignored.
@@ -140,9 +139,9 @@ With that split, mitigation can overtake HP once the HP pool is large (≈ 1200+
 
 ## Sources
 
-- tibiapal.com damage calculator source (`CHARM_STAT_*`, `DEFAULT_*` constants).
-- Canary `PlayerWheel::calculateMitigation` + vocations.xml (structure only).
+- Public damage calculator (`CHARM_STAT_*`, `DEFAULT_*` constants).
+- In-game mitigation structure.
 - User in-game Cyclopedia values (calibration, D19).
-- TibiaTools item meta (shield/spellbook defense, TibiaWiki-sourced).
-- TibiaQA #36739 (older composition; superseded).
+- TibiaWiki item data (shield/spellbook defense, TibiaWiki-sourced).
+- player measurements (older composition; superseded).
 - tibia.gg article "Mitigation, Armor and Defense" (stances removed in 15.25; formula not published).

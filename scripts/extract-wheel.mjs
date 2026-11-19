@@ -1,5 +1,5 @@
 // Extracts Wheel of Destiny facts from the official planner (WASM) into src/data/wheel/wheel-data.json.
-// Inputs (gitignored, downloaded manually): scripts/.cache/wod/*, scripts/.cache/tibiapal/*.
+// Inputs (gitignored, downloaded manually): scripts/.cache/wod/*, scripts/.cache/hunt-data/*.
 // Usage: npm run extract:wheel
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const WOD = join(ROOT, 'scripts/.cache/wod');
-const PAL = join(ROOT, 'scripts/.cache/tibiapal');
+const PAL = join(ROOT, 'scripts/.cache/hunt-data');
 const OUT = join(ROOT, 'src/data/wheel/wheel-data.json');
 
 const STR = JSON.parse(readFileSync(join(WOD, 'SkillwheelStringsJsonLibrary.json'), 'utf8'));
@@ -403,7 +403,7 @@ for (const voc of VOCS) {
 
 const data = {
   meta: {
-    source: 'Official Wheel of Destiny planner (test.tibia.com), WASM module run in Node + SkillwheelStringsJsonLibrary.json; reference builds and target counts from tibiapal.com.',
+    source: 'Official Wheel of Destiny planner (test.tibia.com), WASM module run in Node + SkillwheelStringsJsonLibrary.json; reference builds and target counts from community data.',
     generatedAt: new Date().toISOString().slice(0, 10),
     totalCapacity: 4000,
     note: 'Facts derived by running the planner; no CipSoft code is included.',

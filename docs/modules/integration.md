@@ -107,7 +107,7 @@ Paladin, level 600 → 550 points, with Dragon Lord + Demon added (URL `m=dragon
 
 ### Open issues
 
-- Healing formulas are approximate (canary), and the cooldowns of the 2026 spells are estimates.
+- Healing formulas are approximate (approximate), and the cooldowns of the 2026 spells are estimates.
 - Armor is not modelled. Base mitigation assumes default equipment.
 - Alternatives are absent near a full wheel: there is no room for a build ≥ 10 % different.
 - UI polish is postponed (D15). There are no DOM/component tests.
@@ -170,7 +170,7 @@ in PL/EN plus `engineText` fallback (`i18n/i18n.test.ts`), and planner gem names
 ### Open issues
 
 - The mitigation base per vocation, spell `maxTargets`, team target counts and monk elements are estimates.
-- tibiapal reference builds are in the legacy code format, and there is no planner export code.
+- community reference builds are in the legacy code format, and there is no planner export code.
 - There are no DOM/component tests (no jsdom). UI logic lives in pure, tested helpers.
 - Scroll points are not persisted.
 

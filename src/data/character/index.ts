@@ -111,16 +111,16 @@ export function resolveCharacterStats(vocation: Vocation, stats: CharacterStats)
 // ---------------------------------------------------------------------------
 // Mitigation (% of incoming damage removed), D19 — no fight modes in the current game.
 //
-// Structure from Canary PlayerWheel::calculateMitigation:
+// Structure from the game:
 //   (shielding × vocFactor + offhandFactor × defense) / 100 × distanceFactor, then × (1 + wheel%/100)
-// Constants re-fitted on the user's in-game Cyclopedia values (they win over Canary):
+// Constants re-fitted on the user's in-game Cyclopedia values (they take priority):
 //   RP shielding 108 + quiver → shielding part 1.07 %; same RP + shield → 2.50 % total, shield part 1.28 %;
 //   ED level 781 → shielding part 0.40 %, spellbook part 0.87 %.
 // See docs/modules/character-formulas.md (inference + uncertainty).
 
 export type Offhand = 'shield' | 'spellbook' | 'quiver' | 'none';
 
-/** % per 100 shielding = Canary vocation multiplier × 0.883 (fitted on RP: 108 × 1.13 % = 1.22 % with a shield). */
+/** % per 100 shielding = game vocation multiplier × 0.883 (fitted on RP: 108 × 1.13 % = 1.22 % with a shield). */
 export const MITIGATION_SHIELDING_FACTOR: Record<Vocation, number> = {
   knight: 1.126, // EK Cyclopedia: 119 shielding → 1.34 %
   paladin: 1.13,
@@ -132,10 +132,10 @@ export const MITIGATION_SHIELDING_FACTOR: Record<Vocation, number> = {
 /** % per 100 offhand defense, shields and spellbooks alike (RP shield 50 → 1.28 %, ED spellbook 34 → 0.87 %). */
 export const MITIGATION_DEFENSE_FACTOR = 2.56;
 
-/** Whole-term factor with a quiver (1.07 / 1.22; Canary uses 1.2 here — contradicted by the game). */
+/** Whole-term factor with a quiver (1.07 / 1.22; generic value 1.2 — contradicted by the game). */
 export const QUIVER_FACTOR = 0.877;
 
-/** Level brackets of the typical best-in-slot offhand defense (TibiaTools / TibiaWiki item data). */
+/** Level brackets of the typical best-in-slot offhand defense (TibiaWiki item data). */
 export const OFFHAND_LEVELS = [200, 400, 600, 800, 1000, 1250, 1500] as const;
 
 /** Typical offhand defense per OFFHAND_LEVELS (nearest lower bracket). */

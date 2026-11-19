@@ -1,10 +1,10 @@
 /**
- * Curated metadata merged into src/data/damage/spell-formulas.json by datamine-tibiatools.mjs.
- * Things the TibiaTools API does not expose: real cooldowns, area class, healing formulas.
+ * Curated metadata merged into src/data/damage/spell-formulas.json by datamine-damage.mjs.
+ * Things the damage API does not expose: real cooldowns, area class, healing formulas.
  *
- * Cooldowns: opentibiabr/canary spell scripts (data/scripts/spells), which track the official
- * client; 2026 spells (not in canary) are estimates from tibiapal rotation presets (`approx`).
- * Healing: canary `onGetFormulaValues` (level/magic level linear formulas), APPROXIMATE.
+ * Cooldowns: community spell data, which track the official
+ * client; 2026 spells are estimates from community rotation presets (`approx`).
+ * Healing: community healing formulas (level/magic level linear formulas), APPROXIMATE.
  */
 
 /** API name (without stage suffix) -> { cd seconds, area, approx? } */
@@ -91,7 +91,7 @@ export const SPELL_META = {
   'Holy Missile Rune': { cd: 2, area: 'single' },
 };
 
-/** Healing spells relevant to the wheel (not covered by the API). avg = (min+max)/2 of canary formulas. */
+/** Healing spells relevant to the wheel (not covered by the API). avg = (min+max)/2 of the formulas. */
 export const HEALING = [
   { name: 'Intense Wound Cleansing', vocations: ['knight'], cd: 600, area: 'single', min: [0.2, 70, 438], max: [0.2, 92, 544] },
   { name: 'Fair Wound Cleansing', vocations: ['knight'], cd: 1, area: 'single', min: [0.4, 8, 50], max: [0.4, 15.9, 102] },

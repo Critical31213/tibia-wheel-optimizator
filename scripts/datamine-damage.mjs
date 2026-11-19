@@ -1,13 +1,12 @@
 #!/usr/bin/env node
 /**
- * Datamines the public TibiaTools damage API (https://tibiatools.io/api/v1, used by
- * tibiapal.com/damage-calculator) into fitted per-spell damage formulas.
+ * Datamines a public damage-calculator API (base URL from the DAMAGE_API env var) into fitted per-spell damage formulas.
  *
  *   npm run datamine:damage              # download (cached) + fit
  *   npm run datamine:damage -- --offline # fit from the on-disk cache only
  *
  * Politeness: sequential requests, >= 2.5 s apart, generic User-Agent, every response
- * cached on disk (scripts/.cache/tibiatools/) keyed by a hash of the request, retries
+ * cached on disk (scripts/.cache/damage-api/) keyed by a hash of the request, retries
  * with backoff on 5xx/network errors; on HTTP 429 one 65 s back-off, then a hard stop
  * (re-running resumes from the cache). Budget: MAX_REQUESTS network requests per run.
  * See docs/modules/damage-model.md.
@@ -19,8 +18,8 @@ import { fileURLToPath } from 'node:url';
 import { HEALING, SPELL_META } from './datamine-damage-meta.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const API = 'https://tibiatools.io/api/v1';
-const CACHE = join(ROOT, 'scripts/.cache/tibiatools');
+const API = process.env.DAMAGE_API ?? '';
+const CACHE = join(ROOT, 'scripts/.cache/damage-api');
 const OUT_DIR = join(ROOT, 'src/data/damage');
 const UA = 'wheel-optimizer-research';
 const DELAY_MS = 2500; // the API rate-limits at roughly 25 requests/minute
@@ -44,6 +43,7 @@ async function http(url, init) {
     network++;
     let res;
     try {
+      if (!API) throw new Error("set DAMAGE_API (base URL of the damage API)");
       res = await fetch(url, { ...init, headers: { 'User-Agent': UA, Accept: 'application/json', ...(init?.headers ?? {}) } });
     } catch (e) {
       if (attempt >= 3) throw e;
@@ -105,7 +105,7 @@ async function damage(req) {
 const LEVELS = [200, 400, 600, 800, 1000, 1250, 1500];
 const LEVELS_FACTORIAL = [200, 600, 1000, 1500];
 const CURVE_EXTRA_LEVELS = [50, 100, 150, 300, 500, 700, 900, 1100, 1750, 2000];
-const CRIT = { critChance: 10, critDamage: 50 }; // tibiapal default: Powerful Strike
+const CRIT = { critChance: 10, critDamage: 50 }; // community default: Powerful Strike
 
 /** Representative weapons; names resolved against /meta/weapons. Level brackets are typical picks. */
 const BRACKET_WEAPONS = {
@@ -512,8 +512,8 @@ const RULES = {
 };
 
 function compose(formulas, brackets, probes, M, total) {
-  const hits = readJson(join(ROOT, 'scripts/.cache/tibiapal/spellAverageHitsData.json'));
-  const rotations = readJson(join(ROOT, 'scripts/.cache/tibiapal/rotationPresetsData.json'));
+  const hits = readJson(join(ROOT, 'scripts/.cache/hunt-data/spellAverageHitsData.json'));
+  const rotations = readJson(join(ROOT, 'scripts/.cache/hunt-data/rotationPresetsData.json'));
   const perkByScope = {};
   for (const p of M.perks) {
     if (!p.appliesToSpell) continue;
@@ -582,7 +582,7 @@ function compose(formulas, brackets, probes, M, total) {
     max: { const: h.max[2], level: h.max[0], magicLevel: h.max[1] },
     avg: { const: (h.min[2] + h.max[2]) / 2, level: (h.min[0] + h.max[0]) / 2, magicLevel: (h.min[1] + h.max[1]) / 2 },
     note: ['linear level (not levelTerm)', h.note].filter(Boolean).join('; '),
-    source: 'opentibiabr/canary onGetFormulaValues (approximate)',
+    source: 'community healing formulas (approximate)',
   }));
 
   const perks = {};
@@ -591,8 +591,8 @@ function compose(formulas, brackets, probes, M, total) {
 
   return {
     meta: {
-      source: 'TibiaTools damage API (https://tibiatools.io/api/v1), as used by tibiapal.com/damage-calculator',
-      generatedBy: 'npm run datamine:damage (scripts/datamine-tibiatools.mjs)',
+      source: 'public damage-calculator API',
+      generatedBy: 'npm run datamine:damage (scripts/datamine-damage.mjs)',
       requests: { damageRequests: total, metaRequests: META.length, note: 'one /damage response covers every spell of the vocation' },
       note: 'avg/min/max = raw damage per hit per target before crit, creature resistances and mitigation.',
       levelTerm: 'g(L) = L/5 to 500, then +1 per 6 levels to 1100, per 7 to 1800, per 8 to 2600, per 9 above',
@@ -603,7 +603,7 @@ function compose(formulas, brackets, probes, M, total) {
       },
     },
     rules: RULES,
-    critDefaults: { critChance: 10, critDamage: 50, note: 'tibiapal default: Powerful Strike imbuement; expected multiplier 1 + chance*extra' },
+    critDefaults: { critChance: 10, critDamage: 50, note: 'community default: Powerful Strike imbuement; expected multiplier 1 + chance*extra' },
     weaponBrackets: brackets,
     spells,
     healing,

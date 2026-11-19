@@ -1,6 +1,6 @@
 {
  "meta": {
-  "source": "Official Wheel of Destiny planner (test.tibia.com), WASM module run in Node + SkillwheelStringsJsonLibrary.json; reference builds and target counts from tibiapal.com.",
+  "source": "Official Wheel of Destiny planner (test.tibia.com), WASM module run in Node + SkillwheelStringsJsonLibrary.json; reference builds and target counts from community data.",
   "generatedAt": "2026-11-18",
   "totalCapacity": 4000,
   "note": "Facts derived by running the planner; no CipSoft code is included."

@@ -1,4 +1,4 @@
-/** Types of the generated damage dataset (scripts/datamine-tibiatools.mjs). */
+/** Types of the generated damage dataset (scripts/datamine-damage.mjs). */
 import type { Element, Vocation } from '../../types';
 
 export type DamageArea = 'single' | 'area' | 'beam' | 'chain';
@@ -29,7 +29,7 @@ export interface FitQuality {
 }
 
 export interface DamageVariant {
-  /** TibiaTools spell id. */
+  /** damage API spell id. */
   apiId: number;
   /** API suffix: "No Bonus", "Stage 1", "Central", "Stage 2 Sides", "Primary", "Repeat Stage 3"... */
   label: string | null;
@@ -61,10 +61,10 @@ export interface DamageSpell {
   singleTarget: boolean;
   cooldownSeconds: number;
   cooldownApprox?: boolean;
-  /** tibiapal "spell average hits" (real hunting data); 1 for single-target. */
+  /** community "spell average hits" (real hunting data); 1 for single-target. */
   avgTargetsHunt: number | null;
   avgTargetsHuntOuter?: number;
-  /** TibiaTools perk ids of the spell's augment-able effects. */
+  /** damage API perk ids of the spell's augment-able effects. */
   perkIds: { baseDamage?: number; critDamage?: number; critChance?: number } | null;
   variants: DamageVariant[];
   /** Wheel revelation that unlocks the spell (D20); absent = always available. */

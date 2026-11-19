@@ -48,7 +48,7 @@ src/engine/
 - **Gems and slots.** A lesser gem has `basic1`. A regular gem has `basic1` and `basic2`. A greater gem has both basics and `supreme`.
   - D28: a gem fits only a vessel of its own quality (lesser → lesser, regular → regular, greater → greater); then all its slots are active (`fits`, `activeSlots`). Placement gives mismatched pairs weight 0.
   - D30: `withRoom`: with every unlocked vessel of a quality filled, a recommendation of that quality becomes a replacement of the weakest placed gem (`replaces`, gain = difference) or is dropped. Qualities without an unlocked vessel keep their recommendations.
-- D29 life leech: `leechEhp(model, threat)` (values.ts) = leech HP/s / (leech HP/s + main heal per turn) × HEAL_EHP × threat, with leech per cast = leech% × damage × (0.1n + 0.9) / n (Canary). `weightsFor(priority, v.leech)` adds defense weight × leech to the offense weight. Gift of Life is ×0.5 while hunting.
+- D29 life leech: `leechEhp(model, threat)` (values.ts) = leech HP/s / (leech HP/s + main heal per turn) × HEAL_EHP × threat, with leech per cast = leech% × damage × (0.1n + 0.9) / n . `weightsFor(priority, v.leech)` adds defense weight × leech to the offense weight. Gift of Life is ×0.5 while hunting.
 - **Momentum.** Supreme cooldown mods add 0, 0.33, 0.66 or 1 % momentum by grade.
 
 ## 2. Valuation (`spells.ts`, `values.ts`)
@@ -94,7 +94,7 @@ Every source yields `Parts = { off, def, util }`. They are blended as `score = w
   | single-target spell, hunt (D16) | **unusable**: its share, augments and gem mods are 0 |
   | single-target spell, boss | 1 |
   | area spell, boss mode | `min(maxTargets, 1.2)` (adds) |
-  | area spell, hunt | `min(maxTargets, avgHitsHunt)` (tibiapal averages; `huntStyle` is ignored) |
+  | area spell, hunt | `min(maxTargets, avgHitsHunt)` (community averages; `huntStyle` is ignored) |
   | beam outer tiles, hunt / boss | `avgHitsHuntOuter` / 0 |
 
 - **Monsters:**
@@ -218,7 +218,7 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 
 - The rotation is a single-slot model (presets with ratios, or greedy in boss mode), with no mana limits and no movement.
 - The Avatar's boss window is 120 s per 30 min.
-- Hunt targets (tibiapal averages), `maxTargets` and monk elements are approximate (S1).
+- Hunt targets (community averages), `maxTargets` and monk elements are approximate (S1).
 - Single-target spells are ignored in hunt mode (D16).
 - 1 % effective HP is weighted like 1 % damage; `HEAL_EHP`, threat and leech factors are heuristics. Base mitigation comes from `src/data/character`.
 - Momentum is valued as a cooldown proxy.
@@ -228,7 +228,7 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 | File | Covers |
 |---|---|
 | `model.test.ts` | Geometry, the directed unlock graph matches `WHEEL_DATA`, twins, vessels and mods, thresholds, messages. |
-| `spells.test.ts` | Targets (tibiapal averages, hunt > boss), D16 (single-target unusable in hunt, boss targets ≤ 1.2, no Augmented Annihilation in hunt), immune → useless, Avatar, cooldown floor, momentum, effect parsing, augments. |
+| `spells.test.ts` | Targets (community averages, hunt > boss), D16 (single-target unusable in hunt, boss targets ≤ 1.2, no Augmented Annihilation in hunt), immune → useless, Avatar, cooldown floor, momentum, effect parsing, augments. |
 | `gems.test.ts` | Hungarian vs brute force, active slots, placement, recommendations, upgrades, Mitigation Multiplier scaling with real base mitigation. |
 | `gemSteps.test.ts` | D26: upgrades only with every unlocked vessel filled; RM gem re-optimization (owning the gem reaches the predicted stage), no avatar RM in hunt. |
 | `optimizer.test.ts` | Path validity on random inputs, RM, vessel unlock order, augments, determinism, edge budgets, priority, perf < 50 ms (best of 3 per input), planner reference builds. |

@@ -127,7 +127,7 @@ describe('transit slices and forced spells', () => {
 });
 
 describe('D22: area augments and near-equal gem substitutes', () => {
-  it('a spell with its wheel area augment uses the tibiapal hunt average; without it fewer targets', () => {
+  it('a spell with its wheel area augment uses the community hunt average; without it fewer targets', () => {
     const m = buildSpellModel('knight', { mode: 'hunt' }, null, { level: 1250 });
     const fs = m.spells.get('Front Sweep')!;
     expect(fs.areaGap).toBeGreaterThan(0);

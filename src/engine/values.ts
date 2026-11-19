@@ -117,7 +117,7 @@ export function sub(a: Parts, b: Parts): Parts {
 }
 
 /**
- * D29: % EHP per +1 % damage via imbuement life leech. Leech per hit (Canary calculateLeechAmount) =
+ * D29: % EHP per +1 % damage via imbuement life leech. Leech per hit (the game) =
  * damage × leech × (0.1n + 0.9) / n for n targets; its share of sustain vs the main heal cast every turn × HEAL_EHP.
  */
 export function leechEhp(model: SpellModel, threat: number): number {

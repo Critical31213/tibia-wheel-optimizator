@@ -1,7 +1,6 @@
 # Damage model (`src/data/damage/`)
 
-Per-spell damage formulas fitted offline on the TibiaTools damage API (`https://tibiatools.io/api/v1`), the backend of
-tibiapal.com/damage-calculator. The app makes no network calls; everything lives in `spell-formulas.json`.
+Per-spell damage formulas fitted offline on a public damage-calculator API. The app makes no network calls; everything lives in `spell-formulas.json`.
 
 ## Loader API (`src/data/damage/index.ts`)
 
@@ -12,10 +11,10 @@ tibiapal.com/damage-calculator. The app makes no network calls; everything lives
 | `levelTerm(level)` | Shared level term g(L). |
 | `spellCooldownTurns(name, reductionSeconds?)` | Cooldown in 2 s turns (min 1). |
 | `spellElement`, `spellArea` (`single`/`area`/`beam`/`chain`), `isSingleTarget` | Metadata. `singleTarget` = D16 flag (never valued in hunt mode). |
-| `defaultTargets(name, outer?)` | tibiapal "spell average hits" (real hunting data); 1 for single-target spells. |
-| `rotationPresets(voc)`, `recommendedRotation(voc)` | tibiapal rotation presets, ratios normalized to weights. |
+| `defaultTargets(name, outer?)` | community "spell average hits" (real hunting data); 1 for single-target spells. |
+| `rotationPresets(voc)`, `recommendedRotation(voc)` | community rotation presets, ratios normalized to weights. |
 | `critMultiplier(chance%, extra%)` | `1 + chance·extra` (default 10/50 → 1.05). |
-| `healingAverage(name, character, …)` | Healing spells (Canary formulas, approximate). |
+| `healingAverage(name, character, …)` | Healing spells (approximate formulas). |
 | `weaponBracket(voc, level, paladinWeapon?)` | Representative weapon/attack per level bracket (default `attack`); paladin bow or crossbow (D21). |
 | `revelationSpell(name)`, `REVELATION_SPELLS` | Unlocking revelation or null (D20). |
 | `pierceDamageMod(mod, pct)`, `BALLISTIC_MASTERY`, `POSITIONAL_TACTICS` | D21 effects (see below). |
@@ -73,7 +72,7 @@ The committed fixture `__fixtures__/api-samples.json` (10 API responses) is re-c
   therefore matters only through Ballistic Mastery and auto-attack.
 
 **Ballistic Mastery** (`BALLISTIC_MASTERY`)
-- **Bow: +4 % physical and holy pierce.** A cached TibiaTools probe (`node scripts/probe-pierce.mjs`, 6 API calls)
+- **Bow: +4 % physical and holy pierce.** A cached damage API probe (`node scripts/probe-pierce.mjs`, 6 API calls)
   shows how pierce changes the creature damage modifier. Pierce first cancels resistance 1:1 until the modifier
   reaches neutral 1.0; the remainder adds at half rate. `pierceDamageMod(mod, pct)` implements this.
   - The probe matched exactly for Behemoth (holy 0.7 → 0.74; with 40 % pierce: 1.05), Dragon Lord (1.0 → 1.02)
@@ -116,15 +115,15 @@ Double Jab, Greater Tiger Clash, Devastating Knockout, Forceful Uppercut, Mystic
 `COOLDOWN_OVERRIDES` (D25): TibiaWiki base cooldowns where the datamine differs, applied on load.
 
 
-- Cooldowns come from opentibiabr/canary spell scripts. 2026 spells without public data are marked
+- Cooldowns come from community spell data. 2026 spells without public data are marked
   `cooldownApprox` (Shield Bash/Slam, Divine Grenade, Barrages, Death Echo, Forked spells, Thousand Fist Blows).
-- Healing is not in the API. `healing[]` uses Canary `onGetFormulaValues` with linear `level`, and is approximate.
+- Healing is not in the API. `healing[]` uses community healing formulas with linear `level`, and is approximate.
 
 ## Datamine (`npm run datamine:damage`)
 
-`scripts/datamine-tibiatools.mjs` (spell meta in `scripts/datamine-damage-meta.mjs`):
+`scripts/datamine-damage.mjs` (spell meta in `scripts/datamine-damage-meta.mjs`):
 
-1. Downloads `/meta/*` (9 requests) into the gitignored `scripts/.cache/tibiatools/`.
+1. Downloads `/meta/*` (9 requests) into the gitignored `scripts/.cache/damage-api/`.
 2. Sends a planned set of `POST /damage` requests.
    - The rate limit is about 25 requests per minute, so requests go sequentially, 2.5 s apart, with a generic user agent.
    - Every response is cached by request hash.
@@ -139,5 +138,5 @@ Double Jab, Greater Tiger Clash, Devastating Knockout, Forceful Uppercut, Mystic
 
 ## Sources and attribution
 
-- TibiaTools API / tibiapal.com damage calculator: formulas, perks, targets data, rotation presets.
-- opentibiabr/canary: cooldowns and healing formulas.
+- Public damage-calculator API: formulas, perks, targets data, rotation presets.
+- community spell data: cooldowns and healing formulas.
