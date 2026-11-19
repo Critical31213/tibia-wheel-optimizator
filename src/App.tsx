@@ -1,6 +1,7 @@
 import { useDeferredValue, useMemo } from 'react';
 import { useOptimizer } from './hooks/useOptimizer';
 import { CharacterPanel } from './components/CharacterPanel';
+import { DebugCopy } from './components/DebugCopy';
 import { ExportPanel } from './components/ExportPanel';
 import { FightContextPanel } from './components/FightContextPanel';
 import { GemsPanel } from './components/GemsPanel';
@@ -113,6 +114,7 @@ export default function App() {
           <FightContextPanel value={context} onChange={update} priority={inputs.priority} onPriorityChange={(priority) => update({ priority })} />
           <GemsPanel vocation={inputs.vocation} gems={gems} mods={wheel.mods} emptyVessels={emptyVessels} onChange={setGems} />
           <WeaponsPanel key={inputs.vocation} vocation={inputs.vocation} meleeSkill={inputs.meleeSkill} prefs={weaponPrefs} onChange={setWeaponPrefs} />
+          <DebugCopy input={request} />
         </div>
 
         <div className="flex flex-col gap-3">

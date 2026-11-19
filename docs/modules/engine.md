@@ -257,3 +257,7 @@ re-optimized Revelation Mastery gems add the regular basics' effect to the with/
 
 D58: `BuildResult.wheelEffect` = `effectOf(v, rawTotals(..., withBase = false))`, i.e. what the wheel and its gems add over an
 empty wheel. `offenseScore` / `defenseScore` (share of the full-wheel maximum) stay for alternatives only.
+
+D60: after a full beam search, `improveSwaps` tries 1-for-1 swaps of a full slice for an empty slice of the same
+capacity (rebuilt with `replay`, must stay connected) and keeps strict improvements (up to 4 rounds). Fixes e.g. a
+Revelation Mastery slice whose points cross no threshold chosen over the skill boost next to it.

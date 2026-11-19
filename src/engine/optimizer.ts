@@ -314,6 +314,45 @@ function complete(s: Search, start: State): State {
   }
 }
 
+/** Rebuilds a state from full slices (any valid order) and an optional partial one; null when not connected. */
+function replay(s: Search, start: State, full: number[], partial: number, partialPts: number): State | null {
+  let st = start;
+  let left = full;
+  while (left.length) {
+    const k = left.findIndex((i) => isAvailable(s.wheel, st.alloc, i));
+    if (k < 0) return null;
+    const i = left[k];
+    st = extend(s, st, i, s.wheel.slices[i].capacity);
+    left = [...left.slice(0, k), ...left.slice(k + 1)];
+  }
+  if (partial < 0) return st;
+  return isAvailable(s.wheel, st.alloc, partial) ? extend(s, st, partial, partialPts) : null;
+}
+
+/**
+ * D59: 1-for-1 swaps of a full slice for an empty one of the same capacity (e.g. a Revelation Mastery slice whose
+ * points cross no threshold vs a skill boost next to it). The beam's revelation look-ahead can miss these.
+ */
+function improveSwaps(s: Search, start: State, best: State): State {
+  const n = s.wheel.slices.length;
+  for (let round = 0; round < 4; round++) {
+    const full = best.path.filter((i) => isFull(s.wheel, best.alloc, i));
+    const partial = best.path.find((i) => best.alloc[i] > 0 && !isFull(s.wheel, best.alloc, i)) ?? -1;
+    let found: State | null = null;
+    for (const i of full) {
+      if (start.alloc[i] > 0) continue;
+      for (let j = 0; j < n; j++) {
+        if (best.alloc[j] > 0 || s.wheel.slices[j].capacity !== s.wheel.slices[i].capacity) continue;
+        const st = replay(s, start, full.filter((x) => x !== i && start.alloc[x] === 0).concat(j), partial, partial >= 0 ? best.alloc[partial] : 0);
+        if (st && st.score > (found ?? best).score + 1e-9) found = st;
+      }
+    }
+    if (!found) return best;
+    best = found;
+  }
+  return best;
+}
+
 function search(wheel: EngineWheel, t: Tables, budget: number, gemRm: number[][], seed: readonly number[] = [], opts = FULL_SEARCH): State {
   const n = wheel.slices.length;
   let density = 0;
@@ -365,7 +404,7 @@ function search(wheel: EngineWheel, t: Tables, budget: number, gemRm: number[][]
       if (done.score > best.score + 1e-9) best = done;
     }
   }
-  return best;
+  return opts === FULL_SEARCH ? improveSwaps(s, empty, best) : best;
 }
 
 // ---------------------------------------------------------------------------

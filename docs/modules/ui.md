@@ -23,6 +23,7 @@ screens it is two columns (controls left, results right).
 | `src/lib/monsters.ts` | `resolveMonsters`, `combinedModifiers` (weighted average, missing = 100), `combinedDamageTypes` (tested). |
 | `src/lib/planner.ts` | Re-exports `PLANNER_URL`/`plannerUrl(code)` from `src/data/wheel/plannerCode` (single source); `copyText` (Clipboard API → `execCommand` fallback) (tested). |
 | `src/components/MonsterCard.tsx` | Name, HP/exp, element chips, damage types. |
+| `src/components/DebugCopy.tsx` | Temporary (D60): link under "My weapons" copying the exact `OptimizerInput` as JSON (textarea fallback) so a reported build can be reproduced. |
 | `src/components/Gain.tsx` | D55: a gain shown as `±x% dmg` (offense colour) and `±y% EHP` (defense colour), negatives red, parts below 0.05 hidden; the blended optimizer score only in the tooltip (shown as `pts` when neither part is visible, e.g. utility). Used for gem recommendations, upgrades (and to IV), weapon ranking, reshapes and suggestions. |
 | `src/components/NotesPanel.tsx` | D54: collapsed "For the curious" section at the end of the page with the descriptive hints (extra points, skills, knight skill, fight mode, monster weight, weapon grid, proficiency assumptions, units, storage); icons credit moved to the footer. |
 | `src/components/PrioritySlider.tsx` | 0–100 range slider (no own panel since D54, rendered inside `FightContextPanel`). |

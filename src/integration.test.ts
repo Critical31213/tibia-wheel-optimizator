@@ -721,3 +721,14 @@ describe('D42: worker messages', () => {
     expect(r).toEqual(optimize(input));
   });
 });
+
+describe('D59: equal-capacity swaps', () => {
+  it('takes +1 distance instead of a Revelation Mastery slice whose points cross no threshold', () => {
+    const monster = MONSTERS.find((m) => m.name === 'Rootthing Nutshell')!;
+    const r = optimize({ vocation: 'paladin', points: 800, monster, priority: 20, context: { mode: 'hunt' } });
+    const names = r.path.map((id) => getWheel('paladin').slices.find((s) => s.id === id)!.conviction.name);
+    expect(names).not.toContain('Revelation Mastery Divine Grenade');
+    expect(names).toContain('Distance Skill Boost');
+    expect(r.revelations.find((x) => x.perk.name === 'Divine Grenade')!.stage).toBe(2);
+  });
+});

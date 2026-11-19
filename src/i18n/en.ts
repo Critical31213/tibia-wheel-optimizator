@@ -30,6 +30,8 @@ export const en = {
   'gain.score': '{v} pts',
   'gain.tip': 'Damage: {dmg}% · effective HP: {ehp}% · optimizer score: {score}',
   'notes.storage': 'Gems and weapons are stored in this browser per vocation (not in the link).',
+  'debug.copy': 'Copy configuration (debug)',
+  'debug.copied': 'Copied — paste it in the chat',
   'app.licenses': 'Sources & licenses',
   'lang.label': 'Language',
 

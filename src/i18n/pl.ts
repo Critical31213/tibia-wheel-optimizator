@@ -24,6 +24,8 @@ export const pl: Dictionary = {
   'gain.score': '{v} pkt',
   'gain.tip': 'Obrażenia: {dmg}% · efektywne HP: {ehp}% · wynik optymalizatora: {score}',
   'notes.storage': 'Gemy i bronie są zapisywane w tej przeglądarce osobno dla każdej profesji (nie w linku).',
+  'debug.copy': 'Kopiuj konfigurację (debug)',
+  'debug.copied': 'Skopiowano — wklej ją w rozmowie',
   'app.licenses': 'Źródła i licencje',
   'lang.label': 'Język',
 
