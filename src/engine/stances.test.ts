@@ -79,8 +79,9 @@ describe('D24 Lord of Destruction follows the elemental stance', () => {
     expect(names).toContain('Lord of Destruction');
     expect(names).not.toContain('Gift of Life');
     // Augment pair look-ahead: stage I (-2 s cooldown) is worth 0 here, stage II (+12 % base damage) needs both copies.
-    expect(r.allocation.QTR2).toBe(100);
-    expect(r.allocation.QBL2).toBe(100);
+    // D73: the Death Echo augments sit in the central ring 3 slots.
+    expect(r.allocation.QTR4).toBe(100);
+    expect(r.allocation.QBL4).toBe(100);
   });
 });
 

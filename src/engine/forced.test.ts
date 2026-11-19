@@ -26,8 +26,8 @@ describe('D35: forced augment stage and revelation stage', () => {
     expect(at(900)).toBe('ok');
   });
 
-  it('D38: an RM gem only helps once its greater vessel is unlocked (300 points: no stage II from a gem)', () => {
-    expect(revelationOptions({ vocation: 'paladin', points: 300, gems: [] })[0].stages[1].status).toBe('impossible');
+  it('D38: an RM gem only helps once its greater vessel is unlocked (275 points: no stage II from a gem; D73: RM in ring 2 makes it possible at 300)', () => {
+    expect(revelationOptions({ vocation: 'paladin', points: 275, gems: [] })[0].stages[1].status).toBe('impossible');
   });
 
   it.each(VOCATIONS)('D38: %s: every revelation at stage III, at the fewest points reach calls ok (with and without an RM gem IV), is met', (vocation) => {

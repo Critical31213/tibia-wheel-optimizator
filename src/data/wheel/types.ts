@@ -19,6 +19,8 @@ export type SupremeCategory =
   | 'augHealing'
   | 'augDamage'
   | 'augOther'
+  /** D73: +chain targets / range. */
+  | 'augChain'
   | 'revelationMastery';
 
 export interface DedicationPerk {

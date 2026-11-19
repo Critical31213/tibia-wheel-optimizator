@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { VOCATIONS } from '../../types';
+import { VOCATIONS, type Vocation } from '../../types';
 import { SPELLS, WHEEL_DATA, getSpell, getWheelData, getWheelSpellNames } from './index';
 
 describe('wheel data', () => {
@@ -90,5 +90,36 @@ describe('wheel data', () => {
     for (const b of getWheelData(v).referenceBuilds.builds) {
       expect(Object.values(b.tiles).reduce((s, x) => s + x, 0)).toBe(b.spent);
     }
+  });
+});
+
+describe('D73: announced wheel and supreme mod changes', () => {
+  it.each(VOCATIONS)('%s: Revelation Mastery in ring 2, leech in ring 3, an augment in the central ring 3 slot', (v) => {
+    const tiles = getWheelData(v).tiles;
+    for (const q of ['TL', 'TR', 'BL', 'BR']) {
+      const inQ = tiles.filter((t) => t.quarter === q);
+      expect(inQ.filter((t) => t.conviction.category === 'revelationMastery').map((t) => t.ring)).toEqual([2]);
+      expect(inQ.filter((t) => t.conviction.category === 'leech').map((t) => t.ring).sort()).toEqual([3, 4]);
+      const ring3 = inQ.filter((t) => t.ring === 3).map((t) => t.conviction.category);
+      expect(ring3.filter((c) => c === 'leech')).toHaveLength(1);
+      expect(ring3).toContain('augmentation');
+    }
+  });
+
+  it('new grade values and chain mods', () => {
+    const sup = (v: Vocation, name: string) => getWheelData(v).mods.supreme.filter((m) => m.name === name);
+    expect(sup('knight', 'Augmented Annihilation').map((m) => m.values[3])).toEqual(expect.arrayContaining([36]));
+    expect(sup('knight', 'Augmented Shield Slam').map((m) => m.values)).toEqual([
+      [10, 11, 12, 15],
+      [15, 16.5, 18, 22.5],
+    ]);
+    expect(sup('sorcerer', 'Augmented Great Energy Beam').map((m) => m.values[3]).sort()).toEqual([18, 9]);
+    for (const [v, spell] of [['knight', 'Chivalrous Challenge'], ['sorcerer', 'Lightning'], ['paladin', 'Divine Dazzle']] as const) {
+      const m = sup(v, `Augmented ${spell} (Chain)`);
+      expect(m).toHaveLength(1);
+      expect(m[0]).toMatchObject({ category: 'augChain', values: [1, 1, 1, 2] });
+    }
+    expect(sup('knight', 'Augmented Intense Wound Cleansing').map((m) => m.category)).toEqual(['augHealing']);
+    expect(sup('paladin', 'Augmented Divine Dazzle').filter((m) => m.category === 'augCooldown')).toHaveLength(0);
   });
 });

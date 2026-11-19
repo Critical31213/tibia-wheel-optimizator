@@ -532,6 +532,8 @@ export function supremeEffects(m: WheelSupremeMod, grade: number): SpellEffect[]
       return [{ kind: 'heal', amount: x }];
     case 'augCooldown':
       return [{ kind: 'cd', amount: x }];
+    case 'augChain':
+      return [{ kind: 'jumps', amount: x }];
     default:
       return [];
   }

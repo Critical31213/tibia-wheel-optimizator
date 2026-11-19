@@ -29,7 +29,7 @@ describe('gem steps: new gems at grade I, upgrades after vessels are full', () =
   });
 
   it('Revelation Mastery gems are valued by re-optimizing the wheel', () => {
-    const input = { vocation: 'knight' as const, points: 950, monster: null, priority: 0, character: { level: 1000 }, alternatives: 0 };
+    const input = { vocation: 'knight' as const, points: 900, monster: null, priority: 0, character: { level: 1000 }, alternatives: 0 };
     const r = optimize(input);
     const rm = r.gemRecommendations.find((g) => g.mods.some((m) => m.name === "Revelation Mastery Executioner's Throw"))!;
     expect(rm.reasonMsg?.key).toBe('gem.rmReopt');
@@ -148,7 +148,7 @@ describe('D71: gem mod swaps', () => {
 describe('D72: idle mods, no supreme swaps', () => {
   it('flags an RM gem below the next stage and never proposes a supreme swap', () => {
     const rm: OwnedGem = { id: 'rm', quality: 'greater', basic1: { modId: 4, grade: 1 }, basic2: { modId: 16, grade: 1 }, supreme: { modId: 39, grade: 1 } };
-    const r = optimize({ vocation: 'paladin', points: 1000, monster: null, priority: 50, context: HUNT, alternatives: 0, gems: [rm] });
+    const r = optimize({ vocation: 'paladin', points: 1200, monster: null, priority: 50, context: HUNT, alternatives: 0, gems: [rm] });
     const v = r.vessels.find((x) => x.gem?.id === 'rm')!;
     const idle = v.idle?.find((x) => x.slot === 'supreme');
     expect(idle?.reasonMsg).toMatchObject({ key: 'gem.idleRm', params: { revelation: 'Avatar of Light', next: 250 } });

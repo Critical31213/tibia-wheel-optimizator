@@ -221,6 +221,7 @@ Plans carry their weapon; the choice, re-choice and `result.weapon` are describe
   - Supreme spell mods are valued with the build's wheel effects on the other spells in both sides of the delta (`spellBundleParts(..., others)`): a cooldown cut is worth nothing when the preset rotation is ratio-bound.
   - `gain = blend(grade + 1) − blend(grade)`, with momentum included for cooldown mods, sorted descending.
   - `gainToMax = blend(IV) − blend(grade)`.
+- **Chain mods (D73).** `augChain` supreme mods add chain targets (`jumps` effect → `extraTargets` in hunt; support spells count as utility); `targetsAt` caps chain spells at `MAX_CHAIN_TARGETS` (12). Shield Slam / Shield Bash use the weapon's elements (`weaponElement`).
 - **`VesselAssignment.idle` (D72).** Active mods of a placed owned gem worth ~0 in the build, with a reason: an RM below the next stage (points with the gem vs threshold), an RM already at the last stage, a resistance the spot does not deal, an avatar augment while hunting, a spell augment the rotation does not gain from.
 - **`modSwaps` (D71).**
   - Per active basic slot of each placed owned gem (D72: supreme mods are not swapped; a better supreme comes as a replacement gem in `gemRecommendations`): the best other mod for that slot (same slot rules as new gems, never the gem's other basic mod), at the character's grade on it (`GemEnv.grades`, else I).

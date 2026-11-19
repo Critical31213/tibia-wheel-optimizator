@@ -34,6 +34,7 @@ const LIST: S[] = [
   { name: 'Ethereal Spear', vocations: ['paladin'], element: 'physical', kind: 'damage', area: 'single', maxTargets: 1 },
   { name: 'Strong Ethereal Spear', vocations: ['paladin'], element: 'physical', kind: 'damage', area: 'single', avgHitsHunt: 1.0, maxTargets: 1 },
   { name: 'Divine Dazzle', vocations: ['paladin'], element: null, kind: 'support', area: 'chain', maxTargets: 5, approximate: true, note: 'Challenges/dazzles targets; augment I adds 2 jumps.' },
+  { name: 'Chivalrous Challenge', vocations: ['knight'], element: null, kind: 'support', area: 'chain', maxTargets: 5, approximate: true, note: 'Chain challenge; D73 chain augment adds targets and range.' },
   { name: 'Divine Empowerment', vocations: ['paladin'], element: null, kind: 'support', area: 'single', maxTargets: 1, note: 'Damage-increasing field.' },
   { name: 'Salvation', vocations: ['paladin'], element: 'healing', kind: 'healing', area: 'single', maxTargets: 1 },
   avatar('Avatar of Light', 'paladin'),

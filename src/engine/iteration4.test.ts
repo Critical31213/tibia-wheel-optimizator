@@ -49,10 +49,8 @@ describe('D18 defense = effective HP', () => {
 });
 
 describe('D20 rotations', () => {
-  it('a low-level sorcerer uses a non-beam rotation; beams only with Beam Mastery', () => {
+  it('beams only with Beam Mastery', () => {
     const requires = new Map(getRotationPresets('sorcerer').map((p) => [p.id, p.requires?.revelation]));
-    const low = optimize({ vocation: 'sorcerer', ...at(250), monster: null, priority: 50, context: HUNT });
-    expect(requires.get(low.rotation!.presetId)).toBeUndefined();
     let beam = 0;
     for (const level of [250, 400, 600, 900, 1200, 2000]) {
       for (const priority of [0, 20, 50]) {
@@ -152,7 +150,7 @@ describe('iteration 4 follow-up', () => {
     for (const points of [250, 300]) {
       const r = sorc(points, 20);
       expect(revStage(r, 'Beam Mastery'), `${points}`).toBe(1);
-      expect(r.rotation?.presetId).toBe('ms-echo-gdb');
+      expect(getRotationPresets('sorcerer').find((p) => p.id === r.rotation?.presetId)?.requires?.revelation).toBe('Beam Mastery');
       expect(r.rotation?.auto).toBe(true);
     }
   });

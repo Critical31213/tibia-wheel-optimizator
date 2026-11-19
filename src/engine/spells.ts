@@ -10,6 +10,7 @@
  */
 import { GREEDY_ROTATION_ID, type CharacterStats, type Element, type FightContext, type Monster, type RotationPreset, type Vocation, type WeightedMonster } from '../types';
 import { getSpell, getWheelSpellNames, type SpellMeta } from '../data/wheel';
+import { MAX_CHAIN_TARGETS } from '../data/wheel/update';
 import {
   getDamageSpell,
   getDamageSpells,
@@ -428,7 +429,9 @@ export function cooldownGain(base: number, reduction: number): number {
 /** Targets of a spell at a revelation stage (revelation spells cap targets by stage) plus extra targets. */
 export function targetsAt(model: SpellModel, s: SpellEval, stage: number, extra = 0): number {
   const def = REVELATION_SPELLS[s.name];
-  const max = (def?.maxTargets && stage >= 1 ? def.maxTargets[stage - 1] : s.maxTargets) + extra;
+  const raw = (def?.maxTargets && stage >= 1 ? def.maxTargets[stage - 1] : s.maxTargets) + extra;
+  // D73: chain targets stack up to MAX_CHAIN_TARGETS.
+  const max = s.area === 'chain' ? Math.min(raw, Math.max(s.maxTargets, MAX_CHAIN_TARGETS)) : raw;
   if (s.singleTarget) return 1;
   if (!extra && !(def?.maxTargets && stage >= 1)) return s.targets;
   const shape = { kind: s.kind, area: s.area, maxTargets: max, avgHitsHunt: s.meta?.avgHitsHunt ?? s.dmg?.avgTargetsHunt ?? undefined };

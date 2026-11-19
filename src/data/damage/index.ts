@@ -9,7 +9,12 @@ import type { Coefficients, DamageSpell, DamageVariant, HealingSpell, RotationPr
 
 export type * from './types';
 
-export const SPELL_FORMULAS: SpellFormulasFile = formulasJson;
+/** D73: Shield Slam and Shield Bash deal the equipped weapon's elements. */
+const WEAPON_ELEMENT_SPELLS = new Set(['Shield Slam', 'Shield Bash']);
+export const SPELL_FORMULAS: SpellFormulasFile = {
+  ...formulasJson,
+  spells: formulasJson.spells.map((s) => (WEAPON_ELEMENT_SPELLS.has(s.name) ? { ...s, weaponElement: true } : s)),
+} as SpellFormulasFile;
 /** Spells unlocked by a wheel revelation (D20) → revelation name (as in wheel-data.json). */
 export const REVELATION_SPELLS: Readonly<Record<string, string>> = {
   'Divine Grenade': 'Divine Grenade',

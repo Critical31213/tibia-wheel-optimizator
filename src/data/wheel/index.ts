@@ -6,11 +6,13 @@ import type { Vocation } from '../../types';
 import wheelJson from './wheel-data.json';
 import { SPELLS } from './spells';
 import type { SpellMeta, VocationWheelData, WheelDataFile } from './types';
+import { applyWheelUpdate } from './update';
 
 export type * from './types';
 export { SPELLS };
 
-export const WHEEL_DATA: WheelDataFile = wheelJson;
+/** D73: planner data with the announced quadrant and supreme mod changes. */
+export const WHEEL_DATA: WheelDataFile = applyWheelUpdate(wheelJson as WheelDataFile);
 
 export function getWheelData(vocation: Vocation): VocationWheelData {
   return WHEEL_DATA.vocations[vocation];
