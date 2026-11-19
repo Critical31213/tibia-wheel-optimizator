@@ -237,7 +237,7 @@ the selected monster resolves. The engine is bundled eagerly (it is small).
   `owned`; legacy `recommended` counts as empty). A quality with empty vessels gets an amber border + "N unlocked
   vessels for X gems are empty — add your gems"; the collapsed panel header shows "N empty vessels".
 - **Vessels**: only owned gems are shown inside a vessel; any other unlocked vessel reads "Empty — add a gem".
-- **Owned gems**: a quality section with 2+ gems collapses (header toggle); the add button stays visible.
+- **Owned gems**: a quality section with 2+ gems collapses (header toggle); a collapsed section also hides its add button.
 - **Recommended gems**: grouped by quality (`recommendationsByQuality`; each quality section collapses, D30; a replacement shows a note), each with mods, gain, reason and
   near-equal substitutes, or "—". "Add to my gems" appends it (`gemFromRecommendation`, mods at the character's grades).
 - **Best upgrades**: one row per mod ("gems: N"); "Upgrade" raises that mod in every gem (`setModGrade`). Editing a

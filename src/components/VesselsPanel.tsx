@@ -118,7 +118,7 @@ export function VesselsPanel({ vocation, result, mods, onAddGem, onUpgrade }: Ve
                 onClick={() => toggle(q)}
                 className="flex w-full items-center gap-2 text-left text-sm font-medium text-parchment-100 hover:text-gold-300"
               >
-                <span aria-hidden="true" className="w-3 text-xs text-parchment-400">{closed.has(q) ? '▸' : '▾'}</span>
+                <span aria-hidden="true" className="inline-flex w-5 shrink-0 justify-center text-lg leading-none text-gold-400">{closed.has(q) ? '▶' : '▼'}</span>
                 <GemIcon quality={q} />
                 <span className="min-w-0 flex-1 truncate">{gemName(vocation, q)}</span>
                 <span className="text-xs font-normal text-parchment-400">{recs[q].length}</span>

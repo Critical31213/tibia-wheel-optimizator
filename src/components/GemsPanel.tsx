@@ -184,7 +184,7 @@ export function GemsPanel({ vocation, gems, mods, emptyVessels, onChange }: Gems
                       onClick={() => toggle(q)}
                       className="flex w-full items-center gap-2 text-left hover:text-gold-300"
                     >
-                      <span aria-hidden="true" className="w-3 text-xs text-parchment-400">{hidden ? '▸' : '▾'}</span>
+                      <span aria-hidden="true" className="inline-flex w-5 shrink-0 justify-center text-lg leading-none text-gold-400">{hidden ? '▶' : '▼'}</span>
                       <GemIcon quality={q} />
                       <span className="min-w-0 flex-1 truncate">{name}</span>
                       <span className="text-xs font-normal text-parchment-400">{list.length}</span>
@@ -222,14 +222,14 @@ export function GemsPanel({ vocation, gems, mods, emptyVessels, onChange }: Gems
                     ))}
                   </ul>
                 )}
-                <button
+                {!hidden && <button
                   type="button"
                   onClick={() => onChange((all) => [...all, createGem(q)])}
                   aria-label={t('gems.addOf', { name })}
                   className="rounded-lg border border-gold-600 bg-gold-700/30 px-3 py-1 text-sm font-medium text-gold-300 hover:bg-gold-700/50"
                 >
                   + {t('gems.add')}
-                </button>
+                </button>}
               </section>
             );
           })}
