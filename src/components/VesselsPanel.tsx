@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { GemQuality, GemRecommendation, ModDefinition, ModGrade, ModSwapRecommendation, OwnedGem, UpgradeRecommendation, Vocation } from '../types';
+import type { GemQuality, GemRecommendation, VesselAssignment, ModDefinition, ModGrade, ModSwapRecommendation, OwnedGem, UpgradeRecommendation, Vocation } from '../types';
 import type { BuildResult } from '../lib/api';
 import { engineText, useT } from '../i18n';
 import { findMod, GEM_QUALITIES, slotKind, slotsForQuality } from '../lib/gems';
@@ -20,26 +20,40 @@ function SubHeading({ children, aside }: { children: ReactNode; aside?: ReactNod
 
 const Empty = ({ children }: { children: string }) => <p className="text-sm text-parchment-400">{children}</p>;
 
-function ModChip({ name, grade }: { name: string; grade: ModGrade }) {
+function ModChip({ name, grade, idle }: { name: string; grade: ModGrade; idle?: string }) {
+  const t = useT();
   return (
-    <li className="rounded-full border border-ink-600 bg-ink-950/60 px-2 py-0.5 text-[11px] text-parchment-200">
-      {name} <span className="text-gold-300">{ROMAN[grade]}</span>
+    <li
+      title={idle}
+      className={cx('rounded-full border px-2 py-0.5 text-[11px]', idle ? 'border-amber-700/70 bg-amber-950/30 text-parchment-400' : 'border-ink-600 bg-ink-950/60 text-parchment-200')}
+    >
+      {name} <span className={idle ? 'text-parchment-400' : 'text-gold-300'}>{ROMAN[grade]}</span>
+      {idle && <span className="ml-1 text-amber-300">· {t('vessels.idle')}</span>}
     </li>
   );
 }
 
-function GemMods({ gem, mods }: { gem: OwnedGem; mods: ModDefinition[] }) {
+function GemMods({ gem, mods, idle }: { gem: OwnedGem; mods: ModDefinition[]; idle?: VesselAssignment['idle'] }) {
+  const t = useT();
+  const why = new Map((idle ?? []).map((x) => [x.slot, engineText(t, x.reasonMsg, x.reason)]));
   const refs = slotsForQuality(gem.quality).flatMap((slot) => {
     const ref = gem[slot];
     return ref ? [{ slot, ref, name: findMod(mods, slotKind(slot), ref.modId)?.name ?? `#${ref.modId}` }] : [];
   });
   if (!refs.length) return null;
   return (
-    <ul className="mt-1 flex flex-wrap gap-1">
-      {refs.map(({ slot, ref, name }) => (
-        <ModChip key={slot} name={name} grade={ref.grade} />
-      ))}
-    </ul>
+    <>
+      <ul className="mt-1 flex flex-wrap gap-1">
+        {refs.map(({ slot, ref, name }) => (
+          <ModChip key={slot} name={name} grade={ref.grade} idle={why.get(slot)} />
+        ))}
+      </ul>
+      {refs.some((r) => why.has(r.slot)) && (
+        <ul className="mt-1 space-y-0.5 text-[11px] text-amber-300/90">
+          {refs.flatMap(({ slot, name }) => (why.has(slot) ? [<li key={slot}>{name}: {why.get(slot)}</li>] : []))}
+        </ul>
+      )}
+    </>
   );
 }
 
@@ -96,7 +110,7 @@ export function VesselsPanel({ vocation, result, mods, onAddGem, onUpgrade, onSw
                     <span className="min-w-0 flex-1 truncate">{gemName(vocation, v.gem.quality)}</span>
                     <span className="shrink-0 rounded-full bg-weak/15 px-1.5 py-0.5 text-[10px] text-weak uppercase">{t('vessels.owned')}</span>
                   </div>
-                  <GemMods gem={v.gem} mods={mods} />
+                  <GemMods gem={v.gem} mods={mods} idle={v.idle} />
                 </div>
               ) : (
                 <p className={cx('mt-1.5 text-xs', v.unlocked ? 'text-amber-300' : 'text-parchment-400')}>

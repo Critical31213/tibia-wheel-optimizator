@@ -221,8 +221,9 @@ Plans carry their weapon; the choice, re-choice and `result.weapon` are describe
   - Supreme spell mods are valued with the build's wheel effects on the other spells in both sides of the delta (`spellBundleParts(..., others)`): a cooldown cut is worth nothing when the preset rotation is ratio-bound.
   - `gain = blend(grade + 1) − blend(grade)`, with momentum included for cooldown mods, sorted descending.
   - `gainToMax = blend(IV) − blend(grade)`.
+- **`VesselAssignment.idle` (D72).** Active mods of a placed owned gem worth ~0 in the build, with a reason: an RM below the next stage (points with the gem vs threshold), an RM already at the last stage, a resistance the spot does not deal, an avatar augment while hunting, a spell augment the rotation does not gain from.
 - **`modSwaps` (D71).**
-  - Per active slot of each placed owned gem: the best other mod for that slot (same slot rules as new gems, never the gem's other basic mod), at the character's grade on it (`GemEnv.grades`, else I).
+  - Per active basic slot of each placed owned gem (D72: supreme mods are not swapped; a better supreme comes as a replacement gem in `gemRecommendations`): the best other mod for that slot (same slot rules as new gems, never the gem's other basic mod), at the character's grade on it (`GemEnv.grades`, else I).
   - `gain = blend(gem with the swap) − blend(gem)`; an RM supreme is valued without its own points on both sides (`withoutOwnRm`, as in D43). No swap cost is judged; only gains > 0 are listed, best first.
 
 ## 5. i18n
@@ -250,7 +251,7 @@ Plans carry their weapon; the choice, re-choice and `result.weapon` are describe
 | `model.test.ts` | Geometry, the directed unlock graph matches `WHEEL_DATA`, twins, vessels and mods, thresholds, messages. |
 | `spells.test.ts` | Targets (community averages, hunt > boss), D16 (single-target unusable in hunt, boss targets ≤ 1.2, no Augmented Annihilation in hunt), immune → useless, Avatar, cooldown floor, momentum, effect parsing, augments. |
 | `gems.test.ts` | Hungarian vs brute force, active slots, placement, recommendations, upgrades, Mitigation Multiplier scaling with real base mitigation. |
-| `gemSteps.test.ts` | D26: upgrades only with every unlocked vessel filled; RM gem re-optimization (owning the gem reaches the predicted stage), no avatar RM in hunt. D71: mod swaps (best mod, character grade, never the other basic mod). |
+| `gemSteps.test.ts` | D26: upgrades only with every unlocked vessel filled; RM gem re-optimization (owning the gem reaches the predicted stage), no avatar RM in hunt. D71: mod swaps (best mod, character grade, never the other basic mod). D72: idle RM mod reason, no supreme swaps. |
 | `optimizer.test.ts` | Path validity on random inputs, RM, vessel unlock order, augments, determinism, edge budgets, priority, perf < 50 ms (best of 3 per input), planner reference builds. |
 | `iteration3.test.ts` | Character level and skills, HP > mitigation (RP 400), HP still beats Mitigation Multiplier for EK 1500 at priority 100 (D18), leech devalued, RM look-ahead and owned RM gem, multi-monster weighting, distinct alternatives, planner code decode and unlock path, official planner WASM round-trip (`skipIf` when `scripts/.cache/wod/skillgrid.cjs` is missing). |
 | `iteration5.test.ts` | D23: no `recommended` vessel source (main + alternatives, planner code carries only owned gems), recommendations without owned gems, vessel slice = flat bonus without gems, owned-gem vessel valuation matches the placement, owned gems placed in the build; distinct focus labels. |

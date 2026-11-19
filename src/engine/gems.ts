@@ -37,7 +37,7 @@ import {
   type ValuationContext,
   ZERO,
 } from './values';
-import { type EngineWheel, stageFor } from './wheel/build';
+import { type EngineWheel, REVELATION_THRESHOLDS, stageFor } from './wheel/build';
 
 export type GemSlot = 'basic1' | 'basic2' | 'supreme';
 export const SLOTS_BY_QUALITY: Record<GemQuality, GemSlot[]> = {
@@ -393,10 +393,48 @@ export function vesselAssignments(
 ): VesselAssignment[] {
   return env.wheel.definition.vessels.map((vs, i) => {
     const own = i < unlocked ? placed[i] : null;
-    return own
-      ? { vesselId: vs.id, quality: vs.quality, unlocked: true, gem: own, source: 'owned' }
-      : { vesselId: vs.id, quality: vs.quality, unlocked: i < unlocked, gem: null, source: 'empty' };
+    if (own) {
+      const idle = idleMods(env, own, vs.quality);
+      return { vesselId: vs.id, quality: vs.quality, unlocked: true, gem: own, source: 'owned', ...(idle.length ? { idle } : {}) };
+    }
+    return { vesselId: vs.id, quality: vs.quality, unlocked: i < unlocked, gem: null, source: 'empty' };
   });
+}
+
+/** D72: active mods of a placed gem worth ~0 here (an RM below the next stage, a resistance nobody deals, ...). */
+function idleMods(env: GemEnv, gem: OwnedGem, vessel: GemQuality): NonNullable<VesselAssignment['idle']> {
+  const base = withoutOwnRm(env, gem, vessel);
+  const out: NonNullable<VesselAssignment['idle']> = [];
+  for (const slot of activeSlots(gem.quality, vessel)) {
+    const ref = gem[slot];
+    if (!ref || Math.abs(env.blend(modParts(base, slot, ref.modId, ref.grade))) > 1e-3) continue;
+    const r = idleReason(base, slot, ref.modId, ref.grade);
+    out.push({ slot, reason: r.text, reasonMsg: r.msg });
+  }
+  return out;
+}
+
+function idleReason(env: GemEnv, slot: GemSlot, modId: number, grade: number) {
+  if (slot !== 'supreme') {
+    const m = findBasic(env.wheel, modId);
+    if (m?.effects.every((e) => RESIST_EFFECT[e.effectId] !== undefined)) return text('gem.idleResist', {});
+    return text('gem.idle', {});
+  }
+  const m = findSupreme(env.wheel, modId);
+  if (m?.category === 'revelationMastery') {
+    const d = revelationIndex(env.wheel.revelations, m.revelation);
+    if (d >= 0) {
+      const points = env.facts.revPoints[d] + (m.values[grade - 1] ?? 0);
+      const stage = stageFor(points);
+      const revelation = m.revelation ?? '';
+      if (stage >= REVELATION_THRESHOLDS.length) return text('gem.idleRmMax', { revelation });
+      return text('gem.idleRm', { revelation, points: Math.round(points), next: REVELATION_THRESHOLDS[stage], stage: stage + 1 });
+    }
+  }
+  const spell = m?.spell ?? '';
+  if (spell && env.v.model.spells.get(spell)?.avatar && env.v.context.mode !== 'boss') return text('gem.idleAvatar', { spell });
+  if (spell) return text('gem.idleSpell', { spell });
+  return text('gem.idle', {});
 }
 
 /**
@@ -459,7 +497,7 @@ function withoutOwnRm(env: GemEnv, gem: OwnedGem, vessel: GemQuality): GemEnv {
 }
 
 /**
- * D71: per active slot of each placed owned gem, the best replacement mod (slot rules as for new gems, not the gem's
+ * D71: per active basic slot of each placed owned gem, the best replacement mod (slot rules as for new gems, not the gem's
  * other basic mod) at the character's grade on that mod. Gain only; the swap cost is not judged.
  */
 export function modSwaps(env: GemEnv, vessels: readonly VesselAssignment[]): ModSwapRecommendation[] {
@@ -472,16 +510,17 @@ export function modSwaps(env: GemEnv, vessels: readonly VesselAssignment[]): Mod
     const before = base.blend(beforeParts);
     for (const slot of activeSlots(gem.quality, vs.quality)) {
       const ref = gem[slot];
-      if (!ref) continue;
+      // D72: supreme swaps are expensive; a better supreme comes as a replacement gem (recommendations).
+      if (!ref || slot === 'supreme') continue;
       const other = slot === 'basic1' ? gem.basic2 : slot === 'basic2' ? gem.basic1 : null;
-      const ranked = slot === 'supreme' ? rankSupreme(base, NEW_GEM_GRADE) : rankBasic(base, slot === 'basic1' ? 1 : 2, NEW_GEM_GRADE);
+      const ranked = rankBasic(base, slot === 'basic1' ? 1 : 2, NEW_GEM_GRADE);
       const best = ranked.find((r) => r.id !== ref.modId && r.id !== other?.modId);
       if (!best) continue;
       const next: OwnedGem = { ...gem, [slot]: { modId: best.id, grade: best.grade as ModGrade } };
       const afterParts = gemParts(base, next, vs.quality);
       const gain = base.blend(afterParts) - before;
       if (gain <= 0.005) continue;
-      const cur = slot === 'supreme' ? findSupreme(env.wheel, ref.modId) : findBasic(env.wheel, ref.modId);
+      const cur = findBasic(env.wheel, ref.modId);
       out.push({
         gemId: gem.id,
         vesselId: vs.vesselId,

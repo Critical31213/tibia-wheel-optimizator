@@ -328,6 +328,7 @@ export const en = {
   'vessels.locked': 'Locked',
   'vessels.unlocked': 'Unlocked',
   'vessels.owned': 'owned',
+  'vessels.idle': 'no value',
   'vessels.recommended': 'recommended',
   'vessels.empty': 'Empty',
   'vessels.emptyAdd': 'Empty — add a gem',
@@ -346,7 +347,7 @@ export const en = {
   'upgrades.gems': 'gems: {n}',
   'upgrades.toMax': 'to IV:',
   'swaps.title': 'Gem mod swaps',
-  'swaps.note': 'Best replacement for each mod of the gems in vessels. The new mod has the grade the character already has on it (I when none). Gain only; the swap cost is not included.',
+  'swaps.note': 'Best replacement for each basic mod of the gems in vessels (a better supreme mod: see recommended gems). The new mod has the grade the character already has on it (I when none). Gain only; the swap cost is not included.',
   'swaps.none': 'No swap with a gain.',
   'swaps.apply': 'Swap',
 

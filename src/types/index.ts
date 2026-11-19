@@ -265,6 +265,8 @@ export interface VesselAssignment {
   unlocked: boolean;
   gem: OwnedGem | null;
   source: 'owned' | 'recommended' | 'empty';
+  /** D72: active mods of the placed gem worth nothing in this build, with why. */
+  idle?: { slot: 'basic1' | 'basic2' | 'supreme'; reason: string; reasonMsg?: EngineMessage }[];
 }
 
 /** D55: a gain split into % damage per turn and % effective HP (the blended `gain` mixes both by priority). */
@@ -305,7 +307,7 @@ export interface UpgradeRecommendation {
   effectToMax?: GainEffect;
 }
 
-/** D71: replace one mod of a placed owned gem; the new mod has the character's grade on it (I when unknown). */
+/** D71: replace one basic mod of a placed owned gem (D72: supreme mods are not swapped); the new mod has the character's grade on it (I when unknown). */
 export interface ModSwapRecommendation {
   gemId: string;
   vesselId: number;
