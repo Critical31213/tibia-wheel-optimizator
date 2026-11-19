@@ -198,6 +198,8 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
   - Each has `reason` and `reasonMsg` from the dominant mod (spell share, avatar in boss, RM stage gained, resistance vs monster, and so on), sorted by gain.
 - **`upgradeRecommendations`.**
   - Only owned gems, only active slots, and only +1 grade; empty (D26) while an unlocked vessel has no gem.
+  - D27: one entry per mod (`kind`, `modId`, `gems` = owned gems with it); grades are shared by the character (`withSharedGrades` normalizes input gems to the highest grade per mod), so the gain sums over every placed gem with the mod. Recommended gems carry the character's grade for a mod (`GemEnv.grades`).
+  - Supreme spell mods are valued with the build's wheel effects on the other spells in both sides of the delta (`spellBundleParts(..., others)`): a cooldown cut is worth nothing when the preset rotation is ratio-bound.
   - `gain = blend(grade + 1) − blend(grade)`, with momentum included for cooldown mods, sorted descending.
   - `gainToMax = blend(IV) − blend(grade)`.
 

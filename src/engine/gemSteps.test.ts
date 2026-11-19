@@ -35,3 +35,31 @@ describe('gem steps: new gems at grade I, upgrades after vessels are full', () =
     expect(r.gemRecommendations.some((g) => g.mods.some((m) => /Revelation Mastery Avatar/.test(m.name)))).toBe(false);
   });
 });
+
+describe('D27: shared mod grades, cooldown gems in a full rotation', () => {
+  const sorc = { vocation: 'sorcerer' as const, points: 4000, monster: null, priority: 50, context: HUNT, alternatives: 0 };
+  const greaterRec = () => optimize(sorc).gemRecommendations.find((g) => g.quality === 'greater')!;
+
+  it('a mod has the highest owned grade in every gem; upgrades are per mod', () => {
+    const rec = greaterRec();
+    const a = gemOf('a', rec);
+    const b = gemOf('b', { ...rec, mods: rec.mods.map((m) => ({ ...m, grade: m.kind === 'basic' ? 3 : 1 })) });
+    const r = optimize({ ...sorc, gems: [a, b, ...Array.from({ length: 6 }, (_, i) => gemOf(`c${i}`, rec))] });
+    const hp = rec.mods.find((m) => m.kind === 'basic')!;
+    for (const v of r.vessels) if (v.gem?.basic1?.modId === hp.modId) expect(v.gem.basic1.grade).toBe(3);
+    const up = r.upgradeRecommendations.filter((u) => u.kind === 'basic' && u.modId === hp.modId);
+    expect(up).toHaveLength(1);
+    expect(up[0].fromGrade).toBe(3);
+    expect(up[0].gems).toBeGreaterThan(1);
+    // A recommended gem carries the character's grade.
+    const again = r.gemRecommendations.find((g) => g.quality === 'greater')!;
+    const hpRec = again.mods.find((m) => m.kind === 'basic' && m.modId === hp.modId);
+    if (hpRec) expect(hpRec.grade).toBe(3);
+  });
+
+  it('a cooldown gem adds nothing when the preset rotation is already full', () => {
+    const r = optimize({ vocation: 'sorcerer', points: 950, monster: null, priority: 0, character: { level: 1000 }, alternatives: 0 });
+    expect(r.rotation?.presetId).toBe('ms-echo-gdb');
+    expect(r.gemRecommendations.some((g) => g.mods.some((m) => m.kind === 'supreme' && m.name === 'Augmented Energy Wave' && /cooldown/i.test(g.reason)))).toBe(false);
+  });
+});

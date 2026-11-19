@@ -195,11 +195,14 @@ export const en = {
   'recs.none': 'No gem recommendations yet.',
   'recs.gain': 'Gain {gain}',
   'recs.similar': 'Near-equal substitutes:',
+  'recs.add': 'Add to my gems',
 
   'upgrades.title': 'Best upgrades',
   'upgrades.none': 'No upgrades to suggest — add your gems above.',
   'upgrades.fillFirst': 'Fill every unlocked vessel with a gem first; grade upgrades (+1) come after that.',
   'upgrades.gain': 'Gain {gain}',
+  'upgrades.apply': 'Upgrade',
+  'upgrades.gems': 'gems: {n}',
   'upgrades.toMax': 'to IV: {gain}',
 
   'spells.title': 'Spells in this context',

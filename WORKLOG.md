@@ -43,6 +43,7 @@ Roles:
 | D24 | 2026-11-18 | Stances (Vocation Adjustments 2026, TibiaWiki after the 7 July 2026 patch) are modelled and picked automatically per rotation plan by their build-independent value (damage vs the shared reference T0 + % EHP) at the user's priority. One stance per vocation; sorcerers one elemental + one aura. Elemental stances convert the next other-element spell: converted share = min(1, element casts / other casts). Serene uptime 80 %, 30 % of incoming damage from non-adjacent enemies (Divine Defiance dodge); Divine Defiance's healing magic level is valued through healing (e.g. Salvation). Monk presets carry their virtue. Elemental pierce capped at 2× sensitivity. | User request; values confirmed by the user (Q1–Q4). |
 | D25 | 2026-11-18 | Base spell cooldowns follow TibiaWiki where the TibiaTools datamine differs (`COOLDOWN_OVERRIDES`, applied on load): Shield Bash 4, Death Echo 6, Great Death Beam 6, Forked Glacier 6, Forked Thorns 6, Strong Ice Wave 4, Devastating Knockout 8, Mystic Repulse 8, Thousand Fist Blows 8, Intense Wound Cleansing 120 s. The rotation display includes the build's augment mods (cooldowns). | User: the DE – EW – DE – GDB rotation needs Death Echo's −2 s augment (DE was 4 s in the datamine). |
 | D26 | 2026-11-18 | Gem steps: recommended gems are valued at grade I (a newly revealed gem); Fragment Workshop upgrades (+1 grade) are listed only once every unlocked vessel holds a gem. Revelation Mastery gems are valued by re-optimizing the wheel with the gem owned (greater, grade I): RM value = re-optimized objective with vs without the mod (beam width 16), plus the gem's basics; avatar RM is skipped outside boss mode; a full wheel keeps the static value. | User: players without gems or with small gems need small steps; an RM gem changes the best wheel, not only the stage. |
+| D27 | 2026-11-19 | Mod grades belong to the character: a mod has the highest grade any owned gem shows, in every gem (`withSharedGrades` on load and in `runOptimizer`; grade edits apply to all gems). Upgrades are per mod (gain summed over placed gems). Recommended gems carry the character's grades. Supreme spell gems are valued against the build's wheel augments on the other spells, so a cooldown gem in an already full preset rotation is worth ~0. Shared-cooldown ties (Ice/Terra Burst) prefer the spell the rotation casts. UI: "Add to my gems" on recommendations, "Upgrade" on upgrades. | User: Fragment Workshop grades apply to every gem; cooldown gems change little when the rotation is fixed and already the best. |
 
 ---
 
@@ -388,6 +389,11 @@ All 70 non-rune damage/healing spells checked against TibiaWiki; 10 differed (mo
 - Front Sweep's augment falls at level 2500 (6.8 % → 1.5 %) because Groundshaker out-damages unaugmented Front Sweep in the greedy rotation; the augment's value is the gain over Groundshaker. Not a bug.
 - Vessel resonance: +1 per filled Gem Vessel slice confirmed by the user (TibiaWiki's gem-size rule predates the update).
 - D26 implemented (`withRmReoptimized`, `NEW_GEM_GRADE`); warm performance budget raised to 75 ms (RM probes ~+60 %).
+
+### 2026-11-19 — Gem buttons, shared grades, cooldown gems (D27)
+
+- The Energy Wave cooldown gem (sorcerer, ms-echo-gdb) was worth ~4 because supreme gems were valued in a rotation without the build's other augments: without Death Echo's −2 s, Death Echo was cooldown-capped and spare turns went to Energy Wave. With the build's augments the rotation is full and ratio-bound, so the gem is worth ~0; Great Death Beam damage now leads.
+- D27 implemented (engine `modGrades` / `withSharedGrades`, per-mod `upgrades`; lib `updateGem`, `setModGrade`, `gemFromRecommendation`; VesselsPanel buttons).
 
 ## In progress / Next
 

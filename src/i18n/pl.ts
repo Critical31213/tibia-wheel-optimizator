@@ -189,11 +189,14 @@ export const pl: Dictionary = {
   'recs.none': 'Brak zaleceń gemów.',
   'recs.gain': 'Zysk {gain}',
   'recs.similar': 'Prawie równie dobre zamienniki:',
+  'recs.add': 'Dodaj do moich gemów',
 
   'upgrades.title': 'Najlepsze ulepszenia',
   'upgrades.none': 'Brak ulepszeń do zaproponowania — dodaj swoje gemy powyżej.',
   'upgrades.fillFirst': 'Najpierw włóż gemy do wszystkich odblokowanych vesseli; ulepszenia stopnia (+1) pojawią się potem.',
   'upgrades.gain': 'Zysk {gain}',
+  'upgrades.apply': 'Ulepsz',
+  'upgrades.gems': 'gemów: {n}',
   'upgrades.toMax': 'do IV: {gain}',
 
   'spells.title': 'Spelle w tym kontekście',

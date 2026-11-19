@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { ModDefinition, ModGrade, OwnedGem, Vocation } from '../types';
+import type { GemRecommendation, ModDefinition, ModGrade, OwnedGem, UpgradeRecommendation, Vocation } from '../types';
 import type { BuildResult } from '../lib/api';
 import { engineText, useT } from '../i18n';
 import { findMod, GEM_QUALITIES, slotKind, slotsForQuality } from '../lib/gems';
@@ -48,10 +48,14 @@ interface VesselsPanelProps {
   vocation: Vocation;
   result: BuildResult;
   mods: ModDefinition[];
+  /** Adds a recommended gem to the character (hidden when absent). */
+  onAddGem?: (rec: GemRecommendation) => void;
+  /** Applies a +1 grade upgrade to every gem with the mod (hidden when absent). */
+  onUpgrade?: (u: UpgradeRecommendation) => void;
 }
 
 /** Vessel placement, gem recommendations, upgrades and per-context spell usage. */
-export function VesselsPanel({ vocation, result, mods }: VesselsPanelProps) {
+export function VesselsPanel({ vocation, result, mods, onAddGem, onUpgrade }: VesselsPanelProps) {
   const t = useT();
   const spellsId = useId();
   const [spellsOpen, setSpellsOpen] = useState(false);
@@ -117,6 +121,11 @@ export function VesselsPanel({ vocation, result, mods }: VesselsPanelProps) {
                         ))}
                       </ul>
                       <span className="shrink-0 text-xs tabular-nums text-weak">{t('recs.gain', { gain: gain(r.gain) })}</span>
+                      {onAddGem && (
+                        <button type="button" onClick={() => onAddGem(r)} className="rounded-md border border-gold-600 bg-gold-700/30 px-2 py-0.5 text-xs font-medium text-gold-300 hover:bg-gold-700/50 shrink-0">
+                          + {t('recs.add')}
+                        </button>
+                      )}
                     </div>
                     {r.reason && <p className="mt-1 text-xs text-parchment-400">{engineText(t, r.reasonMsg, r.reason)}</p>}
                     {!!r.similar?.length && (
@@ -139,10 +148,10 @@ export function VesselsPanel({ vocation, result, mods }: VesselsPanelProps) {
       ) : (
         <ol className="divide-y divide-ink-700 rounded-lg border border-ink-700">
           {result.upgradeRecommendations.map((u) => (
-            <li key={`${u.gemId}-${u.slot}`} className="flex items-center gap-2 px-3 py-1.5 text-sm">
+            <li key={`${u.kind}-${u.modId}`} className="flex items-center gap-2 px-3 py-1.5 text-sm">
               <span className="min-w-0 flex-1 truncate text-parchment-200">
                 {u.name}
-                <span className="text-parchment-400"> · {t(`slot.${u.slot}`)}</span>
+                <span className="text-parchment-400"> · {t('upgrades.gems', { n: u.gems })}</span>
               </span>
               <span className="shrink-0 tabular-nums text-gold-300">
                 {ROMAN[u.fromGrade]} → {ROMAN[u.toGrade]}
@@ -152,6 +161,11 @@ export function VesselsPanel({ vocation, result, mods }: VesselsPanelProps) {
                 <span className="hidden w-24 shrink-0 text-right text-[11px] tabular-nums text-parchment-400 sm:inline">
                   {t('upgrades.toMax', { gain: gain(u.gainToMax) })}
                 </span>
+              )}
+              {onUpgrade && (
+                <button type="button" onClick={() => onUpgrade(u)} className="rounded-md border border-gold-600 bg-gold-700/30 px-2 py-0.5 text-xs font-medium text-gold-300 hover:bg-gold-700/50 shrink-0">
+                  {t('upgrades.apply')}
+                </button>
               )}
             </li>
           ))}

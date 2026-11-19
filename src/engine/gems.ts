@@ -49,6 +49,38 @@ export interface GemEnv {
   wheel: EngineWheel;
   facts: BuildFacts;
   blend: (p: Parts) => number;
+  /** D27: the character's mod grades (`modKey` → grade); recommended gems carry them. */
+  grades?: ReadonlyMap<string, number>;
+}
+
+export const modKey = (kind: ModKind, id: number) => `${kind}:${id}`;
+const kindOf = (slot: GemSlot): ModKind => (slot === 'supreme' ? 'supreme' : 'basic');
+
+/** D27: Fragment Workshop grades belong to the character, so a mod's grade is the highest any gem shows. */
+export function modGrades(gems: readonly OwnedGem[]): Map<string, ModGrade> {
+  const out = new Map<string, ModGrade>();
+  for (const g of gems)
+    for (const slot of SLOTS_BY_QUALITY[g.quality]) {
+      const ref = g[slot];
+      if (!ref) continue;
+      const k = modKey(kindOf(slot), ref.modId);
+      if (ref.grade > (out.get(k) ?? 0)) out.set(k, ref.grade);
+    }
+  return out;
+}
+
+/** Gems with every mod at its shared (character) grade. */
+export function withSharedGrades(gems: readonly OwnedGem[]): OwnedGem[] {
+  const grades = modGrades(gems);
+  return gems.map((g) => {
+    const out = { ...g };
+    for (const slot of SLOTS_BY_QUALITY[g.quality]) {
+      const ref = g[slot];
+      const grade = ref && grades.get(modKey(kindOf(slot), ref.modId));
+      if (ref && grade && grade !== ref.grade) out[slot] = { ...ref, grade };
+    }
+    return out;
+  });
 }
 
 /** Slots of `gem` active in a vessel of quality `vessel`. */
@@ -150,6 +182,7 @@ interface ModPick {
   kind: ModKind;
   id: number;
   name: string;
+  grade: number;
   parts: Parts;
   score: number;
 }
@@ -162,8 +195,9 @@ function rankBasic(env: GemEnv, slotNo: 1 | 2, grade: number): ModPick[] {
   return env.wheel.basicMods
     .filter((m) => m.slots.includes(slotNo) && (slotNo === 2 || m.effects.every((e) => SLOT1_EFFECTS.has(e.effectId))))
     .map((m) => {
-      const parts = basicModParts(env.v, m, grade);
-      return { slot, kind: 'basic' as const, id: m.id, name: m.name, parts, score: env.blend(parts) };
+      const g = Math.max(grade, env.grades?.get(modKey('basic', m.id)) ?? 0);
+      const parts = basicModParts(env.v, m, g);
+      return { slot, kind: 'basic' as const, id: m.id, name: m.name, grade: g, parts, score: env.blend(parts) };
     })
     .sort((a, b) => b.score - a.score || a.id - b.id);
 }
@@ -171,10 +205,13 @@ function rankBasic(env: GemEnv, slotNo: 1 | 2, grade: number): ModPick[] {
 function rankSupreme(env: GemEnv, grade: number): ModPick[] {
   return env.wheel.supremeMods
     .map((m) => {
-      const parts = supremeModParts(env.v, env.wheel.revelations, env.facts, m, grade);
-      return { slot: 'supreme' as const, kind: 'supreme' as const, id: m.id, name: m.name, parts, score: env.blend(parts) };
+      const g = Math.max(grade, env.grades?.get(modKey('supreme', m.id)) ?? 0);
+      const parts = supremeModParts(env.v, env.wheel.revelations, env.facts, m, g);
+      const share = m.spell ? displayShare(env.v.model, m.spell, env.facts.stages) : 0;
+      return { slot: 'supreme' as const, kind: 'supreme' as const, id: m.id, name: m.name, grade: g, parts, score: env.blend(parts), share };
     })
-    .sort((a, b) => b.score - a.score || a.id - b.id);
+    // Ties (e.g. Ice / Terra Burst sharing a cooldown): the spell the rotation already casts.
+    .sort((a, b) => (Math.abs(b.score - a.score) > 1e-6 ? b.score - a.score : b.share - a.share || a.id - b.id));
 }
 
 export interface BestGem {
@@ -296,7 +333,7 @@ export function recommendations(env: GemEnv): GemRecommendation[] {
       const r = pickReason(env, top);
       return {
         quality: g.quality,
-        mods: g.picks.map((p) => ({ kind: p.kind, modId: p.id, name: p.name, grade: NEW_GEM_GRADE as ModGrade })),
+        mods: g.picks.map((p) => ({ kind: p.kind, modId: p.id, name: p.name, grade: p.grade as ModGrade })),
         gain: round1(g.score),
         reason: r.text,
         reasonMsg: r.msg,
@@ -323,33 +360,49 @@ export function vesselAssignments(
   });
 }
 
+/**
+ * D27: +1 grade per mod. A grade belongs to the character, so the gain sums over every placed gem with the mod.
+ */
 export function upgrades(env: GemEnv, vessels: VesselAssignment[]): UpgradeRecommendation[] {
-  const out: UpgradeRecommendation[] = [];
+  const byMod = new Map<string, { slot: GemSlot; modId: number; grade: ModGrade; gemIds: string[] }>();
+  const uses: { key: string; slot: GemSlot; modId: number }[] = [];
   for (const vs of vessels) {
     const gem = vs.gem;
     if (vs.source !== 'owned' || !gem) continue;
     for (const slot of activeSlots(gem.quality, vs.quality)) {
       const ref = gem[slot];
-      if (!ref || ref.grade >= 4) continue;
-      const to = (ref.grade + 1) as ModGrade;
-      const cur = env.blend(modParts(env, slot, ref.modId, ref.grade));
-      const gain = env.blend(modParts(env, slot, ref.modId, to)) - cur;
-      if (gain <= 1e-6) continue;
-      const gainToMax = to === 4 ? gain : env.blend(modParts(env, slot, ref.modId, 4)) - cur;
-      const mod = slot === 'supreme' ? findSupreme(env.wheel, ref.modId) : findBasic(env.wheel, ref.modId);
-      out.push({
-        gemId: gem.id,
-        slot,
-        modId: ref.modId,
-        name: mod?.name ?? `#${ref.modId}`,
-        fromGrade: ref.grade,
-        toGrade: to,
-        gain: Math.round(gain * 100) / 100,
-        gainToMax: Math.round(gainToMax * 100) / 100,
-      });
+      if (!ref) continue;
+      const key = modKey(kindOf(slot), ref.modId);
+      uses.push({ key, slot, modId: ref.modId });
+      const m = byMod.get(key);
+      if (m) m.gemIds.push(gem.id);
+      else byMod.set(key, { slot, modId: ref.modId, grade: ref.grade, gemIds: [gem.id] });
     }
   }
-  return out.sort((a, b) => b.gain - a.gain || a.gemId.localeCompare(b.gemId) || a.slot.localeCompare(b.slot));
+  const out: UpgradeRecommendation[] = [];
+  for (const [key, m] of byMod) {
+    if (m.grade >= 4) continue;
+    const to = (m.grade + 1) as ModGrade;
+    const at = (grade: number) => uses.filter((u) => u.key === key).reduce((a, u) => a + env.blend(modParts(env, u.slot, u.modId, grade)), 0);
+    const cur = at(m.grade);
+    const gain = at(to) - cur;
+    if (gain <= 1e-6) continue;
+    const gainToMax = to === 4 ? gain : at(4) - cur;
+    const mod = m.slot === 'supreme' ? findSupreme(env.wheel, m.modId) : findBasic(env.wheel, m.modId);
+    out.push({
+      gemId: m.gemIds[0],
+      gems: m.gemIds.length,
+      slot: m.slot,
+      kind: kindOf(m.slot),
+      modId: m.modId,
+      name: mod?.name ?? `#${m.modId}`,
+      fromGrade: m.grade,
+      toGrade: to,
+      gain: Math.round(gain * 100) / 100,
+      gainToMax: Math.round(gainToMax * 100) / 100,
+    });
+  }
+  return out.sort((a, b) => b.gain - a.gain || a.kind.localeCompare(b.kind) || a.modId - b.modId);
 }
 
 /** Revelation points added by owned RM gems placed in active greater vessels, per domain. */

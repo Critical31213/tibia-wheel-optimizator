@@ -276,8 +276,15 @@ export function stagesFor(model: SpellModel, spell: string, stage: number): numb
 /**
  * Value of a set of effects applied to one spell against the rotation at `stages`. Cooldowns are summed
  * first so the 50 % floor applies. Damage spells: Δ rotation damage (D16: single-target spells in hunt = 0).
+ * `others`: the build's effects on the other spells (D27), part of both sides of the delta.
  */
-export function spellBundleParts(v: ValuationContext, spell: string, effects: SpellEffect[], stages: readonly number[] = NO_STAGES): Parts {
+export function spellBundleParts(
+  v: ValuationContext,
+  spell: string,
+  effects: SpellEffect[],
+  stages: readonly number[] = NO_STAGES,
+  others?: ReadonlyMap<string, SpellEffect[]>,
+): Parts {
   const s = v.model.spells.get(spell);
   if (!s) return ZERO;
   const stage = s.stageDomain >= 0 ? stages[s.stageDomain] : 3;
@@ -286,8 +293,11 @@ export function spellBundleParts(v: ValuationContext, spell: string, effects: Sp
   if (UTILITY_SPELLS.has(spell) && !v.forced.has(spell)) return ZERO;
   if (s.kind === 'damage') {
     if (!s.usable) return ZERO;
-    const base: RotationInput = { stages };
-    const mods = new Map([[spell, toMods(effects, v.context.mode === 'hunt')]]);
+    const hunt = v.context.mode === 'hunt';
+    const otherMods = new Map<string, SpellMods>();
+    for (const [n, e] of others ?? []) if (n !== spell && e.length) otherMods.set(n, toMods(e, hunt));
+    const base: RotationInput = { stages, mods: otherMods };
+    const mods = new Map([...otherMods, [spell, toMods(effects, hunt)]]);
     // A perk never lowers damage: with preset ratios a cooldown cut could otherwise shift casts to a weaker spell.
     const off = Math.max(0, deltaOff(v.model, { stages, mods }, base));
     const leech = effects.filter((e) => e.kind === 'leech').reduce((a, e) => a + e.amount, 0);
@@ -528,8 +538,8 @@ export function supremeModParts(
   if (v.model.spells.get(spell)?.avatar && v.context.mode !== 'boss') return ZERO;
   const wheel = facts.wheelEffects.get(spell) ?? [];
   let p = sub(
-    spellBundleParts(v, spell, [...wheel, ...supremeEffects(m, grade)], facts.stages),
-    spellBundleParts(v, spell, wheel, facts.stages),
+    spellBundleParts(v, spell, [...wheel, ...supremeEffects(m, grade)], facts.stages, facts.wheelEffects),
+    spellBundleParts(v, spell, wheel, facts.stages, facts.wheelEffects),
   );
   if (m.momentum) {
     const mom = m.momentum[grade - 1] ?? MOMENTUM_PER_GRADE[grade - 1] ?? 0;

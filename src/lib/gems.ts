@@ -1,5 +1,8 @@
 /** Pure gem helpers: slot rules, mod filtering, (de)serialisation. */
-import type { GemModRef, GemQuality, ModDefinition, ModGrade, ModKind, OwnedGem, Vocation } from '../types';
+import type { GemModRef, GemQuality, GemRecommendation, ModDefinition, ModGrade, ModKind, OwnedGem, Vocation } from '../types';
+import { modGrades, modKey, withSharedGrades } from '../engine/gems';
+
+export { modGrades, withSharedGrades };
 
 export type GemSlot = 'basic1' | 'basic2' | 'supreme';
 
@@ -79,7 +82,54 @@ export function sanitizeGems(raw: unknown): OwnedGem[] {
       }),
     );
   }
-  return out;
+  return withSharedGrades(out);
+}
+
+/** D27: sets a mod's grade in every gem (Fragment Workshop grades belong to the character). */
+export function setModGrade(gems: readonly OwnedGem[], kind: ModKind, modId: number, grade: ModGrade): OwnedGem[] {
+  return gems.map((g) => {
+    const out = { ...g };
+    for (const slot of slotsForQuality(g.quality)) {
+      const ref = g[slot];
+      if (ref && ref.modId === modId && slotKind(slot) === kind) out[slot] = { ...ref, grade };
+    }
+    return out;
+  });
+}
+
+/**
+ * Replaces a gem. A grade edit applies to every gem with that mod; a newly picked mod takes the grade the
+ * character already has for it.
+ */
+export function updateGem(gems: readonly OwnedGem[], next: OwnedGem): OwnedGem[] {
+  const prev = gems.find((g) => g.id === next.id);
+  const others = gems.filter((g) => g.id !== next.id);
+  const grades = modGrades(others);
+  const fixed = { ...next };
+  let changed: { kind: ModKind; modId: number; grade: ModGrade } | null = null;
+  for (const slot of slotsForQuality(next.quality)) {
+    const ref = next[slot];
+    if (!ref) continue;
+    const old = prev?.[slot];
+    if (old && old.modId === ref.modId) {
+      if (old.grade !== ref.grade) changed = { kind: slotKind(slot), modId: ref.modId, grade: ref.grade };
+    } else {
+      const g = grades.get(modKey(slotKind(slot), ref.modId));
+      if (g) fixed[slot] = { ...ref, grade: g };
+    }
+  }
+  const list = gems.map((g) => (g.id === next.id ? fixed : g));
+  return changed ? setModGrade(list, changed.kind, changed.modId, changed.grade) : list;
+}
+
+/** An owned gem from a recommendation (mods at the character's grades). */
+export function gemFromRecommendation(rec: GemRecommendation, gems: readonly OwnedGem[]): OwnedGem {
+  const grades = modGrades(gems);
+  const basics = rec.mods.filter((m) => m.kind === 'basic');
+  const sup = rec.mods.find((m) => m.kind === 'supreme');
+  const ref = (kind: ModKind, m?: { modId: number; grade: ModGrade }): GemModRef | null =>
+    m ? { modId: m.modId, grade: (grades.get(modKey(kind, m.modId)) ?? m.grade) as ModGrade } : null;
+  return normalizeGem({ ...createGem(rec.quality), basic1: ref('basic', basics[0]), basic2: ref('basic', basics[1]), supreme: ref('supreme', sup) });
 }
 
 export function parseGems(json: string | null): OwnedGem[] {

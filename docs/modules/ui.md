@@ -37,7 +37,7 @@ screens it is two columns (controls left, results right).
 | `src/lib/vessels.ts` | `emptyUnlockedByQuality`, `recommendationsByQuality`, `activeRevelationsByDomain` (tested). |
 | `src/components/LanguageSwitch.tsx` | PL / EN segmented toggle. |
 | `src/hooks/usePersistentGems.ts` | Owned gems per vocation in localStorage (not in the URL). |
-| `src/lib/gems.ts` | Gem slot rules, mod filtering, gem (de)serialisation (tested). |
+| `src/lib/gems.ts` | Gem slot rules, mod filtering, gem (de)serialisation, shared mod grades (D27) (tested). |
 | `src/i18n/engine.ts` | `engineText(t, msg, fallback)`: renders engine messages (`engine.<key>`) and translates id params. |
 | `src/i18n/` | `en.ts` / `pl.ts` dictionaries, `lang.ts` (pure helpers), `context.ts` (`useT`, `useI18n`), `I18nProvider.tsx` (tested). |
 | `src/hooks/useDebouncedValue.ts` | Generic debounce hook. |
@@ -238,4 +238,6 @@ the selected monster resolves. The engine is bundled eagerly (it is small).
   vessels for X gems are empty — add your gems"; the collapsed panel header shows "N empty vessels".
 - **Vessels**: only owned gems are shown inside a vessel; any other unlocked vessel reads "Empty — add a gem".
 - **Recommended gems**: grouped by quality (`recommendationsByQuality`), each with mods, gain, reason and
-  near-equal substitutes, or "—".
+  near-equal substitutes, or "—". "Add to my gems" appends it (`gemFromRecommendation`, mods at the character's grades).
+- **Best upgrades**: one row per mod ("gems: N"); "Upgrade" raises that mod in every gem (`setModGrade`). Editing a
+  grade in the gems editor also applies to every gem with the mod (`updateGem`, D27).

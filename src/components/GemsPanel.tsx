@@ -1,7 +1,7 @@
 import { useId, useState } from 'react';
 import type { GemModRef, GemQuality, ModDefinition, ModGrade, OwnedGem, Vocation } from '../types';
 import { useT } from '../i18n';
-import { createGem, GEM_QUALITIES, MOD_GRADES, modsForSlot, normalizeGem, slotKind, slotsForQuality } from '../lib/gems';
+import { createGem, GEM_QUALITIES, MOD_GRADES, modsForSlot, normalizeGem, slotKind, slotsForQuality, updateGem } from '../lib/gems';
 import type { GemSlot } from '../lib/gems';
 import { cx, gemName, ROMAN } from '../lib/labels';
 import { GemIcon } from './GemIcon';
@@ -190,7 +190,7 @@ export function GemsPanel({ vocation, gems, mods, emptyVessels, onChange }: Gems
                         index={index}
                         vocation={vocation}
                         mods={mods}
-                        onChange={(next) => onChange((all) => all.map((g) => (g.id === gem.id ? next : g)))}
+                        onChange={(next) => onChange((all) => updateGem(all, next))}
                         onRemove={() => onChange((all) => all.filter((g) => g.id !== gem.id))}
                       />
                     ))}

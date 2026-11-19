@@ -250,7 +250,11 @@ export interface GemRecommendation {
 }
 
 export interface UpgradeRecommendation {
+  /** First owned gem with the mod. */
   gemId: string;
+  /** D27: owned gems with the mod (all upgraded together). */
+  gems: number;
+  kind: ModKind;
   slot: 'basic1' | 'basic2' | 'supreme';
   modId: number;
   name: string;

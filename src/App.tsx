@@ -14,6 +14,7 @@ import { VesselsPanel } from './components/VesselsPanel';
 import { VocationPicker } from './components/VocationPicker';
 import { WheelChart } from './components/WheelChart';
 import { usePersistentGems } from './hooks/usePersistentGems';
+import { gemFromRecommendation, setModGrade } from './lib/gems';
 import { usePersistentInputs } from './hooks/usePersistentInputs';
 import { usePersistentSpellPrefs } from './hooks/usePersistentSpellPrefs';
 import { useT } from './i18n';
@@ -134,7 +135,13 @@ export default function App() {
           )}
           {shown && (
             <Panel title={t('vessels.title')} headingId="vessels-heading">
-              <VesselsPanel vocation={deferred.vocation} result={shown} mods={resultWheel.mods} />
+              <VesselsPanel
+                vocation={deferred.vocation}
+                result={shown}
+                mods={resultWheel.mods}
+                onAddGem={deferred.vocation === inputs.vocation ? (rec) => setGems((all) => [...all, gemFromRecommendation(rec, all)]) : undefined}
+                onUpgrade={deferred.vocation === inputs.vocation ? (u) => setGems((all) => setModGrade(all, u.kind, u.modId, u.toGrade)) : undefined}
+              />
             </Panel>
           )}
         </div>

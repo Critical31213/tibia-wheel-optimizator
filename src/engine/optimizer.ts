@@ -34,6 +34,9 @@ import {
   activeSlots,
   type GemEnv,
   gemParts,
+  modGrades,
+  modKey,
+  withSharedGrades,
   NEW_GEM_GRADE,
   placedRmPoints,
   placeGems,
@@ -1037,7 +1040,7 @@ function assemble(p: Prepared, best: State): BuildResult {
   const unlocked = Math.min(wheel.definition.vessels.length, vesselSlices);
   const gridRev = DOMAIN_ORDER.map((_, d) => best.domainPts[d] + RM_SLICE_POINTS * best.rmFull[d]);
   const wheelEffects = wheelEffectsFor(wheel, best.alloc);
-  let env: GemEnv = { v, wheel, blend, facts: factsFor(gridRev, wheelEffects) };
+  let env: GemEnv = { v, wheel, blend, facts: factsFor(gridRev, wheelEffects), grades: modGrades(p.gems) };
   const placed = placeGems(env, gems, unlocked);
   let vessels = vesselAssignments(env, unlocked, placed);
   const rmGem = placedRmPoints(env, vessels);
@@ -1283,7 +1286,8 @@ export function pickStances(input: OptimizerInput, preset: RotationPreset | null
   return { stances: best.stances, v: best.v ?? undefined };
 }
 
-export function runOptimizer(input: OptimizerInput): OptimizerResult {
+export function runOptimizer(raw: OptimizerInput): OptimizerResult {
+  const input = raw.gems?.length ? { ...raw, gems: withSharedGrades(raw.gems) } : raw;
   const { p, plans, main } = bestBuild(input);
   const n = Math.max(0, Math.min(5, Math.floor(input.alternatives ?? DEFAULT_ALTERNATIVES)));
   const count = Number.isFinite(n) ? n : DEFAULT_ALTERNATIVES;
@@ -1303,10 +1307,11 @@ function withRmReoptimized(input: OptimizerInput, p: Prepared, main: State, recs
   const greater = recs.find((r) => r.quality === 'greater');
   const basic = (k: number) => {
     const m = greater?.mods.filter((x) => x.kind === 'basic')[k];
-    return m ? { modId: m.modId, grade: NEW_GEM_GRADE as ModGrade } : null;
+    return m ? { modId: m.modId, grade: m.grade } : null;
   };
   const rest = recs.filter((r) => !r.mods.some((m) => m.kind === 'supreme' && p.wheel.supremeMods.find((s) => s.id === m.modId)?.category === 'revelationMastery'));
   const out = [...rest];
+  const grades = modGrades(p.gems);
   const probe = (supreme: GemModRef | null) => {
     const gem: OwnedGem = { id: 'rm-probe', quality: 'greater', basic1: basic(0), basic2: basic(1), supreme };
     const gems = [...p.gems, gem];
@@ -1323,7 +1328,8 @@ function withRmReoptimized(input: OptimizerInput, p: Prepared, main: State, recs
     const d = revelationIndex(p.wheel.revelations, m.revelation);
     // Avatars are not recommended for hunting.
     if (d < 0 || (p.wheel.revelations[d].data.isAvatar && p.v.context.mode !== 'boss')) continue;
-    const hypo = probe({ modId: m.id, grade: NEW_GEM_GRADE as ModGrade });
+    const grade = Math.max(NEW_GEM_GRADE, grades.get(modKey('supreme', m.id)) ?? 0) as ModGrade;
+    const hypo = probe({ modId: m.id, grade });
     const obj = objective(hypo.p, hypo.main);
     // RM value = the same greater gem with vs without the mod (both re-optimized); basics as valued statically.
     const rmGain = obj - plainObj;
@@ -1336,7 +1342,7 @@ function withRmReoptimized(input: OptimizerInput, p: Prepared, main: State, recs
       quality: 'greater',
       mods: [
         ...(greater?.mods.filter((x) => x.kind === 'basic') ?? []),
-        { kind: 'supreme', modId: m.id, name: m.name, grade: NEW_GEM_GRADE as ModGrade },
+        { kind: 'supreme', modId: m.id, name: m.name, grade },
       ],
       gain: round1(gain),
       reason: msg.text,
