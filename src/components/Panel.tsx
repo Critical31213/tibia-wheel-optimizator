@@ -16,7 +16,7 @@ interface PanelProps {
 export function Panel({ title, step, headingId, aside, className, children }: PanelProps) {
   return (
     <section className={cx('panel', className)} aria-labelledby={headingId}>
-      <div className="mb-3 flex items-center justify-between gap-3">
+      <div className="mb-2.5 flex items-center justify-between gap-3">
         <h2 id={headingId} className="section-title flex items-center gap-2">
           {step !== undefined && (
             <span

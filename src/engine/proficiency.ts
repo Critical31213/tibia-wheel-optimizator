@@ -24,10 +24,10 @@ import { K, leechPoint, type Parts, type ValuationContext } from './values';
 
 export const PROF = {
   /** Share of damage dealt to creatures at full health (alpha strike) / low health (omega strike). */
-  ALPHA_SHARE: { hunt: 0.2, boss: 0.01 },
-  OMEGA_SHARE: { hunt: 0.3, boss: 0.3 },
+  ALPHA_SHARE: { hunt: 0.1, boss: 0.005 },
+  OMEGA_SHARE: { hunt: 0.15, boss: 0.15 },
   /** Share of auto-attacks from far enough for range damage / perfect shot. */
-  RANGE_SHARE: 0.5,
+  RANGE_SHARE: 0.25,
   /** Ammunition assumed with bows and crossbows (Diamond Arrow, Spectral Bolt). */
   ARROW_ATTACK: 37,
   BOLT_ATTACK: 78,

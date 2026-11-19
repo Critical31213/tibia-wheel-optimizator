@@ -194,7 +194,6 @@ function PerkGrid({ owned, weapon, onChange }: PerkGridProps) {
           );
         })}
       </ol>
-      <p className="mt-1 text-[11px] text-parchment-400">{t('weapons.gridHint')}</p>
     </div>
   );
 }
@@ -371,7 +370,7 @@ export function WeaponsPanel({ vocation, meleeSkill, prefs, onChange }: WeaponsP
   return (
     <Panel
       title={t('weapons.title')}
-      step={7}
+      step={6}
       headingId="weapons-heading"
       aside={
         <button
@@ -404,9 +403,6 @@ export function WeaponsPanel({ vocation, meleeSkill, prefs, onChange }: WeaponsP
             ))}
           </ul>
         )}
-        <p className="text-[11px] text-parchment-400">
-          {t('weapons.skillsNote')} {t('weapons.storedLocally')} {t('weapons.iconsCredit')}
-        </p>
       </div>
     </Panel>
   );

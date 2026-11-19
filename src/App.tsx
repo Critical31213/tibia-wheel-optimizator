@@ -6,8 +6,8 @@ import { FightContextPanel } from './components/FightContextPanel';
 import { GemsPanel } from './components/GemsPanel';
 import { LanguageSwitch } from './components/LanguageSwitch';
 import { MonsterSearch } from './components/MonsterSearch';
+import { NotesPanel } from './components/NotesPanel';
 import { Panel } from './components/Panel';
-import { PrioritySlider } from './components/PrioritySlider';
 import { ResultsPanel } from './components/ResultsPanel';
 import { RotationPanel } from './components/RotationPanel';
 import { VesselsPanel } from './components/VesselsPanel';
@@ -98,25 +98,24 @@ export default function App() {
   const emptyVessels = useMemo(() => (shown && current ? emptyUnlockedByQuality(shown.vessels) : null), [shown, current]);
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
-      <header className="relative mb-6 pt-8 text-center sm:mb-8 sm:pt-0">
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:py-8">
+      <header className="relative mb-4 pt-8 text-center sm:mb-6 sm:pt-0">
         <LanguageSwitch className="absolute top-0 right-0 w-20" />
         <h1 className="font-display text-2xl font-bold tracking-wide text-gold-300 sm:px-24 sm:text-3xl">{t('app.title')}</h1>
         <p className="mt-1 text-sm text-parchment-300">{t('app.subtitle')}</p>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-start lg:gap-6">
-        <div className="flex flex-col gap-4">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-start lg:gap-5">
+        <div className="flex flex-col gap-3">
           <VocationPicker value={inputs.vocation} onChange={(vocation) => update({ vocation })} />
           <CharacterPanel vocation={inputs.vocation} value={inputs} max={maxPoints} onChange={update} />
           <MonsterSearch value={spot} ready={monstersReady} onChange={(monsters) => update({ monsters })} />
-          <FightContextPanel value={context} onChange={update} />
-          <PrioritySlider value={inputs.priority} onChange={(priority) => update({ priority })} />
+          <FightContextPanel value={context} onChange={update} priority={inputs.priority} onPriorityChange={(priority) => update({ priority })} />
           <GemsPanel vocation={inputs.vocation} gems={gems} mods={wheel.mods} emptyVessels={emptyVessels} onChange={setGems} />
           <WeaponsPanel key={inputs.vocation} vocation={inputs.vocation} meleeSkill={inputs.meleeSkill} prefs={weaponPrefs} onChange={setWeaponPrefs} />
         </div>
 
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3">
           <Panel title={t('app.wheelTitle', { vocation: VOCATION_LABELS[resultVocation] })} headingId="wheel-heading">
             {gems.length === 0 && (
               <p role="note" className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
@@ -177,7 +176,9 @@ export default function App() {
         </div>
       </div>
 
-      <footer className="mt-10 text-center text-xs text-parchment-400">
+      <NotesPanel vocation={inputs.vocation} capacity={maxPoints} />
+
+      <footer className="mt-6 text-center text-xs text-parchment-400">
         {t('app.footer')}{' '}
         <a href="./third-party-licenses.txt" className="underline hover:text-parchment-200">
           {t('app.licenses')}

@@ -15,7 +15,7 @@ export interface InputState {
   points: number;
   /** Character level (drives points and character stats); null = not entered. */
   level: number | null;
-  /** Promotion scroll points (0–MAX_SCROLLS). */
+  /** Extra points: scrolls, weekly, bounty, gem upgrades (0–MAX_SCROLLS). */
   scrolls: number;
   mainSkill: number | null;
   shielding: number | null;
@@ -50,7 +50,7 @@ export const contextOf = (s: Pick<InputState, 'mode'>): FightContext => ({ mode:
 export const MAX_POINTS = 4000;
 export const MAX_LEVEL = 5000;
 export const MAX_SKILL = 200;
-export const MAX_SCROLLS = 50;
+export const MAX_SCROLLS = 1000;
 export const MAX_MONSTERS = 10;
 export const MIN_WEIGHT = 0.1;
 export const MAX_WEIGHT = 99999;

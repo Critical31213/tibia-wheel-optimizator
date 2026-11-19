@@ -19,7 +19,8 @@ export function optimize(input: OptimizerInput): OptimizerResult {
 /** Level from which promotion points are earned (1 per level above 50). */
 export const MIN_LEVEL_FOR_POINTS = 50;
 /** Max extra points from the 5 promotion scrolls (3 + 5 + 9 + 13 + 20). */
-export const MAX_SCROLL_POINTS = 50;
+/** D54: extra points (promotion scrolls, weekly tasks, bounties, gem upgrades…); the total is still capped by the wheel. */
+export const MAX_EXTRA_POINTS = 1000;
 
 /**
  * Promotion points at a given level: max(0, level − 50), plus optional points
@@ -27,7 +28,7 @@ export const MAX_SCROLL_POINTS = 50;
  */
 export function pointsForLevel(level: number, scrollPoints = 0): number {
   const base = Math.max(0, Math.floor(Number.isFinite(level) ? level : 0) - MIN_LEVEL_FOR_POINTS);
-  const scrolls = Math.max(0, Math.min(MAX_SCROLL_POINTS, Math.floor(scrollPoints)));
+  const scrolls = Math.max(0, Math.min(MAX_EXTRA_POINTS, Math.floor(scrollPoints)));
   return base > 0 ? base + scrolls : 0;
 }
 

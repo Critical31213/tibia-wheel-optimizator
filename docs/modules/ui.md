@@ -16,18 +16,19 @@ screens it is two columns (controls left, results right).
 | `src/components/Panel.tsx` | Bordered section card with numbered heading. |
 | `src/components/VocationPicker.tsx` | 5 toggle cards, `radiogroup`. |
 | `src/components/VocationIcon.tsx` | Stroke icon per vocation. |
-| `src/components/CharacterPanel.tsx` | Level (→ points via `pointsForLevel`), scroll points, manual points override, per-vocation skills (empty = "auto"); knights: sword / axe / club icon toggles next to the melee skill (D51, `meleeSkill`, other weapon types skipped). |
+| `src/components/CharacterPanel.tsx` | One row: level, extra points (D54: scrolls, weekly, bounty, gem upgrades; 0–1000, `scrolls` field), points (override); per-vocation skills in 3 columns (empty = "auto"); knights: a separate "trained skill" segmented row (any / sword / axe / club icons, D51/D54, `meleeSkill`, other weapon types skipped). |
 | `src/components/MonsterSearch.tsx` | Hunting spot: debounced ARIA combobox adding monsters (max 10), weight per monster, remove; `MonsterCard` for one, weighted combined chips for several. |
 | `src/components/BuildSwitcher.tsx` | "Best build · Alt 1 · Alt 2" toggle + alternative label, trade-off, relative score. |
 | `src/components/ExportPanel.tsx` | Planner code of the viewed build: read-only field, Copy code / Copy planner link / Open planner. |
 | `src/lib/monsters.ts` | `resolveMonsters`, `combinedModifiers` (weighted average, missing = 100), `combinedDamageTypes` (tested). |
 | `src/lib/planner.ts` | Re-exports `PLANNER_URL`/`plannerUrl(code)` from `src/data/wheel/plannerCode` (single source); `copyText` (Clipboard API → `execCommand` fallback) (tested). |
 | `src/components/MonsterCard.tsx` | Name, HP/exp, element chips, damage types. |
-| `src/components/PrioritySlider.tsx` | 0–100 range slider. |
+| `src/components/NotesPanel.tsx` | D54: collapsed "For the curious" section at the end of the page with the descriptive hints (extra points, skills, knight skill, fight mode, monster weight, weapon grid, proficiency assumptions, units, storage); icons credit moved to the footer. |
+| `src/components/PrioritySlider.tsx` | 0–100 range slider (no own panel since D54, rendered inside `FightContextPanel`). |
 | `src/components/WheelChart.tsx` | SVG wheel, tooltip, active revelation perks per domain (no fill-order badges). |
 | `src/components/ResultsPanel.tsx` | Scores, revelations, convictions, stats, rationale, fill order. |
 | `src/components/SegmentedControl.tsx` | Generic compact `radiogroup` (roving tabindex, arrows/Home/End, `disabled`). |
-| `src/components/FightContextPanel.tsx` | Hunt / Boss toggle (hunt style removed, D20); Avatar / single-target hints. |
+| `src/components/FightContextPanel.tsx` | D54 "Fight" panel: Hunt / Boss toggle (hunt style removed, D20) and the priority slider. |
 | `src/components/RotationPanel.tsx` | Rotation select (Auto + vocation presets, note / requirements), used rotation of the viewed build (auto-attack share first (D51), then spells: share %, ★ = revelation spell, auto-picked), stance select (Auto / manual set, D32; prefs key `st`), stances of the viewed build (D24), two columns: forced spell augments (select + chips with stage I/II toggle, D35) and forced revelation stages (select per revelation; unreachable stages disabled with an RM gem / upgrade / out-of-reach note). Prefs keys `fs2`, `fr`. |
 | `src/hooks/usePersistentSpellPrefs.ts` | `rotationId` + `forcedSpells` per vocation (localStorage) mirrored to URL `r` / `fs`. |
 | `src/lib/spellPrefs.ts` | Spell-prefs sanitising + URL / JSON codec (tested). |
@@ -62,8 +63,7 @@ App
 ├─ CharacterPanel      vocation, value (points, level, scrolls, skills), max (= wheel.totalCapacity), onChange(patch)
 ├─ MonsterSearch       value: WeightedMonster[], ready (dataset loaded), onChange(MonsterEntry[])
 │  └─ MonsterCard      monster
-├─ FightContextPanel   value: FightContext, onChange(patch)
-├─ PrioritySlider      value, onChange(priority)
+├─ FightContextPanel   value: FightContext, onChange(patch), priority, onPriorityChange (→ PrioritySlider)
 ├─ GemsPanel           vocation, gems, mods, emptyVessels (viewed build, per quality), onChange(updater)
 ├─ WeaponsPanel        vocation, prefs: WeaponPrefs, onChange(updater)
 ├─ Panel › RotationPanel presets, spells (forceable), value: SpellPrefs, onChange(patch), usage = viewed build `rotation`

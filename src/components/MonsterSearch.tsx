@@ -232,7 +232,6 @@ export function MonsterSearch({ value, ready, onChange }: MonsterSearchProps) {
                 </li>
               ))}
             </ul>
-            {value.length > 1 && <p className="text-xs text-parchment-400">{t('monster.weightHint')}</p>}
             {value.length === 1 ? <MonsterCard monster={value[0].monster} /> : <CombinedCard list={value} />}
           </>
         ) : (

@@ -16,7 +16,7 @@ import { STANCE_SEP } from './spellPrefs';
 /** One build (main or alternative) as shown by the wheel / summary / vessels. */
 export type BuildResult = Omit<OptimizerResult, 'alternatives'>;
 
-export { getWheel, MAX_SCROLL_POINTS, optimize, pointsForLevel, revelationOptions } from '../engine';
+export { getWheel, MAX_EXTRA_POINTS, optimize, pointsForLevel, revelationOptions } from '../engine';
 
 /** D35: revelation perk names of the vocation (domain order). */
 export function getRevelationNames(vocation: Vocation): string[] {

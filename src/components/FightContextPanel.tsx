@@ -1,15 +1,18 @@
 import type { FightContext, FightMode } from '../types';
 import { useT } from '../i18n';
 import { Panel } from './Panel';
+import { PrioritySlider } from './PrioritySlider';
 import { SegmentedControl } from './SegmentedControl';
 
 interface FightContextPanelProps {
   value: FightContext;
   onChange: (patch: Partial<FightContext>) => void;
+  priority: number;
+  onPriorityChange: (v: number) => void;
 }
 
-/** Hunt / Boss toggle. */
-export function FightContextPanel({ value, onChange }: FightContextPanelProps) {
+/** D54: hunt / boss toggle and the priority slider in one panel. */
+export function FightContextPanel({ value, onChange, priority, onPriorityChange }: FightContextPanelProps) {
   const t = useT();
   return (
     <Panel title={t('context.title')} step={4} headingId="context-heading">
@@ -22,8 +25,9 @@ export function FightContextPanel({ value, onChange }: FightContextPanelProps) {
           { value: 'boss', label: t('context.boss') },
         ]}
       />
-      {value.mode === 'hunt' && <p className="mt-2 text-xs text-parchment-300">{t('context.singleTargetNote')}</p>}
-      <p className="mt-2 text-xs text-parchment-400">{t('context.hint')}</p>
+      <div className="mt-3">
+        <PrioritySlider value={priority} onChange={onPriorityChange} />
+      </div>
     </Panel>
   );
 }

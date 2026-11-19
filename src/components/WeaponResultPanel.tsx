@@ -163,7 +163,6 @@ export function WeaponResultPanel({ result, owned, suggest, busy, onSuggestChang
           </ul>
         )}
       </details>
-      <p className="text-[11px] text-parchment-400">{t('weaponResult.units')}</p>
     </div>
   );
 }

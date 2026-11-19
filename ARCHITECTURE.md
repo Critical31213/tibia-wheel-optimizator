@@ -9,7 +9,7 @@ A static single-page web app that recommends how to spend Wheel of Destiny
 promotion points for a Tibia character, given:
 
 1. the **vocation** (Knight, Paladin, Sorcerer, Druid, Monk),
-2. the **character** (level → points, scroll points, per-vocation skills),
+2. the **character** (level → points, extra points, per-vocation skills),
 3. an optional **hunting spot**: up to 10 monsters with relative weights (elemental
    resistances and damage types sourced from tibiopedia.pl),
 4. a **priority slider** between maximum DPS (0) and maximum survivability (100),
@@ -185,7 +185,7 @@ Full details: [`docs/modules/engine.md`](docs/modules/engine.md).
 - **Gems** (`gems.ts`):
   - Owned gems are placed with the Hungarian algorithm; active slots = min(gem, vessel) quality.
   - Recommendations are per quality at grade IV, only mods with positive value. Healing supreme gems are 0 for sorcerer/druid. Paladin uniques (Ballistic Mastery, Positional Tactics) are valued as exact damage deltas. Upgrades are +1 grade for active mods, ranked by gain.
-- **Points**: `pointsForLevel(level, scrollPoints = 0) = max(0, level − 50)` (+ up to 50 scroll points).
+- **Points**: `pointsForLevel(level, scrollPoints = 0) = max(0, level − 50)` (+ extra points: scrolls, weekly, bounty, gem upgrades; up to `MAX_EXTRA_POINTS` = 1000, D54; the total is capped by the wheel).
 
 ## 7. UI (S3 UI)
 

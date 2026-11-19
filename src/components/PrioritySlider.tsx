@@ -1,6 +1,6 @@
+import { useId } from 'react';
 import { useT } from '../i18n';
 import { priorityKey } from '../lib/labels';
-import { Panel } from './Panel';
 
 interface PrioritySliderProps {
   value: number;
@@ -10,14 +10,14 @@ interface PrioritySliderProps {
 /** 0 = Max DPS, 100 = Max Survivability. Results recompute live. */
 export function PrioritySlider({ value, onChange }: PrioritySliderProps) {
   const t = useT();
+  const id = useId();
   const label = t(priorityKey(value));
   return (
-    <Panel
-      title={t('priority.title')}
-      step={5}
-      headingId="priority-heading"
-      aside={<span className="text-xs font-semibold text-gold-300">{label}</span>}
-    >
+    <div>
+      <div className="mb-1 flex items-center justify-between text-xs">
+        <span id={`${id}-label`} className="text-parchment-300">{t('priority.title')}</span>
+        <span className="font-semibold text-gold-300">{label}</span>
+      </div>
       <input
         type="range"
         min={0}
@@ -25,15 +25,15 @@ export function PrioritySlider({ value, onChange }: PrioritySliderProps) {
         step={1}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        list="priority-ticks"
-        aria-labelledby="priority-heading"
+        list={`${id}-ticks`}
+        aria-labelledby={`${id}-label`}
         aria-valuetext={t('priority.valueText', { label, value })}
         className="priority-range w-full"
       />
-      <datalist id="priority-ticks">
+      <datalist id={`${id}-ticks`}>
         <option value="50" />
       </datalist>
-      <div className="relative mt-1 flex justify-between text-xs text-parchment-300">
+      <div className="relative mt-1 flex justify-between text-[11px] text-parchment-300">
         <span className="text-offense">{t('priority.maxDps')}</span>
         <button
           type="button"
@@ -44,6 +44,6 @@ export function PrioritySlider({ value, onChange }: PrioritySliderProps) {
         </button>
         <span className="text-defense">{t('priority.maxSurvival')}</span>
       </div>
-    </Panel>
+    </div>
   );
 }

@@ -6,7 +6,6 @@ import {
   getWheel,
   isMonsterDataLoaded,
   loadMonsterData,
-  MAX_SCROLL_POINTS,
   optimize,
   pointsForLevel,
   searchMonsters,
@@ -106,8 +105,8 @@ describe('integration: data + engine', () => {
     },
   );
 
-  it('level 1000 + all scrolls = 1000 points, enough for a stage-2+ revelation', () => {
-    expect(pointsForLevel(1000, MAX_SCROLL_POINTS)).toBe(1000);
+  it('level 1000 + 50 extra points = 1000 points, enough for a stage-2+ revelation', () => {
+    expect(pointsForLevel(1000, 50)).toBe(1000);
     const r = optimize({ vocation: 'druid', points: 1000, monster: null, priority: 50 });
     expect(r.revelations.some((x) => x.stage >= 2)).toBe(true);
   });

@@ -143,7 +143,7 @@ export function GemsPanel({ vocation, gems, mods, emptyVessels, onChange }: Gems
   return (
     <Panel
       title={t('gems.title')}
-      step={6}
+      step={5}
       headingId="gems-heading"
       aside={
         <button
@@ -234,7 +234,6 @@ export function GemsPanel({ vocation, gems, mods, emptyVessels, onChange }: Gems
             );
           })}
         </div>
-        <p className="mt-2 text-[11px] text-parchment-400">{t('gems.storedLocally')}</p>
       </div>
     </Panel>
   );
