@@ -15,7 +15,8 @@ export const en = {
   'app.noGemsLink': 'Add your gems',
   'app.summaryTitle': 'Build summary',
   'app.empty': 'Enter your promotion points (or character level) to see an optimized build.',
-  'app.footer': 'Fan-made tool. Tibia is a trademark of CipSoft GmbH. Monster data from tibiopedia.pl.',
+  'app.footer': 'Unofficial fan tool, not affiliated with CipSoft. Tibia is a trademark of CipSoft GmbH. Monster data from tibiopedia.pl.',
+  'app.licenses': 'Sources & licenses',
   'lang.label': 'Language',
 
   'common.show': 'Show',

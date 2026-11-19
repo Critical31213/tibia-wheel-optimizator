@@ -9,7 +9,8 @@ export const pl: Dictionary = {
   'app.noGemsLink': 'Dodaj swoje gemy',
   'app.summaryTitle': 'Podsumowanie buildu',
   'app.empty': 'Wpisz punkty promocji (lub poziom postaci), aby zobaczyć zoptymalizowany build.',
-  'app.footer': 'Narzędzie fanowskie. Tibia jest znakiem towarowym CipSoft GmbH. Dane potworów z tibiopedia.pl.',
+  'app.footer': 'Nieoficjalne narzędzie fanowskie, niezwiązane z CipSoft. Tibia jest znakiem towarowym CipSoft GmbH. Dane potworów z tibiopedia.pl.',
+  'app.licenses': 'Źródła i licencje',
   'lang.label': 'Język',
 
   'common.show': 'Pokaż',

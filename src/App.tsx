@@ -155,7 +155,12 @@ export default function App() {
         </div>
       </div>
 
-      <footer className="mt-10 text-center text-xs text-parchment-400">{t('app.footer')}</footer>
+      <footer className="mt-10 text-center text-xs text-parchment-400">
+        {t('app.footer')}{' '}
+        <a href="./third-party-licenses.txt" className="underline hover:text-parchment-200">
+          {t('app.licenses')}
+        </a>
+      </footer>
     </div>
   );
 }

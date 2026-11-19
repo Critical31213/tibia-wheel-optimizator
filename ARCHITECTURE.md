@@ -72,7 +72,8 @@ RUNTIME (static SPA)
 │   └── datamine-damage-meta.mjs # curated cooldowns / areas / healing formulas
 ├── public/favicon.svg
 ├── index.html
-├── vite.config.ts          # React + Tailwind plugins, chunk size limit
+├── vite.config.ts          # React + Tailwind plugins, CSP meta, third-party-licenses.txt (D37), chunk size limit
+├── THIRD_PARTY_NOTICES.md  # sources and licenses; guarded by src/legal.test.ts (D37)
 └── src/
     ├── types/index.ts      # shared contract (all modules)
     ├── data/               # monsters.json (2006) + search API (lazy-loaded chunk)

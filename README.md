@@ -115,6 +115,8 @@ to JSON. The CipSoft code itself is never committed or shipped. Details: [docs/m
   from the community spell data (2026 spells are estimated).
 
 Tibia is a registered trademark of CipSoft GmbH. This is an unofficial fan project, not affiliated with or endorsed by CipSoft.
+Licenses and required notices of all sources: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) (shipped with the site as
+`third-party-licenses.txt`, linked in the footer). Add every new source there before using it.
 
 ## Project structure
 
