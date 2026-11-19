@@ -261,3 +261,7 @@ empty wheel. `offenseScore` / `defenseScore` (share of the full-wheel maximum) s
 D60: after a full beam search, `improveSwaps` tries 1-for-1 swaps of a full slice for an empty slice of the same
 capacity (rebuilt with `replay`, must stay connected) and keeps strict improvements (up to 4 rounds). Fixes e.g. a
 Revelation Mastery slice whose points cross no threshold chosen over the skill boost next to it.
+
+D61: `rationale()` adds a `rationale.unique*` line for every full unique slice on the path: a per-perk description and
+`gain` = `effectOf(v, convP[i])` (non-zero parts only, e.g. "+3% damage, +0.3% EHP"; the UI translates "damage").
+Below 0.05 in both parts it emits `rationale.uniquePath` (filled for dedication points / as a step outwards).

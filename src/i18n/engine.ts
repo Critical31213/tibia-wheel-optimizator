@@ -17,6 +17,7 @@ function translateParams(t: TFunction, params: EngineMessage['params']): Vars | 
     if (typeof value !== 'string') out[name] = value;
     else if (name === 'style' && HUNT_STYLES.has(value)) out[name] = t(`context.${value}` as MessageKey);
     else if (name === 'rotation' && value === GREEDY_ROTATION_ID) out[name] = t('rotation.boss');
+    else if (name === 'gain') out[name] = value.replace(/\bdamage\b/g, t('engine.unit.damage'));
     else if (name === 'element' || name === 'list' || name === 'types') {
       out[name] = value.replace(ELEMENT_IDS, (id) =>
         id === 'unknown' ? t('common.unknown') : t(`element.${id}` as MessageKey).toLowerCase(),

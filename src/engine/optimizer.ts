@@ -722,6 +722,16 @@ function rotationUsage(p: Prepared, stages: number[], alloc: ArrayLike<number>):
 
 type Msg = { msg: EngineMessage; text: string };
 
+const UNIQUE_REASON: Partial<Record<string, EngineMessageKey>> = {
+  'Positional Tactics': 'rationale.uniquePositional',
+  'Battle Instinct': 'rationale.uniqueBattleInstinct',
+  'Battle Healing': 'rationale.uniqueBattleHealing',
+  'Runic Mastery': 'rationale.uniqueRunic',
+  'Focus Mastery': 'rationale.uniqueFocus',
+  'Healing Link': 'rationale.uniqueHealingLink',
+  Sanctuary: 'rationale.uniqueSanctuary',
+};
+
 function rationale(p: Prepared, best: State, stages: number[], revPoints: number[], vesselsUnlocked: number, vesselSlices: number): Msg[] {
   const { input, wheel, v } = p;
   const ctx = v.context;
@@ -806,6 +816,23 @@ function rationale(p: Prepared, best: State, stages: number[], revPoints: number
       ? text('rationale.hpOverMitigation', { ratio: round1(ratio) })
       : text('rationale.mitigationOverHp', { ratio: round1(1 / ratio) }),
   );
+
+  // D61: why each chosen unique conviction (Ballistic Mastery, Positional Tactics, …) is in the build.
+  const signed = (x: number) => `${x >= 0 ? '+' : '−'}${round1(Math.abs(x))}%`;
+  for (const i of best.path) {
+    const sl = wheel.slices[i];
+    if (sl.kind !== 'unique' || !isFull(wheel, best.alloc, i)) continue;
+    const perk = sl.tile.conviction.name;
+    const e = effectOf(v, p.parts.convP[i]);
+    if (Math.abs(e.dmg) < 0.05 && Math.abs(e.ehp) < 0.05) {
+      out.push(text('rationale.uniquePath', { perk }));
+      continue;
+    }
+    const key: EngineMessageKey =
+      perk === 'Ballistic Mastery' ? (ctx.mode === 'boss' ? 'rationale.uniqueBallisticBoss' : 'rationale.uniqueBallisticHunt') : (UNIQUE_REASON[perk] ?? 'rationale.uniqueOther');
+    const gain = [Math.abs(e.dmg) >= 0.05 ? `${signed(e.dmg)} damage` : '', Math.abs(e.ehp) >= 0.05 ? `${signed(e.ehp)} EHP` : ''].filter(Boolean).join(', ');
+    out.push(text(key, { perk, gain }));
+  }
 
   const revs = wheel.revelations
     .map((r, d) => ({ name: r.data.name, st: stages[d], pts: revPoints[d] }))

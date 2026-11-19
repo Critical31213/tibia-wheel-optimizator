@@ -38,6 +38,18 @@ export const ENGINE_MESSAGES = {
   'rationale.noRevelation': 'Not enough points for a revelation (250 in one domain); points go into the best inner slices.',
   'rationale.vessels': '{filled} Gem Vessel slices filled: {unlocked} of 8 gem vessels unlocked.',
   'rationale.surplus': 'Only {capacity} points fit in the wheel; {surplus} are surplus.',
+  'unit.damage': 'damage',
+  'rationale.uniqueBallisticHunt': "{perk}: +4% physical and holy pierce with a bow (worth more against monsters resisting those elements) ≈ {gain} here.",
+  'rationale.uniqueBallisticBoss': "{perk}: +10% critical extra damage with a crossbow ≈ {gain} here.",
+  'rationale.uniquePositional': "{perk}: +3 distance while no monster is adjacent (assumed 70% of the time), otherwise +3 holy and healing magic level ≈ {gain} here.",
+  'rationale.uniqueBattleInstinct': "{perk}: shielding and melee skill with 5+ adjacent creatures (assumed 30% of the time on a hunt, 10% on a boss) ≈ {gain} here.",
+  'rationale.uniqueBattleHealing': "{perk}: +10% healing of healing spells (doubled with a shield) ≈ {gain} here.",
+  'rationale.uniqueRunic': "{perk}: 25% chance of +10–20% magic level when using runes (flat estimate) ≈ {gain} here.",
+  'rationale.uniqueFocus': "{perk}: +35% damage of the next spell after a focus spell and −2 s focus cooldown (flat estimate) ≈ {gain} here.",
+  'rationale.uniqueHealingLink': "{perk}: heals you for 25% of the healing you give others ≈ {gain} here.",
+  'rationale.uniqueSanctuary': "{perk}: +10% damage and healing against adjacent targets ≈ {gain} here.",
+  'rationale.uniqueOther': "{perk} ≈ {gain} here.",
+  'rationale.uniquePath': "{perk} adds almost nothing here; its slice is filled for the dedication points or as a step to outer slices.",
   'rationale.partial': 'Last slice {slice} is partially filled ({points}/{capacity}) with the leftover points.',
 
   // Spells
