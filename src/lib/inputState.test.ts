@@ -69,10 +69,10 @@ describe('monster list persistence', () => {
     ];
     expect(encodeMonsters(list)).toBe('demon_dragon-lord*2');
     expect(decodeMonsters('demon_dragon-lord*2')).toEqual(list);
-    expect(decodeMonsters('demon*0_bad id_demon*3_rat*abc_bat*1000')).toEqual([
+    expect(decodeMonsters('demon*0_bad id_demon*3_rat*abc_bat*200000')).toEqual([
       { id: 'demon', weight: 1 },
       { id: 'rat', weight: 1 },
-      { id: 'bat', weight: 100 },
+      { id: 'bat', weight: 99999 },
     ]);
     expect(decodeMonsters('')).toEqual([]);
   });
@@ -88,6 +88,7 @@ describe('monster list persistence', () => {
     expect(normalizeWeight('0.55')).toBe(0.6);
     expect(normalizeWeight(0)).toBeUndefined();
     expect(normalizeWeight('')).toBeUndefined();
+    expect(normalizeWeight('1500')).toBe(1500);
     const state = { monsters: [{ id: 'demon', weight: 1 }, { id: 'gone', weight: 2 }] };
     expect(withKnownMonsters(state, (id) => id === 'demon')).toEqual({ monsters: [{ id: 'demon', weight: 1 }] });
     expect(withKnownMonsters(state, () => true)).toBe(state);

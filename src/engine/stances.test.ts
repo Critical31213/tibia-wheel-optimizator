@@ -95,3 +95,11 @@ describe('D25 TibiaWiki cooldowns', () => {
     expect(r.rotation!.spells.find((s) => s.name === 'Death Echo')!.ratio).toBeGreaterThan(14);
   });
 });
+
+describe('D32: manual stance', () => {
+  it('overrides the automatic pick, [] = none', () => {
+    const input = { vocation: 'knight' as const, points: 600, monster: null, priority: 50, alternatives: 0 };
+    expect(optimize({ ...input, stances: ['Protector'] }).stances).toEqual(['Protector']);
+    expect(optimize({ ...input, stances: [] }).stances).toEqual([]);
+  });
+});

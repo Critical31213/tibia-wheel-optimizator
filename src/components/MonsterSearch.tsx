@@ -37,7 +37,7 @@ function WeightInput({ name, value, onChange }: { name: string; value: number; o
         inputMode="decimal"
         min={MIN_WEIGHT}
         max={MAX_WEIGHT}
-        step={0.5}
+        step={1}
         value={text}
         onChange={(e) => {
           setText(e.target.value);
@@ -45,7 +45,7 @@ function WeightInput({ name, value, onChange }: { name: string; value: number; o
           if (w !== undefined) onChange(w);
         }}
         onBlur={() => setText(String(value))}
-        className="field w-16 py-1 tabular-nums"
+        className="field w-24 py-1 tabular-nums"
       />
     </label>
   );

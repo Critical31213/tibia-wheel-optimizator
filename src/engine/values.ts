@@ -40,8 +40,6 @@ export const ZERO: Parts = { off: 0, def: 0, util: 0 };
 export const K = {
   /** +1 % output of a healing spell = this × its share of your healing, in % EHP (sustain; overheal discounted). */
   HEAL_EHP: 0.5,
-  /** Leech is strongly devalued (D14). Per +1 % leech. */
-  LIFE_LEECH_DEF: 0.15,
   /** D29: imbuement life leech % (EK/RP/monk: 2× Powerful Vampirism; ED/MS: sometimes, so half). */
   LIFE_LEECH_IMBUE: { knight: 50, paladin: 50, monk: 50, sorcerer: 25, druid: 25 } as Record<Vocation, number>,
   MANA_LEECH_OFF: 0.1,
@@ -194,6 +192,9 @@ export function characterFacts(vocation: Vocation, level: number, shielding: num
 
 const def = (v: Pick<ValuationContext, 'threat'>, x: number): Parts => ({ off: 0, def: x * v.threat, util: 0 });
 
+/** D31: % EHP (before threat) per +1 pp life leech = the same leech growth as +100/imbue % damage (D29). */
+const leechPoint = (v: ValuationContext) => (v.leech / Math.max(1e-9, v.threat)) * (100 / K.LIFE_LEECH_IMBUE[v.vocation]);
+
 /** +HP → % EHP gain = HP / base HP. */
 export function hpParts(v: Pick<ValuationContext, 'hp' | 'threat'>, hp: number): Parts {
   return def(v, (100 * hp) / v.hp);
@@ -337,7 +338,7 @@ export function spellBundleParts(
     const off = Math.max(0, deltaOff(v.model, { stages, mods }, base));
     const leech = effects.filter((e) => e.kind === 'leech').reduce((a, e) => a + e.amount, 0);
     let dfn = 0;
-    if (leech > 0) dfn += (leech * K.LIFE_LEECH_DEF * damageShare(v.model, spell, stages)) / 100;
+    if (leech > 0) dfn += (leech * leechPoint(v) * damageShare(v.model, spell, stages)) / 100;
     if (effects.some((e) => e.kind === 'defHit')) dfn += 0.5;
     const util = effects.reduce((a, e) => a + (e.kind === 'mana' ? e.amount * K.MANA_COST_UTIL : 0), 0);
     return { off, def: dfn * v.threat, util };
@@ -406,7 +407,7 @@ export function convictionParts(v: ValuationContext, t: WheelTile): Parts {
       const pct = c.numericValue ?? c.value / 100;
       return /mana/i.test(c.name)
         ? { off: pct * K.MANA_LEECH_OFF, def: pct * K.MANA_LEECH_DEF * v.threat, util: 0 }
-        : def(v, pct * K.LIFE_LEECH_DEF);
+        : def(v, pct * leechPoint(v));
     }
     case 'skillBonus':
       return { off: (c.numericValue ?? 1) * v.skillOff, def: 0, util: 0 };
@@ -555,7 +556,7 @@ export function supremeModParts(
   if (m.category === 'effect') {
     if (/dodge/i.test(m.name)) return reductionParts(v, x);
     if (/critical/i.test(m.name)) return { off: deltaOff(v.model, { stages: facts.stages, critExtra: x }, { stages: facts.stages }), def: 0, util: 0 };
-    if (/life leech/i.test(m.name)) return def(v, x * K.LIFE_LEECH_DEF);
+    if (/life leech/i.test(m.name)) return def(v, x * leechPoint(v));
     if (/mana leech/i.test(m.name)) return { off: x * K.MANA_LEECH_OFF, def: x * K.MANA_LEECH_DEF * v.threat, util: 0 };
     return ZERO;
   }

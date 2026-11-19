@@ -50,7 +50,7 @@ export const MAX_SKILL = 200;
 export const MAX_SCROLLS = 50;
 export const MAX_MONSTERS = 10;
 export const MIN_WEIGHT = 0.1;
-export const MAX_WEIGHT = 100;
+export const MAX_WEIGHT = 99999;
 
 /** Skill fields shown (and sent to the engine) per vocation (D13). */
 export const VOCATION_SKILLS: Record<Vocation, readonly SkillField[]> = {

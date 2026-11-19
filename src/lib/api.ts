@@ -10,12 +10,19 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import type { Monster, OptimizerResult, Vocation } from '../types';
 import { getWheelData } from '../data/wheel';
+import { stanceCombos } from '../data/damage/stances';
+import { STANCE_SEP } from './spellPrefs';
 
 /** One build (main or alternative) as shown by the wheel / summary / vessels. */
 export type BuildResult = Omit<OptimizerResult, 'alternatives'>;
 
 export { getWheel, MAX_SCROLL_POINTS, optimize, pointsForLevel } from '../engine';
 export { getRotationPresets } from '../data/damage/rotations';
+
+/** D32: selectable stance sets of the vocation, as keys ('' = none, names joined by STANCE_SEP). */
+export function getStanceOptions(vocation: Vocation): string[] {
+  return stanceCombos(vocation).map((c) => c.map((s) => s.name).join(STANCE_SEP));
+}
 
 /** Spells whose augment can be forced (D21): augment slices + supreme-mod spells of the vocation, sorted. */
 export function getForceableSpells(vocation: Vocation): string[] {

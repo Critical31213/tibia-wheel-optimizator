@@ -338,6 +338,8 @@ export interface OptimizerInput {
   rotationId?: string;
   /** Spells whose wheel augment must be taken (e.g. utility spells needed at a spot). */
   forcedSpells?: string[];
+  /** D32: stance names chosen by the user ([] = none); undefined = engine picks per plan. */
+  stances?: string[];
 }
 
 export interface StatLine {

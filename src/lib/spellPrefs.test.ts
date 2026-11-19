@@ -8,7 +8,7 @@ import {
   spellPrefsStorageKey,
   spellPrefsToQuery,
 } from './spellPrefs';
-import { getForceableSpells, getRotationPresets } from './api';
+import { getStanceOptions, getForceableSpells, getRotationPresets } from './api';
 
 const IDS = ['ms-gfw-echo', 'ms-gfw-geb'];
 const SPELLS = ["Hell's Core", 'Great Fire Wave', 'Ultimate Healing'];
@@ -18,6 +18,7 @@ describe('spell prefs', () => {
     expect(sanitizeSpellPrefs({ rotationId: 'ek-mas', forcedSpells: ['great fire wave', 'GREAT FIRE WAVE', 'Nope', 3] }, IDS, SPELLS)).toEqual({
       rotationId: null,
       forcedSpells: ['Great Fire Wave'],
+      stance: null,
     });
     const many = Array.from({ length: 20 }, (_, i) => `s${i}`);
     expect(sanitizeSpellPrefs({ forcedSpells: many }, IDS, many).forcedSpells).toHaveLength(MAX_FORCED_SPELLS);
@@ -26,11 +27,14 @@ describe('spell prefs', () => {
   });
 
   it('round-trips through the URL and localStorage JSON', () => {
-    const prefs = { rotationId: 'ms-gfw-geb', forcedSpells: ["Hell's Core", 'Ultimate Healing'] };
+    const prefs = { rotationId: 'ms-gfw-geb', forcedSpells: ["Hell's Core", 'Ultimate Healing'], stance: 'Master of Flames+Aura of Exposed Weakness' };
+    const ST = getStanceOptions('sorcerer');
     const search = spellPrefsToQuery(prefs, '?v=sorcerer&p=100');
     expect(new URLSearchParams(search).get('v')).toBe('sorcerer');
-    expect(spellPrefsFromQuery(search, IDS, SPELLS)).toEqual(prefs);
-    expect(parseSpellPrefs(JSON.stringify(prefs), IDS, SPELLS)).toEqual(prefs);
+    expect(spellPrefsFromQuery(search, IDS, SPELLS, ST)).toEqual(prefs);
+    expect(parseSpellPrefs(JSON.stringify(prefs), IDS, SPELLS, ST)).toEqual(prefs);
+    expect(spellPrefsFromQuery('?st=', IDS, SPELLS, ST)?.stance).toBe('');
+    expect(spellPrefsFromQuery('?st=Blood+Rage', IDS, SPELLS, ST)?.stance).toBeNull();
     expect(spellPrefsToQuery(EMPTY_SPELL_PREFS, search)).toBe('?v=sorcerer&p=100');
   });
 

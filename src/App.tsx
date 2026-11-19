@@ -18,7 +18,8 @@ import { gemFromRecommendation, setModGrade } from './lib/gems';
 import { usePersistentInputs } from './hooks/usePersistentInputs';
 import { usePersistentSpellPrefs } from './hooks/usePersistentSpellPrefs';
 import { useT } from './i18n';
-import { getForceableSpells, getMonsterById, getRotationPresets, getWheel, optimize, useMonsterData } from './lib/api';
+import { getForceableSpells, getMonsterById, getRotationPresets, getStanceOptions, getWheel, optimize, useMonsterData } from './lib/api';
+import { stanceNames } from './lib/spellPrefs';
 import type { BuildResult } from './lib/api';
 import { characterOf, contextOf } from './lib/inputState';
 import { resolveMonsters } from './lib/monsters';
@@ -33,6 +34,7 @@ export default function App() {
   const deferredPrefs = useDeferredValue(spellPrefs);
   const presets = useMemo(() => getRotationPresets(inputs.vocation), [inputs.vocation]);
   const forceable = useMemo(() => getForceableSpells(inputs.vocation), [inputs.vocation]);
+  const stanceOptions = useMemo(() => getStanceOptions(inputs.vocation), [inputs.vocation]);
   const monstersReady = useMonsterData();
   const deferred = useDeferredValue(inputs);
   const deferredGems = useDeferredValue(gems);
@@ -53,7 +55,7 @@ export default function App() {
   );
   const character = useMemo(() => characterOf(deferred), [deferred]);
   const { mode } = deferred;
-  const { rotationId, forcedSpells } = deferredPrefs;
+  const { rotationId, forcedSpells, stance } = deferredPrefs;
   const result = useMemo(
     () =>
       points > 0
@@ -69,9 +71,10 @@ export default function App() {
             alternatives: 2,
             rotationId: rotationId ?? undefined,
             forcedSpells: forcedSpells.length ? forcedSpells : undefined,
+            stances: stance === null ? undefined : stanceNames(stance),
           })
         : null,
-    [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, rotationId, forcedSpells],
+    [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, rotationId, forcedSpells, stance],
   );
   const resultWheel = useMemo(() => getWheel(deferred.vocation), [deferred.vocation]);
   const alternatives = result?.alternatives ?? [];
@@ -107,12 +110,19 @@ export default function App() {
             </Panel>
           )}
           <Panel title={t('app.wheelTitle', { vocation: VOCATION_LABELS[deferred.vocation] })} headingId="wheel-heading">
+            {gems.length === 0 && (
+              <p role="note" className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                {t('app.noGems')}{' '}
+                <a href="#gems-heading" className="font-medium text-gold-300 underline hover:text-gold-200">{t('app.noGemsLink')}</a>
+              </p>
+            )}
             <WheelChart wheel={resultWheel} result={shown} />
           </Panel>
           <Panel title={t('rotation.title')} headingId="rotation-heading">
             <RotationPanel
               presets={presets}
               spells={forceable}
+              stanceOptions={stanceOptions}
               value={spellPrefs}
               onChange={updateSpellPrefs}
               usage={deferred.vocation === inputs.vocation ? shown?.rotation : undefined}

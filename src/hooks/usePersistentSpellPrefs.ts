@@ -1,28 +1,28 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Vocation } from '../types';
-import { getForceableSpells, getRotationPresets } from '../lib/api';
+import { getForceableSpells, getRotationPresets, getStanceOptions } from '../lib/api';
 import { parseSpellPrefs, spellPrefsFromQuery, spellPrefsStorageKey, spellPrefsToQuery } from '../lib/spellPrefs';
 import type { SpellPrefs } from '../lib/spellPrefs';
 
 const optionsOf = (vocation: Vocation) =>
-  [getRotationPresets(vocation).map((r) => r.id), getForceableSpells(vocation)] as const;
+  [getRotationPresets(vocation).map((r) => r.id), getForceableSpells(vocation), getStanceOptions(vocation)] as const;
 
 function readPrefs(vocation: Vocation, fromUrl: boolean): SpellPrefs {
-  const [ids, spells] = optionsOf(vocation);
+  const [ids, spells, stances] = optionsOf(vocation);
   if (fromUrl) {
-    const q = spellPrefsFromQuery(window.location.search, ids, spells);
+    const q = spellPrefsFromQuery(window.location.search, ids, spells, stances);
     if (q) return q;
   }
   try {
-    return parseSpellPrefs(window.localStorage.getItem(spellPrefsStorageKey(vocation)), ids, spells);
+    return parseSpellPrefs(window.localStorage.getItem(spellPrefsStorageKey(vocation)), ids, spells, stances);
   } catch {
-    return parseSpellPrefs(null, ids, spells);
+    return parseSpellPrefs(null, ids, spells, stances);
   }
 }
 
 /**
- * Rotation choice + forced spells of the current vocation: localStorage per vocation, mirrored to the
- * URL (`r`, `fs`). On a vocation switch the stored prefs of the new vocation (else auto / none) apply.
+ * Rotation choice + forced spells + stance of the current vocation: localStorage per vocation, mirrored to the
+ * URL (`r`, `fs`, `st`). On a vocation switch the stored prefs of the new vocation (else auto / none) apply.
  */
 export function usePersistentSpellPrefs(vocation: Vocation) {
   const [state, setState] = useState(() => ({ vocation, prefs: readPrefs(vocation, typeof window !== 'undefined') }));

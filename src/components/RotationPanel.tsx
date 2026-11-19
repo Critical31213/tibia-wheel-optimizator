@@ -1,13 +1,15 @@
 import { useId } from 'react';
 import { GREEDY_ROTATION_ID, type RotationPreset, type RotationUsage } from '../types';
 import { useT } from '../i18n';
-import { MAX_FORCED_SPELLS } from '../lib/spellPrefs';
+import { MAX_FORCED_SPELLS, stanceNames } from '../lib/spellPrefs';
 import type { SpellPrefs } from '../lib/spellPrefs';
 
 interface RotationPanelProps {
   presets: RotationPreset[];
   /** Spells whose augment can be forced. */
   spells: string[];
+  /** Selectable stance set keys (D32). */
+  stanceOptions: string[];
   value: SpellPrefs;
   onChange: (patch: Partial<SpellPrefs>) => void;
   /** Rotation used by the viewed build. */
@@ -16,8 +18,11 @@ interface RotationPanelProps {
   stances?: string[];
 }
 
+/** Select value of the automatic stance (stance keys are '' or names). */
+const AUTO = '*';
+
 /** Rotation choice (auto / preset), the rotation the viewed build is based on, and forced spell augments. */
-export function RotationPanel({ presets, spells, value, onChange, usage, stances }: RotationPanelProps) {
+export function RotationPanel({ presets, spells, stanceOptions, value, onChange, usage, stances }: RotationPanelProps) {
   const t = useT();
   const id = useId();
   const selected = presets.find((p) => p.id === value.rotationId);
@@ -27,6 +32,7 @@ export function RotationPanel({ presets, spells, value, onChange, usage, stances
       p.requires?.revelation && t('rotation.needsRevelation', { name: p.requires.revelation }),
       p.requires?.shield && t('rotation.needsShield'),
     ].filter(Boolean) as string[];
+  const stanceLabel = (k: string) => (k ? stanceNames(k).join(' + ') : t('rotation.noStance'));
   const addable = spells.filter((s) => !value.forcedSpells.includes(s));
 
   return (
@@ -51,6 +57,27 @@ export function RotationPanel({ presets, spells, value, onChange, usage, stances
         <p className="mt-1 text-xs text-parchment-400">{[selected.note, ...requires(selected)].filter(Boolean).join(' · ')}</p>
       )}
 
+      {stanceOptions.length > 1 && (
+        <>
+          <label htmlFor={`${id}-st`} className="mt-3 block text-xs text-parchment-300">
+            {t('rotation.stance')}
+          </label>
+          <select
+            id={`${id}-st`}
+            value={value.stance ?? AUTO}
+            onChange={(e) => onChange({ stance: e.target.value === AUTO ? null : e.target.value })}
+            className="field mt-1 w-full py-1.5 text-sm"
+          >
+            <option value={AUTO}>{t('rotation.auto')}</option>
+            {stanceOptions.map((k) => (
+              <option key={k} value={k}>
+                {stanceLabel(k)}
+              </option>
+            ))}
+          </select>
+        </>
+      )}
+
       {usage && (
         <div className="mt-3" aria-live="polite">
           <p className="text-xs text-parchment-300">
@@ -60,7 +87,7 @@ export function RotationPanel({ presets, spells, value, onChange, usage, stances
           {stances && (
             <p className="mt-0.5 text-xs text-parchment-300">
               {t('rotation.stance')}: <span className="text-parchment-100">{stances.length ? stances.join(' + ') : t('rotation.noStance')}</span>
-              <span className="text-parchment-400"> ({t('rotation.autoPicked')})</span>
+              {value.stance === null && <span className="text-parchment-400"> ({t('rotation.autoPicked')})</span>}
             </p>
           )}
           <ul className="mt-1 space-y-0.5">

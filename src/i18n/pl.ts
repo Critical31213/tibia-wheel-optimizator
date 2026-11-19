@@ -5,6 +5,8 @@ export const pl: Dictionary = {
   'app.title': 'Optymalizator Wheel of Destiny',
   'app.subtitle': 'Wybierz profesję, punkty i cel — otrzymasz proponowany build koła w Tibii.',
   'app.wheelTitle': 'Koło – {vocation}',
+  'app.noGems': 'Nie dodano gemów. Gemy mogą mocno zmienić najlepsze koło i jego wartość.',
+  'app.noGemsLink': 'Dodaj swoje gemy',
   'app.summaryTitle': 'Podsumowanie buildu',
   'app.empty': 'Wpisz punkty promocji (lub poziom postaci), aby zobaczyć zoptymalizowany build.',
   'app.footer': 'Narzędzie fanowskie. Tibia jest znakiem towarowym CipSoft GmbH. Dane potworów z tibiopedia.pl.',
@@ -45,7 +47,7 @@ export const pl: Dictionary = {
 
   'monster.spot': 'Potwory w tym miejscu',
   'monster.weightOf': 'Waga: {name}',
-  'monster.weightHint': 'Waga = jak często walczysz z tym potworem (względnie).',
+  'monster.weightHint': 'Waga = jak często walczysz z tym potworem (względnie), np. zabójstwa na godzinę.',
   'monster.removeAria': 'Usuń {name}',
   'monster.full': 'Maksymalnie {max} potworów',
   'monster.combined': 'Całe miejsce (średnia ważona)',

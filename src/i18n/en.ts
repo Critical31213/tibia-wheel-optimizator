@@ -11,6 +11,8 @@ export const en = {
   'app.title': 'Wheel of Destiny Optimizer',
   'app.subtitle': 'Pick a vocation, your points and a target — get a suggested Tibia wheel build.',
   'app.wheelTitle': '{vocation} wheel',
+  'app.noGems': 'No gems added. Gems can change the best wheel and its value a lot.',
+  'app.noGemsLink': 'Add your gems',
   'app.summaryTitle': 'Build summary',
   'app.empty': 'Enter your promotion points (or character level) to see an optimized build.',
   'app.footer': 'Fan-made tool. Tibia is a trademark of CipSoft GmbH. Monster data from tibiopedia.pl.',
@@ -51,7 +53,7 @@ export const en = {
 
   'monster.spot': 'Monsters at this spot',
   'monster.weightOf': 'Weight of {name}',
-  'monster.weightHint': 'Weight = how often you fight this monster (relative).',
+  'monster.weightHint': 'Weight = how often you fight this monster (relative), e.g. kills per hour.',
   'monster.removeAria': 'Remove {name}',
   'monster.full': 'Maximum {max} monsters',
   'monster.combined': 'Whole spot (weighted average)',

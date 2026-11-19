@@ -47,6 +47,9 @@ Roles:
 | D28 | 2026-11-19 | A gem fits only a vessel of its own quality (lesser → lesser, regular → regular, greater → greater); previously any gem fitted any vessel with the lower quality's slots active. | User: small gems were placed into every vessel. |
 | D29 | 2026-11-19 | Damage also buys sustain through imbuement life leech: +1 % damage adds leech share × HEAL_EHP × threat % EHP (offense weight += defense weight × that). Leech per hit follows the game (damage × leech × (0.1n + 0.9) / n); imbuement leech 50 % for EK/RP/monk (2× Powerful Vampirism), 25 % for ED/MS; the share is vs the main heal cast every turn. Gift of Life is halved while hunting. | User: players use leech imbuements, so damage is also survivability. |
 | D30 | 2026-11-19 | A gem recommendation needs room: when every unlocked vessel of its quality holds a gem, it is shown only as a replacement of the weakest one there (gain = difference), otherwise dropped. Recommendation sections per quality are collapsible. | User: with 2× the same gem placed, do not recommend a third if there is no room. |
+| D31 | 2026-11-19 | Life leech from wheel nodes, augments and supreme mods is valued by the D29 model: +1 pp = leech EHP / imbuement leech (knight/paladin/monk 50, sorcerer/druid 25). Without gems, leech nodes on the path are now taken when worth it. A notice by the wheel says gems are missing and can change the build a lot. Mana leech unchanged. | User: check whether leech nodes pay off without gems; suggest adding gems. |
+| D32 | 2026-11-19 | Manual stance: Auto or a fixed stance set (incl. none) in the rotation panel; stored per vocation with the rotation prefs (localStorage, URL `st`). A manual stance applies to every plan, also over a preset's own stance. | User request. |
+| D33 | 2026-11-19 | Monster weight up to 99 999 (step 1, wider field), so a weight can be kills per hour. | User request. |
 
 ---
 

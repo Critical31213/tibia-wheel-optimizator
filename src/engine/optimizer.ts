@@ -1283,7 +1283,8 @@ export function planSpecs(input: OptimizerInput): PlanSpec[] {
  */
 export function pickStances(input: OptimizerInput, preset: RotationPreset | null, reference: number, blend: (p: Parts) => number) {
   const fixed = preset?.stance ? getStance(preset.stance) : undefined;
-  const combos = fixed ? [[fixed]] : stanceCombos(input.vocation);
+  const manual = input.stances?.map(getStance).filter((s): s is StanceDef => !!s);
+  const combos = manual ? [manual] : fixed ? [[fixed]] : stanceCombos(input.vocation);
   let best = { stances: [] as StanceDef[], v: null as ValuationContext | null, score: -Infinity };
   for (const stances of combos) {
     const v = valuationFor(input, preset, reference, stances);
