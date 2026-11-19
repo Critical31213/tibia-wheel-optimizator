@@ -1322,6 +1322,7 @@ function assemble(p: Prepared, best: State): BuildResult {
     stats: statLines(wheel, best.alloc, stages, env, vessels),
     offenseScore: norm(got.off, max.off),
     defenseScore: norm(got.def, max.def),
+    wheelEffect: effectOf(v, got),
     rationale: why.map((x) => x.text),
     rationaleMsgs: why.map((x) => x.msg),
     vessels,

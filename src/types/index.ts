@@ -471,6 +471,8 @@ export interface OptimizerResult {
   stats: StatLine[];
   offenseScore: number;
   defenseScore: number;
+  /** D58: what the wheel (with gems) adds: % damage per turn and % effective HP vs an empty wheel. */
+  wheelEffect?: GainEffect;
   /** Short explanations of why the engine chose this build. */
   rationale: string[];
   /** Same as `rationale`, translatable. */

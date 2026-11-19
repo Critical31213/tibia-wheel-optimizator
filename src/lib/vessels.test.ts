@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ActivatedRevelation, Domain, GemRecommendation, VesselAssignment } from '../types';
-import { activeRevelationsByDomain, emptyUnlockedByQuality, recommendationsByQuality } from './vessels';
+import type { GemRecommendation, VesselAssignment } from '../types';
+import { emptyUnlockedByQuality, groupConvictions, recommendationsByQuality } from './vessels';
 
 const vessel = (quality: VesselAssignment['quality'], unlocked: boolean, source: VesselAssignment['source']): VesselAssignment => ({
   vesselId: 0,
@@ -8,12 +8,6 @@ const vessel = (quality: VesselAssignment['quality'], unlocked: boolean, source:
   unlocked,
   gem: null,
   source,
-});
-
-const rev = (id: number, domain: Domain, stage: number): ActivatedRevelation => ({
-  perk: { id: `r${id}`, name: `R${id}`, description: '', category: 'offense', domain, thresholds: [250, 500, 1000] },
-  stage,
-  domainPoints: 100 * stage,
 });
 
 describe('emptyUnlockedByQuality', () => {
@@ -43,12 +37,10 @@ describe('recommendationsByQuality', () => {
   });
 });
 
-describe('activeRevelationsByDomain', () => {
-  it('keeps only active revelations, highest stage per domain', () => {
-    const out = activeRevelationsByDomain([rev(1, 'topLeft', 0), rev(2, 'topRight', 1), rev(3, 'topRight', 2), rev(4, 'bottomLeft', 3)]);
-    expect(out.topLeft).toBeUndefined();
-    expect(out.topRight?.perk.name).toBe('R3');
-    expect(out.bottomLeft?.stage).toBe(3);
-    expect(out.bottomRight).toBeUndefined();
+describe('groupConvictions', () => {
+  it('counts duplicates and drops tier I of an augment taken at tier II', () => {
+    const n = (name: string) => ({ name });
+    const out = groupConvictions(['Aug X I', 'Gem Vessel', 'Aug Y I', 'Gem Vessel', 'Aug X II', 'Gem Vessel'].map(n));
+    expect(out.map((g) => [g.perk.name, g.count])).toEqual([['Gem Vessel', 3], ['Aug Y I', 1], ['Aug X II', 1]]);
   });
 });

@@ -1,7 +1,8 @@
 import type { PerkCategory } from '../types';
 import type { BuildResult } from '../lib/api';
 import { engineText, useT } from '../i18n';
-import { cx, DOMAIN_COLORS, formatNumber } from '../lib/labels';
+import { cx, formatNumber } from '../lib/labels';
+import { groupConvictions } from '../lib/vessels';
 
 const CATEGORY_TEXT: Record<PerkCategory, string> = {
   offense: 'text-offense',
@@ -9,24 +10,14 @@ const CATEGORY_TEXT: Record<PerkCategory, string> = {
   utility: 'text-utility',
 };
 
-function ScoreBar({ label, value, color }: { label: string; value: number; color: string }) {
-  const v = Math.max(0, Math.min(100, Math.round(value)));
+const pct = (n: number) => `${n >= 0 ? '+' : '−'}${formatNumber(Math.abs(Math.round(n * 10) / 10))}%`;
+
+/** D58: what the wheel adds, as one number. */
+function EffectTile({ label, value, color }: { label: string; value: number; color: string }) {
   return (
-    <div>
-      <div className="mb-1 flex justify-between text-xs">
-        <span className="text-parchment-300">{label}</span>
-        <span className="tabular-nums text-parchment-100">{v}</span>
-      </div>
-      <div
-        role="meter"
-        aria-label={label}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={v}
-        className="h-2.5 overflow-hidden rounded-full bg-ink-950 ring-1 ring-ink-600"
-      >
-        <div className={cx('h-full rounded-full transition-[width] duration-300', color)} style={{ width: `${v}%` }} />
-      </div>
+    <div className="rounded-lg border border-ink-700 bg-ink-950/50 px-3 py-2">
+      <p className="text-xs text-parchment-300">{label}</p>
+      <p className={cx('text-xl font-semibold tabular-nums', color)}>{pct(value)}</p>
     </div>
   );
 }
@@ -45,62 +36,27 @@ export function ResultsPanel({ result }: ResultsPanelProps) {
 
   return (
     <div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <ScoreBar label={t('results.offense')} value={result.offenseScore} color="bg-offense" />
-        <ScoreBar label={t('results.defense')} value={result.defenseScore} color="bg-defense" />
-      </div>
-      <p className="mt-2 text-xs text-parchment-400">
-        {t('results.pointsUsed', { used: formatNumber(result.pointsUsed), total: formatNumber(result.pointsTotal) })}
-      </p>
-
-      {result.revelations.length > 0 && (
-        <>
-          <SubHeading>{t('results.revelations')}</SubHeading>
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {result.revelations.map(({ perk, stage, domainPoints }) => {
-              const next = perk.thresholds[stage];
-              const col = DOMAIN_COLORS[perk.domain];
-              return (
-                <li
-                  key={perk.id}
-                  className={cx('rounded-lg border p-2.5', stage > 0 ? 'border-ink-500 bg-ink-850' : 'border-ink-700 opacity-70')}
-                  title={perk.description}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium" style={{ color: col.text }}>
-                      {perk.name}
-                    </span>
-                    <span className="flex gap-1" role="img" aria-label={t('results.stage', { stage, total: perk.thresholds.length })}>
-                      {perk.thresholds.map((t, i) => (
-                        <span
-                          key={t}
-                          className="size-2.5 rounded-full ring-1 ring-ink-500"
-                          style={{ background: i < stage ? col.base : 'transparent' }}
-                        />
-                      ))}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-parchment-400">
-                    {t('results.domainPoints', { domain: t(`domain.${perk.domain}`), points: formatNumber(domainPoints) })}
-                    {next !== undefined && t('results.nextStage', { points: formatNumber(next) })}
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
-        </>
+      {result.wheelEffect && (
+        <div className="grid grid-cols-2 gap-2">
+          <EffectTile label={t('results.damage')} value={result.wheelEffect.dmg} color="text-offense" />
+          <EffectTile label={t('results.ehp')} value={result.wheelEffect.ehp} color="text-defense" />
+        </div>
       )}
+      <p className="mt-2 text-xs text-parchment-400">
+        {t('results.vsEmpty')} {t('results.pointsUsed', { used: formatNumber(result.pointsUsed), total: formatNumber(result.pointsTotal) })}
+      </p>
 
       {result.convictions.length > 0 && (
         <>
           <SubHeading>{t('results.convictions')}</SubHeading>
           <ul className="flex flex-wrap gap-1.5">
-            {result.convictions.map((p, i) => (
+            {groupConvictions(result.convictions).map(({ perk: p, count }) => (
               <li
-                key={`${p.id}-${i}`}
+                key={p.id}
                 title={p.description}
                 className={cx('rounded-full border border-ink-600 bg-ink-950/60 px-2 py-0.5 text-xs', CATEGORY_TEXT[p.category])}
               >
+                {count > 1 && <span className="text-parchment-300">{count} × </span>}
                 {p.name}
               </li>
             ))}

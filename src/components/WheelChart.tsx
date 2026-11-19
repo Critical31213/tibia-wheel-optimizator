@@ -1,10 +1,9 @@
 import { useMemo, useState } from 'react';
-import type { Domain, ModGrade, Slice, WheelDefinition } from '../types';
+import type { Domain, Slice, WheelDefinition } from '../types';
 import type { BuildResult } from '../lib/api';
 import { annularSectorPath, fillRadius, ringBounds, sectorCentroid, sliceAngles } from '../lib/geometry';
 import { useT } from '../i18n';
-import { cx, DOMAIN_COLORS, formatNumber, ROMAN } from '../lib/labels';
-import { activeRevelationsByDomain } from '../lib/vessels';
+import { cx, DOMAIN_COLORS, formatNumber } from '../lib/labels';
 
 const SIZE = 400;
 const C = SIZE / 2;
@@ -48,7 +47,6 @@ export function WheelChart({ wheel, result }: WheelChartProps) {
     });
   }, [wheel, result]);
 
-  const revelations = useMemo(() => activeRevelationsByDomain(result?.revelations ?? []), [result]);
   const active = shapes.find((s) => s.slice.id === hover);
 
   return (
@@ -121,22 +119,32 @@ export function WheelChart({ wheel, result }: WheelChartProps) {
         )}
       </div>
 
-      {Object.keys(revelations).length > 0 && (
-        <ul className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs" aria-label={t('wheel.revelations')}>
+      {result && result.revelations.length > 0 && (
+        <ul className="mt-3 grid grid-cols-2 gap-2 text-xs" aria-label={t('wheel.revelations')}>
           {QUADRANTS.map((d) => {
-            const r = revelations[d];
-            return r ? (
-              <li key={d} className={cx('flex min-w-0 items-center gap-2', (d === 'topRight' || d === 'bottomRight') && 'justify-end text-right')}>
-                <span aria-hidden="true" className="size-3 shrink-0 rounded-sm" style={{ background: DOMAIN_COLORS[d].base }} />
-                <span className="min-w-0" title={r.perk.description}>
-                  <span style={{ color: DOMAIN_COLORS[d].text }}>
-                    {r.perk.name} {ROMAN[r.stage as ModGrade] ?? r.stage}
+            const r = result.revelations.find((x) => x.perk.domain === d);
+            if (!r) return <li key={d} aria-hidden="true" />;
+            const col = DOMAIN_COLORS[d];
+            const next = r.perk.thresholds[r.stage];
+            return (
+              <li
+                key={d}
+                title={r.perk.description}
+                className={cx('min-w-0 rounded-lg border px-2.5 py-1.5', r.stage > 0 ? 'border-ink-500 bg-ink-850' : 'border-ink-700 opacity-60')}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate font-medium" style={{ color: col.text }}>{r.perk.name}</span>
+                  <span className="flex shrink-0 gap-1" role="img" aria-label={t('results.stage', { stage: r.stage, total: r.perk.thresholds.length })}>
+                    {r.perk.thresholds.map((th, i) => (
+                      <span key={th} className="size-2 rounded-full ring-1 ring-ink-500" style={{ background: i < r.stage ? col.base : 'transparent' }} />
+                    ))}
                   </span>
-                  <span className="text-parchment-300"> · {t('wheel.revelationPts', { n: formatNumber(r.domainPoints) })}</span>
-                </span>
+                </div>
+                <p className="mt-0.5 text-[11px] text-parchment-400">
+                  {t('wheel.revelationPts', { n: formatNumber(r.domainPoints) })}
+                  {next !== undefined && t('results.nextStage', { points: formatNumber(next) })}
+                </p>
               </li>
-            ) : (
-              <li key={d} aria-hidden="true" />
             );
           })}
         </ul>

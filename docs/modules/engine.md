@@ -254,3 +254,6 @@ Gem recommendations, upgrades (`effect`, `effectToMax`), weapon picks and reshap
 The blended `gain` / `delta` stays the ranking value. Replacement gems subtract the weakest placed gem's effect;
 re-optimized Revelation Mastery gems add the regular basics' effect to the with/without wheel difference
 (`objectiveParts`). Weapons use `loadoutValuer` (unblended `loadoutScorer`).
+
+D58: `BuildResult.wheelEffect` = `effectOf(v, rawTotals(..., withBase = false))`, i.e. what the wheel and its gems add over an
+empty wheel. `offenseScore` / `defenseScore` (share of the full-wheel maximum) stay for alternatives only.
