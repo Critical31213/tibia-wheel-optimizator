@@ -3,9 +3,10 @@ import type { OwnedWeapon, WeaponPick, WeaponResult } from '../types';
 import type { TFunction } from '../i18n';
 import { useT } from '../i18n';
 import { getAmmo, getShapingOption, getWeapon, levelOptions } from '../lib/api';
-import { formatNumber } from '../lib/labels';
+import { cx, formatNumber } from '../lib/labels';
 import { perkLabel, shapingLabel } from '../lib/weapons';
 import { PerkIcon } from './PerkIcon';
+import { Tip } from './Tip';
 import { WeaponMeta } from './WeaponsPanel';
 
 /** Alpha strike only pays off when the player hits a fresh target first, i.e. playing solo. */
@@ -28,28 +29,30 @@ interface WeaponResultPanelProps {
   onSuggestChange: (on: boolean) => void;
 }
 
+/** D52: the picked perk per level as icons; the effect in a tooltip, manual choices framed in gold. */
 function PickPerks({ pick, owned }: { pick: WeaponPick; owned?: OwnedWeapon }) {
   const t = useT();
   const weapon = getWeapon(pick.weaponId);
   if (!weapon) return null;
   const options = levelOptions(owned ?? { level: weapon.levels.length }, weapon);
+  const n = pick.perks.length;
   return (
-    <ol className="flex flex-col gap-0.5 text-xs">
+    <ol className="flex flex-wrap gap-1">
       {pick.perks.map((k, i) => {
         const p = options[i]?.[k];
         if (!p) return null;
         const manual = owned?.perks?.[i] != null;
+        const label = `${t('weapons.levelN', { n: i + 1 })}: ${perkLabel(t, p)}${p.kind === 'alphaStrike' ? ` (${t('weaponResult.solo')})` : ''}${
+          options[i].length > 1 ? ` · ${manual ? t('weaponResult.yours') : t('weaponResult.picked')}` : ''
+        }`;
         return (
-          <li key={i} className="flex items-center gap-2">
-            <span className="w-5 shrink-0 text-right tabular-nums text-parchment-400">{i + 1}.</span>
-            <PerkIcon perk={p} size={16} />
-            <span className="min-w-0 flex-1 text-parchment-100">
-              {perkLabel(t, p)}
-              <SoloNote kind={p.kind} t={t} />
-            </span>
-            {options[i].length > 1 && (
-              <span className="shrink-0 text-parchment-400">{manual ? t('weaponResult.yours') : t('weaponResult.picked')}</span>
-            )}
+          <li key={i}>
+            <Tip text={label} align={i < 2 ? 'start' : i >= n - 2 ? 'end' : 'center'}>
+              <span tabIndex={0} aria-label={label} className={cx('relative block rounded-md border p-0.5', manual ? 'border-gold-400' : 'border-ink-600')}>
+                <PerkIcon perk={p} size={24} />
+                {p.kind === 'alphaStrike' && <span aria-hidden="true" className="absolute -right-1 -top-1 text-[9px] leading-none text-weak">solo</span>}
+              </span>
+            </Tip>
           </li>
         );
       })}

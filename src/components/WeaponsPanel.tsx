@@ -2,12 +2,13 @@ import { useId, useMemo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { MeleeSkill, OwnedWeapon, Vocation } from '../types';
 import { useT } from '../i18n';
-import { getShapingOption, getWeapon, iconKeys, levelOptions, searchWeapons, shapingId, shapingOptions, type Weapon, type WeaponPerk } from '../lib/api';
+import { getShapingOption, getWeapon, levelOptions, searchWeapons, shapingId, shapingOptions, type Weapon } from '../lib/api';
 import { cx } from '../lib/labels';
 import { MAX_SHAPED, ownWeapon, perkLabel, setPerk, setShaped, shapingLabel, type WeaponPrefs } from '../lib/weapons';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { Panel } from './Panel';
 import { PerkIcon } from './PerkIcon';
+import { Tip } from './Tip';
 
 interface WeaponSearchProps {
   vocation: Vocation;
@@ -129,6 +130,9 @@ export function WeaponMeta({ weapon }: { weapon: Weapon }) {
 /** Two-handedness only matters for weapons a shield could go with (knights). */
 const vocationUsesShield = (w: Weapon) => w.vocations.includes('knight');
 
+/** Tooltip alignment for item `i` of `n` in a row, so edge tooltips stay inside the card. */
+const tipAlign = (i: number, n: number): 'start' | 'center' | 'end' => (i < 2 ? 'start' : i >= n - 2 ? 'end' : 'center');
+
 interface PerkGridProps {
   owned: OwnedWeapon;
   weapon: Weapon;
@@ -136,25 +140,16 @@ interface PerkGridProps {
 }
 
 /**
- * D50: compact proficiency tree — one column of perk icons per level; a click picks a perk by hand (gold frame),
- * a second click returns the level to Auto. Locked levels are dimmed. The legend below names every icon.
+ * D50/D52: compact proficiency tree — one column of perk icons per level, the effect in a tooltip; a click picks a
+ * perk by hand (gold frame), a second click returns the level to Auto. Locked levels are dimmed.
  */
 function PerkGrid({ owned, weapon, onChange }: PerkGridProps) {
   const t = useT();
   const all = levelOptions({ ...owned, level: weapon.levels.length }, weapon);
   const shaped = owned.shaped ?? [];
-  const legend = new Map<string, { perk: WeaponPerk; labels: string[] }>();
-  all.forEach((level, i) =>
-    level.forEach((p) => {
-      const key = iconKeys(p).join('|');
-      const entry = legend.get(key) ?? { perk: p, labels: [] };
-      entry.labels.push(`${i + 1}: ${perkLabel(t, p)}`);
-      legend.set(key, entry);
-    }),
-  );
   return (
     <div>
-      <ol className="flex gap-1 overflow-x-auto pb-1" aria-label={t('weapons.tree')}>
+      <ol className="flex gap-1" aria-label={t('weapons.tree')}>
         {all.map((level, i) => {
           const locked = i >= owned.level;
           const choice = owned.perks?.[i];
@@ -163,35 +158,31 @@ function PerkGrid({ owned, weapon, onChange }: PerkGridProps) {
             <li key={i} className={cx('flex shrink-0 flex-col items-center gap-1', locked && 'opacity-35')}>
               <span className="text-[10px] tabular-nums text-parchment-400">{i + 1}</span>
               {level.map((p, k) => {
-                const label = `${t('weapons.levelN', { n: i + 1 })}: ${perkLabel(t, p)}`;
+                const label = `${t('weapons.levelN', { n: i + 1 })}: ${perkLabel(t, p)}${shape?.replaces === k ? ' ✦' : ''}`;
                 const picked = choice === k;
                 const mark = shape?.replaces === k && (
                   <span aria-hidden="true" className="absolute -left-1 -top-1 text-[10px] leading-none text-gold-300">✦</span>
                 );
-                if (level.length === 1 || locked)
-                  return (
-                    <span key={k} title={label} className="relative rounded-md border border-ink-600 p-0.5">
-                      <span className="sr-only">{label}</span>
+                const fixed = level.length === 1 || locked;
+                return (
+                  <Tip key={k} text={label} align={tipAlign(i, all.length)}>
+                    <button
+                      type="button"
+                      aria-label={label}
+                      aria-pressed={fixed ? undefined : picked}
+                      aria-disabled={fixed || undefined}
+                      onClick={() => !fixed && onChange(setPerk(owned, i, picked ? null : k))}
+                      className={cx(
+                        'relative rounded-md border p-0.5',
+                        picked && !fixed ? 'border-gold-400 bg-gold-700/30' : 'border-ink-600',
+                        !fixed && !picked && 'hover:border-gold-600',
+                        fixed && 'cursor-default',
+                      )}
+                    >
                       <PerkIcon perk={p} />
                       {mark}
-                    </span>
-                  );
-                return (
-                  <button
-                    key={k}
-                    type="button"
-                    title={label}
-                    aria-label={label}
-                    aria-pressed={picked}
-                    onClick={() => onChange(setPerk(owned, i, picked ? null : k))}
-                    className={cx(
-                      'relative rounded-md border p-0.5',
-                      picked ? 'border-gold-400 bg-gold-700/30' : 'border-ink-600 hover:border-gold-600',
-                    )}
-                  >
-                    <PerkIcon perk={p} />
-                    {mark}
-                  </button>
+                    </button>
+                  </Tip>
                 );
               })}
             </li>
@@ -199,14 +190,105 @@ function PerkGrid({ owned, weapon, onChange }: PerkGridProps) {
         })}
       </ol>
       <p className="mt-1 text-[11px] text-parchment-400">{t('weapons.gridHint')}</p>
-      <ul className="mt-1.5 grid gap-1" aria-label={t('weapons.legend')}>
-        {[...legend].map(([key, { perk, labels }]) => (
-          <li key={key} className="flex items-center gap-2 text-[11px] text-parchment-200">
-            <PerkIcon perk={perk} size={16} />
-            <span className="min-w-0">{labels.join(' · ')}</span>
-          </li>
-        ))}
-      </ul>
+    </div>
+  );
+}
+
+/** D52: dust reshapes as chips plus one compact "add" row (level, option, replaced perk). */
+function ShapeEditor({ owned, weapon, vocation, onChange }: { owned: OwnedWeapon; weapon: Weapon; vocation: Vocation; onChange: (o: OwnedWeapon) => void }) {
+  const t = useT();
+  const id = useId();
+  const shapes = useMemo(() => shapingOptions(vocation), [vocation]);
+  const original = levelOptions({ level: owned.level }, weapon);
+  const shaped = owned.shaped ?? [];
+  const free = original.map((_, i) => i + 1).filter((n) => !shaped.some((s) => s.level === n));
+  const [adding, setAdding] = useState(false);
+  const [level, setLevel] = useState(0);
+  const [option, setOption] = useState('');
+  const [replaces, setReplaces] = useState<number | null>(null);
+  if (!original.length) return null;
+  const L = free.includes(level) ? level : free[free.length - 1];
+  const levelOpts = L ? original[L - 1] : [];
+  const repl = replaces !== null && replaces < levelOpts.length ? replaces : levelOpts.length - 1;
+  const add = () => {
+    if (!L || !option) return;
+    onChange(setShaped(owned, L, option, repl));
+    setAdding(false);
+    setOption('');
+    setReplaces(null);
+  };
+  return (
+    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+      <span className="text-parchment-400">{t('weapons.shapes')}:</span>
+      {shaped.map((s) => {
+        const o = getShapingOption(s.option);
+        const label = `${t('weapons.levelN', { n: s.level })}: ${o ? shapingLabel(t, o, 10) : s.option}`;
+        return (
+          <span key={s.level} className="flex items-center gap-1 rounded-md border border-gold-700/60 bg-ink-900 py-0.5 pl-1 pr-0.5">
+            <Tip text={label} align="start">
+              <span className="flex items-center gap-1" tabIndex={0} aria-label={label}>
+                <span className="text-gold-300">✦{s.level}</span>
+                {o && <PerkIcon perk={o} size={16} />}
+              </span>
+            </Tip>
+            <button
+              type="button"
+              onClick={() => onChange(setShaped(owned, s.level, null))}
+              aria-label={t('weapons.shapeRemove', { n: s.level })}
+              className="rounded px-1 text-parchment-400 hover:text-resist"
+            >
+              ×
+            </button>
+          </span>
+        );
+      })}
+      {shaped.length < MAX_SHAPED && free.length > 0 && !adding && (
+        <button type="button" onClick={() => setAdding(true)} className="rounded-md border border-dashed border-ink-500 px-1.5 py-0.5 text-gold-400 hover:border-gold-600">
+          + ✦
+        </button>
+      )}
+      {shaped.length === 0 && !adding && <span className="text-parchment-500">{t('weapons.shapeNoneShort')}</span>}
+      {adding && (
+        <div className="flex w-full flex-wrap items-center gap-1.5">
+          <label htmlFor={`${id}-lvl`} className="sr-only">{t('weapons.level')}</label>
+          <select id={`${id}-lvl`} value={L} onChange={(e) => setLevel(Number(e.target.value))} className="field w-14 py-0.5 text-xs">
+            {free.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+          <label htmlFor={`${id}-opt`} className="sr-only">{t('weapons.shapes')}</label>
+          <select id={`${id}-opt`} value={option} onChange={(e) => setOption(e.target.value)} className="field min-w-0 flex-1 py-0.5 text-xs">
+            <option value="">{t('weapons.shapePick')}</option>
+            {shapes.map((o) => (
+              <option key={shapingId(o)} value={shapingId(o)}>{shapingLabel(t, o, 10)}</option>
+            ))}
+          </select>
+          {levelOpts.length > 1 && (
+            <span role="group" aria-label={t('weapons.shapeReplaces')} className="flex items-center gap-0.5">
+              <span className="text-parchment-400">{t('weapons.shapeReplaces')}:</span>
+              {levelOpts.map((p, k) => (
+                <Tip key={k} text={perkLabel(t, p)} align="end">
+                  <button
+                    type="button"
+                    aria-pressed={repl === k}
+                    aria-label={perkLabel(t, p)}
+                    onClick={() => setReplaces(k)}
+                    className={cx('rounded border p-px', repl === k ? 'border-gold-400' : 'border-transparent opacity-60 hover:opacity-100')}
+                  >
+                    <PerkIcon perk={p} size={16} />
+                  </button>
+                </Tip>
+              ))}
+            </span>
+          )}
+          <button type="button" disabled={!option} onClick={add} className="rounded-md bg-gold-700/40 px-2 py-0.5 text-parchment-50 disabled:opacity-40">
+            {t('weapons.shapeAdd')}
+          </button>
+          <button type="button" onClick={() => setAdding(false)} aria-label={t('common.hide')} className="px-1 text-parchment-400 hover:text-parchment-100">
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -223,11 +305,7 @@ function WeaponCard({ owned, vocation, meleeSkill, onChange, onRemove }: WeaponC
   const t = useT();
   const id = useId();
   const weapon = getWeapon(owned.weaponId);
-  const shapes = useMemo(() => shapingOptions(vocation), [vocation]);
   if (!weapon) return null;
-  const options = levelOptions(owned, weapon);
-  const original = levelOptions({ level: owned.level }, weapon);
-  const shaped = owned.shaped ?? [];
   return (
     <li className="rounded-xl border border-ink-600 bg-ink-950/50 p-3">
       <div className="mb-2 flex items-start gap-2">
@@ -238,88 +316,34 @@ function WeaponCard({ owned, vocation, meleeSkill, onChange, onRemove }: WeaponC
             <p className="text-[11px] text-resist">{t('weapons.otherSkill', { skill: t(`skill.${meleeSkill}`) })}</p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={onRemove}
-          aria-label={t('weapons.removeAria', { name: weapon.name })}
-          className="shrink-0 rounded-md px-2 py-1 text-xs text-resist hover:bg-resist/10"
-        >
-          {t('weapons.remove')}
-        </button>
-      </div>
-      <div className="mb-2 flex items-center gap-2">
-        <label htmlFor={`${id}-level`} className="text-xs text-parchment-300">
+        <label htmlFor={`${id}-level`} className="sr-only">
           {t('weapons.level')}
         </label>
         <select
           id={`${id}-level`}
           value={owned.level}
+          title={t('weapons.level')}
           onChange={(e) => onChange({ ...owned, level: Number(e.target.value) })}
-          className="field w-20 py-1 text-sm"
+          className="field w-16 shrink-0 py-0.5 text-xs"
         >
           {Array.from({ length: weapon.levels.length + 1 }, (_, n) => (
             <option key={n} value={n}>
-              {n}
+              {t('weapons.levelShort', { n })}
             </option>
           ))}
         </select>
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={t('weapons.removeAria', { name: weapon.name })}
+          title={t('weapons.remove')}
+          className="shrink-0 rounded-md px-1.5 py-0.5 text-sm text-resist hover:bg-resist/10"
+        >
+          ×
+        </button>
       </div>
       <PerkGrid owned={owned} weapon={weapon} onChange={onChange} />
-      {options.length > 0 && (
-        <details className="mt-2">
-          <summary className="cursor-pointer text-xs text-gold-400 hover:underline">
-            {t('weapons.shapes')} · {shaped.length}/{MAX_SHAPED}
-          </summary>
-          <p className="mt-1 text-[11px] text-parchment-400">{t('weapons.shapeLimit', { n: MAX_SHAPED })}</p>
-          <div className="mt-1 flex flex-col gap-2">
-            {original.map((level, i) => {
-              const shape = shaped.find((s) => s.level === i + 1);
-              const full = !shape && shaped.length >= MAX_SHAPED;
-              return (
-                <div key={i} className="grid gap-1">
-                  <label htmlFor={`${id}-shape-${i}`} className="text-[11px] text-parchment-400">
-                    {t('weapons.shape', { n: i + 1 })}
-                  </label>
-                  <select
-                    id={`${id}-shape-${i}`}
-                    value={shape?.option ?? ''}
-                    disabled={full}
-                    onChange={(e) => onChange(setShaped(owned, i + 1, e.target.value || null, shape?.replaces ?? level.length - 1))}
-                    className="field min-w-0 py-1 text-sm"
-                  >
-                    <option value="">{t('weapons.shapeNone')}</option>
-                    {shapes.map((o) => (
-                      <option key={shapingId(o)} value={shapingId(o)}>
-                        {shapingLabel(t, o, 10)}
-                      </option>
-                    ))}
-                  </select>
-                  {shape && level.length > 1 && (
-                    <div className="flex items-center gap-2">
-                      <label htmlFor={`${id}-repl-${i}`} className="shrink-0 text-[11px] text-parchment-400">
-                        {t('weapons.shapeReplaces')}
-                      </label>
-                      <select
-                        id={`${id}-repl-${i}`}
-                        value={shape.replaces}
-                        onChange={(e) => onChange(setShaped(owned, i + 1, shape.option, Number(e.target.value)))}
-                        className="field min-w-0 flex-1 py-1 text-xs"
-                      >
-                        {level.map((p, k) => (
-                          <option key={k} value={k}>
-                            {perkLabel(t, p)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                  {shape && !getShapingOption(shape.option) && <span className="text-[11px] text-resist">{shape.option}</span>}
-                </div>
-              );
-            })}
-          </div>
-        </details>
-      )}
+      <ShapeEditor owned={owned} weapon={weapon} vocation={vocation} onChange={onChange} />
     </li>
   );
 }
