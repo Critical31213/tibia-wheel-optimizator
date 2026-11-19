@@ -32,6 +32,10 @@ screens it is two columns (controls left, results right).
 | `src/hooks/usePersistentSpellPrefs.ts` | `rotationId` + `forcedSpells` per vocation (localStorage) mirrored to URL `r` / `fs`. |
 | `src/lib/spellPrefs.ts` | Spell-prefs sanitising + URL / JSON codec (tested). |
 | `src/components/GemsPanel.tsx` | Collapsible "My gems" editor in Lesser / Regular / Greater subsections (mods per slot, grade I–IV), empty-vessel highlight. |
+| `src/components/WeaponsPanel.tsx` | D47: collapsible "My weapons": weapon search (combobox, vocation's weapons with a known tree), per weapon proficiency level 0–n, perk per level (Auto / option; ✦ = reshaped slot) and dust reshapes (shaping option at rank 10 + replaced option, at most 2). |
+| `src/components/WeaponResultPanel.tsx` | D47: best weapon with its perks (picked / your choice), other owned weapons (difference), worthwhile reshapes, collapsible "better weapons you do not own" (opening it sets `suggestWeapons`). |
+| `src/hooks/usePersistentWeapons.ts` | D47: owned weapons + suggest flag per vocation in localStorage (not in the URL). |
+| `src/lib/weapons.ts` | D47: weapon prefs sanitising / codec, `setPerk`, `setShaped`, `perkLabel`, `shapingLabel` (tested). |
 | `src/components/GemIcon.tsx` | Diamond icon tinted by gem/vessel quality. |
 | `src/components/VesselsPanel.tsx` | Vessels, recommended gems per quality, best upgrades, collapsible spell usage. |
 | `src/lib/vessels.ts` | `emptyUnlockedByQuality`, `recommendationsByQuality`, `activeRevelationsByDomain` (tested). |
@@ -59,8 +63,10 @@ App
 ├─ FightContextPanel   value: FightContext, onChange(patch)
 ├─ PrioritySlider      value, onChange(priority)
 ├─ GemsPanel           vocation, gems, mods, emptyVessels (viewed build, per quality), onChange(updater)
+├─ WeaponsPanel        vocation, prefs: WeaponPrefs, onChange(updater)
 ├─ Panel › RotationPanel presets, spells (forceable), value: SpellPrefs, onChange(patch), usage = viewed build `rotation`
 ├─ Panel › WheelChart  wheel, result | null   (the *viewed* build: best or alternative)
+├─ Panel › WeaponResultPanel result.weapon, owned (weapons of the computed input), suggest, busy, onSuggestChange   (only with weapons)
 ├─ Panel › ResultsPanel wheel, result   (empty-state text when points = 0)
 ├─ Panel › ExportPanel  code = viewed build `plannerCode` (empty state when undefined)
 └─ Panel › VesselsPanel vocation, result, mods   (only when result != null)
@@ -88,7 +94,7 @@ Components never import `src/engine` / `src/data` directly — only `src/lib/api
    `monsters = resolveMonsters(entries, getMonsterById)`, `character = characterOf(inputs)` (only the vocation's skill
    fields; level falls back to `points + 50`; `undefined` when nothing entered) and `alternatives: 0`; `context = contextOf(inputs)` (`{ mode }` only),
    `rotationId` / `forcedSpells` from `usePersistentSpellPrefs(vocation)` (deferred; auto / none → `undefined`),
-   `gems` from `usePersistentGems(vocation)` (also deferred). `points = 0` → `result = null` → empty state.
+   `gems` from `usePersistentGems(vocation)` (also deferred), `weapons` / `suggestWeapons` from `usePersistentWeapons(vocation)` (deferred; none → `undefined`). `points = 0` → `result = null` → empty state.
 4. A local `view` index (0 = best, i = `result.alternatives[i-1]`) picks the *viewed* build (`BuildResult` =
    `Omit<OptimizerResult, 'alternatives'>`) shown by the wheel, summary, export and vessels panels; it falls back
    to 0 when the alternative disappears.
@@ -102,9 +108,10 @@ Components never import `src/engine` / `src/data` directly — only `src/lib/api
 | `wheel-optimizer:spells:v1:<vocation>` | localStorage | `{ rotationId, forcedSpells }` JSON, validated against the vocation's presets / forceable spells (max 8) |
 | `?r= &fs=` | URL query | rotation preset id (absent = auto), forced spells joined by `,`; a link with `v` but no `r`/`fs` = auto / none |
 | `wheel-optimizer:gems:v1:<vocation>` | localStorage | `OwnedGem[]` JSON, validated by `sanitizeGems` |
+| `wheel-optimizer:weapons:v1:<vocation>` | localStorage | `{ weapons: OwnedWeapon[], suggest }` JSON, validated by `sanitizeWeapon` |
 | `wheel-optimizer:lang:v1` | localStorage | `pl` / `en` |
 
-Gems are deliberately **not** in the URL (too long); a shared link carries every other input.
+Gems and weapons are deliberately **not** in the URL (too long); a shared link carries every other input.
 
 ## Character, hunting spot, alternatives, export (iteration 3)
 

@@ -12,11 +12,14 @@ import { ResultsPanel } from './components/ResultsPanel';
 import { RotationPanel } from './components/RotationPanel';
 import { VesselsPanel } from './components/VesselsPanel';
 import { VocationPicker } from './components/VocationPicker';
+import { WeaponResultPanel } from './components/WeaponResultPanel';
+import { WeaponsPanel } from './components/WeaponsPanel';
 import { WheelChart } from './components/WheelChart';
 import { usePersistentGems } from './hooks/usePersistentGems';
 import { gemFromRecommendation, setModGrade } from './lib/gems';
 import { usePersistentInputs } from './hooks/usePersistentInputs';
 import { usePersistentSpellPrefs } from './hooks/usePersistentSpellPrefs';
+import { usePersistentWeapons } from './hooks/usePersistentWeapons';
 import { useT } from './i18n';
 import { getForceableSpells, getMonsterById, getRotationPresets, getStanceOptions, getWheel, revelationOptions, useMonsterData } from './lib/api';
 import { stanceNames } from './lib/spellPrefs';
@@ -32,6 +35,8 @@ export default function App() {
   const [gems, setGems] = usePersistentGems(inputs.vocation);
   const [spellPrefs, updateSpellPrefs] = usePersistentSpellPrefs(inputs.vocation);
   const deferredPrefs = useDeferredValue(spellPrefs);
+  const [weaponPrefs, setWeaponPrefs] = usePersistentWeapons(inputs.vocation);
+  const deferredWeapons = useDeferredValue(weaponPrefs);
   const presets = useMemo(() => getRotationPresets(inputs.vocation), [inputs.vocation]);
   const forceable = useMemo(() => getForceableSpells(inputs.vocation), [inputs.vocation]);
   const stanceOptions = useMemo(() => getStanceOptions(inputs.vocation), [inputs.vocation]);
@@ -77,9 +82,11 @@ export default function App() {
             forcedStage2: forcedStage2.length ? forcedStage2 : undefined,
             forcedRevelations: forcedRevelations.length ? forcedRevelations : undefined,
             stances: stance === null ? undefined : stanceNames(stance),
+            weapons: deferredWeapons.weapons.length ? deferredWeapons.weapons : undefined,
+            suggestWeapons: deferredWeapons.weapons.length && deferredWeapons.suggest ? true : undefined,
           }
         : null,
-    [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, rotationId, forcedSpells, forcedStage2, forcedRevelations, stance],
+    [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, rotationId, forcedSpells, forcedStage2, forcedRevelations, stance, deferredWeapons],
   );
   const optimized = useOptimizer(request);
   // The shown build may lag the inputs while the worker computes; everything below follows its own vocation.
@@ -105,6 +112,7 @@ export default function App() {
           <FightContextPanel value={context} onChange={update} />
           <PrioritySlider value={inputs.priority} onChange={(priority) => update({ priority })} />
           <GemsPanel vocation={inputs.vocation} gems={gems} mods={wheel.mods} emptyVessels={emptyVessels} onChange={setGems} />
+          <WeaponsPanel key={inputs.vocation} vocation={inputs.vocation} prefs={weaponPrefs} onChange={setWeaponPrefs} />
         </div>
 
         <div className="flex flex-col gap-4">
@@ -129,6 +137,17 @@ export default function App() {
               stances={current ? shown?.stances : undefined}
             />
           </Panel>
+          {current && shown?.weapon && (
+            <Panel title={t('weaponResult.title')} headingId="weapon-result-heading">
+              <WeaponResultPanel
+                result={shown.weapon}
+                owned={optimized.input?.weapons ?? []}
+                suggest={weaponPrefs.suggest}
+                busy={optimized.busy}
+                onSuggestChange={(suggest) => setWeaponPrefs((p) => ({ ...p, suggest }))}
+              />
+            </Panel>
+          )}
           <Panel title={t('app.summaryTitle')} headingId="results-heading">
             <div aria-live="polite" aria-busy={optimized.busy} className={optimized.busy ? "opacity-70 transition-opacity" : "transition-opacity"}>
               {shown ? (

@@ -1,7 +1,7 @@
 # Weapon proficiency data (D45)
 
 Weapon proficiency: static data (D45), the perk model and the joint choice with the wheel (D46, see
-"Engine" below). The UI follows in a later stage.
+"Engine" below) and the UI (D47, see `docs/modules/ui.md`: `WeaponsPanel`, `WeaponResultPanel`).
 
 ## Import
 
