@@ -7,6 +7,7 @@ import data from './proficiency.json';
 import type { Perk, ShapingOption, Weapon } from './types';
 
 export type * from './types';
+export * from './ammo';
 
 export const WEAPONS: readonly Weapon[] = data.weapons;
 export const SHAPING_OPTIONS: readonly ShapingOption[] = data.shaping;

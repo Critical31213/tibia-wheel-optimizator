@@ -5,7 +5,7 @@
  */
 import type { CharacterStats, Element, OwnedWeapon, Vocation } from '../types';
 import { healingAverage, pierceDamageMod } from '../data/damage';
-import { getShapingOption, getWeapon, shapedPerk, type Perk, type ProficiencySkill, type Weapon } from '../data/proficiency';
+import { getShapingOption, getWeapon, shapedPerk, type Ammo, type Perk, type ProficiencySkill, type Weapon } from '../data/proficiency';
 import {
   AUTO_ATTACK_TARGETS,
   autoAttackHit,
@@ -47,6 +47,8 @@ export interface Loadout {
   weapon: Weapon;
   /** One perk per unlocked level. */
   perks: Perk[];
+  /** D51: ammunition of a bow / crossbow (else the PROF defaults). */
+  ammo?: Ammo;
 }
 
 const isMage = (v: Vocation) => v === 'sorcerer' || v === 'druid';
@@ -63,8 +65,9 @@ export function levelOptions(owned: Pick<OwnedWeapon, 'level' | 'shaped'>, weapo
   return out;
 }
 
-export function loadoutOf(weapon: Weapon, options: Perk[][], choice: readonly number[]): Loadout {
-  return { weapon, perks: options.map((o, i) => o[Math.min(o.length - 1, Math.max(0, choice[i] ?? 0))]) };
+export function loadoutOf(weapon: Weapon, options: Perk[][], choice: readonly number[], ammo?: Ammo): Loadout {
+  const perks = options.map((o, i) => o[Math.min(o.length - 1, Math.max(0, choice[i] ?? 0))]);
+  return ammo ? { weapon, perks, ammo } : { weapon, perks };
 }
 
 /** Owned weapon → weapon + its options (null for unknown weapons). */
@@ -102,8 +105,8 @@ export function loadoutAttack(vocation: Vocation, lo: Loadout): number | undefin
   if (isMage(vocation)) return undefined;
   const w = lo.weapon;
   const perk = sum(lo.perks, (p) => p.kind === 'attack');
-  if (w.type === 'bow') return (w.specials?.attack ?? 0) + PROF.ARROW_ATTACK + perk;
-  if (w.type === 'crossbow') return (w.specials?.attack ?? 0) + PROF.BOLT_ATTACK + perk;
+  if (w.type === 'bow') return (w.specials?.attack ?? 0) + (lo.ammo?.attack ?? PROF.ARROW_ATTACK) + perk;
+  if (w.type === 'crossbow') return (w.specials?.attack ?? 0) + (lo.ammo?.attack ?? PROF.BOLT_ATTACK) + perk;
   return (w.attack ?? 0) + (w.elementAttack?.value ?? 0) + perk;
 }
 
@@ -189,7 +192,12 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
   if (!isMage(model.vocation)) {
     const attack = loadoutAttack(model.vocation, lo) ?? 0;
     const physical = w.elementAttack ? attack - w.elementAttack.value : attack;
-    const autoMix = w.elementAttack && attack > 0
+    // Elemental ammunition turns the whole shot into its element.
+    const ammoElement = lo.ammo && lo.ammo.element !== 'physical' ? lo.ammo.element : null;
+    const autoElement = ammoElement ?? 'physical';
+    const autoMix = ammoElement
+      ? piercedOr(model, ammoElement, pierce(ammoElement))
+      : w.elementAttack && attack > 0
       ? (physical / attack) * piercedOr(model, 'physical', pierce('physical')) + (w.elementAttack.value / attack) * piercedOr(model, w.elementAttack.element, pierce(w.elementAttack.element))
       : piercedOr(model, 'physical', pierce('physical'));
     const range = perks.reduce((a, p) => a + (p.kind === 'rangeDamage' ? p.value : 0), 0) + (w.specials?.perfectShot?.value ?? 0);
@@ -197,8 +205,9 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
       autoAttackHit(model.vocation, c, attack) +
       perks.reduce((a, p) => a + (p.kind === 'autoSkillScaling' ? p.value * scalingSkill(c, p) : 0), 0) +
       range * PROF.RANGE_SHARE;
-    const targets = mode === 'boss' || (model.vocation === 'paladin' && w.type !== 'bow') ? 1 : AUTO_ATTACK_TARGETS[model.vocation];
-    const [pc, pd] = elemCrit('physical');
+    const area = model.vocation !== 'paladin' || (w.type === 'bow' && (lo.ammo?.area ?? true));
+    const targets = mode === 'boss' || !area ? 1 : AUTO_ATTACK_TARGETS[model.vocation];
+    const [pc, pd] = elemCrit(autoElement);
     const crit = critEV(
       critChance + pc + pp((p) => p.kind === 'autoCritChance'),
       critExtra + pd + pp((p) => p.kind === 'autoCritDamage'),

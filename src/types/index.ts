@@ -190,6 +190,8 @@ export interface RotationUsage {
   auto: boolean;
   /** Spells actually cast incl. revelation-unlocked ones and resolved element alternatives; share in %. */
   spells: { name: string; ratio: number; share: number; fromRevelation?: boolean }[];
+  /** D51: auto-attack share of the damage (%), not in `spells`. */
+  autoAttack?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -308,6 +310,9 @@ export interface SpellUsage {
  * monk: level, mainSkill (fist), magicLevel. Missing values are estimated
  * from level.
  */
+export type MeleeSkill = 'sword' | 'axe' | 'club';
+export const MELEE_SKILLS: readonly MeleeSkill[] = ['sword', 'axe', 'club'];
+
 export interface CharacterStats {
   level: number;
   mainSkill?: number;
@@ -353,6 +358,8 @@ export interface OptimizerInput {
   forcedRevelations?: ForcedRevelation[];
   /** D32: stance names chosen by the user ([] = none); undefined = engine picks per plan. */
   stances?: string[];
+  /** D51: knight's trained melee skill; weapons of the other types are skipped (undefined = all). */
+  meleeSkill?: MeleeSkill;
   /** D45: weapons the player owns; the engine picks the best one with its proficiency perks. */
   weapons?: OwnedWeapon[];
   /** D45: also look for better weapons the player does not own (slower). */
@@ -384,6 +391,8 @@ export interface WeaponPick {
   perks: number[];
   /** Objective difference vs the chosen weapon (0 for it; negative = worse). */
   delta: number;
+  /** D51: ammunition id (bows, crossbows). */
+  ammo?: string;
 }
 
 export interface WeaponReshape {

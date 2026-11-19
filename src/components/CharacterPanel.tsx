@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
+import { MELEE_SKILLS } from '../types';
 import type { Vocation } from '../types';
 import { MAX_SCROLL_POINTS, pointsForLevel } from '../lib/api';
 import { useT } from '../i18n';
@@ -6,9 +7,11 @@ import type { MessageKey } from '../i18n/en';
 import { MAX_LEVEL, MAX_SKILL, VOCATION_SKILLS } from '../lib/inputState';
 import type { InputState, SkillField } from '../lib/inputState';
 import { clamp, formatNumber } from '../lib/labels';
+import { cx } from '../lib/labels';
 import { Panel } from './Panel';
+import { PerkIcon } from './PerkIcon';
 
-type CharacterFields = Pick<InputState, 'points' | 'level' | 'scrolls' | SkillField>;
+type CharacterFields = Pick<InputState, 'points' | 'level' | 'scrolls' | 'meleeSkill' | SkillField>;
 
 interface CharacterPanelProps {
   vocation: Vocation;
@@ -31,6 +34,7 @@ function parseOptional(raw: string, min: number, max: number): number | null | u
 /** Character level (drives promotion points), scroll points, manual points override and per-vocation skills. */
 export function CharacterPanel({ vocation, value, max, onChange }: CharacterPanelProps) {
   const t = useT();
+  const skillId = useId();
   const [text, setText] = useState(String(value.points));
   const [synced, setSynced] = useState(value.points);
 
@@ -124,9 +128,32 @@ export function CharacterPanel({ vocation, value, max, onChange }: CharacterPane
         <legend className="mb-1 text-xs text-parchment-300">{t('character.skills')}</legend>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {VOCATION_SKILLS[vocation].map((field) => (
-            <label key={field} className="flex flex-col gap-1 text-xs text-parchment-300">
-              {t(skillLabel(vocation, field))}
+            <div key={field} className="flex flex-col gap-1 text-xs text-parchment-300">
+              <div className="flex items-center justify-between gap-1">
+                <label htmlFor={`${skillId}-${field}`}>{t(skillLabel(vocation, field))}</label>
+                {vocation === 'knight' && field === 'mainSkill' && (
+                  <div role="group" aria-label={t('character.meleeSkill')} className="flex gap-0.5">
+                    {MELEE_SKILLS.map((s) => {
+                      const on = value.meleeSkill === s;
+                      return (
+                        <button
+                          key={s}
+                          type="button"
+                          aria-pressed={on}
+                          title={`${t('character.meleeSkill')}: ${t(`skill.${s}`)}`}
+                          aria-label={t(`skill.${s}`)}
+                          onClick={() => onChange({ meleeSkill: on ? null : s })}
+                          className={cx('rounded border', on ? 'border-gold-400 bg-gold-700/30' : 'border-transparent opacity-60 hover:opacity-100')}
+                        >
+                          <PerkIcon perk={{ kind: 'skill', skill: s }} size={16} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
               <input
+                id={`${skillId}-${field}`}
                 type="number"
                 inputMode="numeric"
                 min={0}
@@ -140,10 +167,13 @@ export function CharacterPanel({ vocation, value, max, onChange }: CharacterPane
                 }}
                 className="field tabular-nums"
               />
-            </label>
+            </div>
           ))}
         </div>
-        <p className="mt-1 text-xs text-parchment-400">{t('character.autoHint')}</p>
+        <p className="mt-1 text-xs text-parchment-400">
+          {t('character.autoHint')}
+          {vocation === 'knight' && ` ${t('character.meleeSkillHint')}`}
+        </p>
       </fieldset>
     </Panel>
   );

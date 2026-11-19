@@ -16,7 +16,7 @@ screens it is two columns (controls left, results right).
 | `src/components/Panel.tsx` | Bordered section card with numbered heading. |
 | `src/components/VocationPicker.tsx` | 5 toggle cards, `radiogroup`. |
 | `src/components/VocationIcon.tsx` | Stroke icon per vocation. |
-| `src/components/CharacterPanel.tsx` | Level (→ points via `pointsForLevel`), scroll points, manual points override, per-vocation skills (empty = "auto"). |
+| `src/components/CharacterPanel.tsx` | Level (→ points via `pointsForLevel`), scroll points, manual points override, per-vocation skills (empty = "auto"); knights: sword / axe / club icon toggles next to the melee skill (D51, `meleeSkill`, other weapon types skipped). |
 | `src/components/MonsterSearch.tsx` | Hunting spot: debounced ARIA combobox adding monsters (max 10), weight per monster, remove; `MonsterCard` for one, weighted combined chips for several. |
 | `src/components/BuildSwitcher.tsx` | "Best build · Alt 1 · Alt 2" toggle + alternative label, trade-off, relative score. |
 | `src/components/ExportPanel.tsx` | Planner code of the viewed build: read-only field, Copy code / Copy planner link / Open planner. |
@@ -28,7 +28,7 @@ screens it is two columns (controls left, results right).
 | `src/components/ResultsPanel.tsx` | Scores, revelations, convictions, stats, rationale, fill order. |
 | `src/components/SegmentedControl.tsx` | Generic compact `radiogroup` (roving tabindex, arrows/Home/End, `disabled`). |
 | `src/components/FightContextPanel.tsx` | Hunt / Boss toggle (hunt style removed, D20); Avatar / single-target hints. |
-| `src/components/RotationPanel.tsx` | Rotation select (Auto + vocation presets, note / requirements), used rotation of the viewed build (share %, ★ = revelation spell, auto-picked), stance select (Auto / manual set, D32; prefs key `st`), stances of the viewed build (D24), two columns: forced spell augments (select + chips with stage I/II toggle, D35) and forced revelation stages (select per revelation; unreachable stages disabled with an RM gem / upgrade / out-of-reach note). Prefs keys `fs2`, `fr`. |
+| `src/components/RotationPanel.tsx` | Rotation select (Auto + vocation presets, note / requirements), used rotation of the viewed build (auto-attack share first (D51), then spells: share %, ★ = revelation spell, auto-picked), stance select (Auto / manual set, D32; prefs key `st`), stances of the viewed build (D24), two columns: forced spell augments (select + chips with stage I/II toggle, D35) and forced revelation stages (select per revelation; unreachable stages disabled with an RM gem / upgrade / out-of-reach note). Prefs keys `fs2`, `fr`. |
 | `src/hooks/usePersistentSpellPrefs.ts` | `rotationId` + `forcedSpells` per vocation (localStorage) mirrored to URL `r` / `fs`. |
 | `src/lib/spellPrefs.ts` | Spell-prefs sanitising + URL / JSON codec (tested). |
 | `src/components/GemsPanel.tsx` | Collapsible "My gems" editor in Lesser / Regular / Greater subsections (mods per slot, grade I–IV), empty-vessel highlight. |
@@ -105,7 +105,7 @@ Components never import `src/engine` / `src/data` directly — only `src/lib/api
 | Key | Where | Content |
 |-----|-------|---------|
 | `wheel-optimizer:inputs:v1` | localStorage | the whole `InputState` (legacy `monsterId` migrated) |
-| `?v= &p= &lv= &sc= &sk= &sh= &ml= &m= &prio= &f=` | URL query | same inputs (`lv` level, `sc` scrolls, `sk` main skill, `sh` shielding, `ml` magic level; `m` = `id[*weight]` joined by `_`, weight 1 omitted; `f` = hunt/boss; legacy `h` ignored); empty optional keys omitted |
+| `?v= &p= &lv= &sc= &sk= &sh= &ml= &ms= &m= &prio= &f=` | URL query | same inputs (`lv` level, `sc` scrolls, `sk` main skill, `sh` shielding, `ml` magic level, `ms` knight's melee skill sword/axe/club; `m` = `id[*weight]` joined by `_`, weight 1 omitted; `f` = hunt/boss; legacy `h` ignored); empty optional keys omitted |
 | `wheel-optimizer:spells:v1:<vocation>` | localStorage | `{ rotationId, forcedSpells }` JSON, validated against the vocation's presets / forceable spells (max 8) |
 | `?r= &fs=` | URL query | rotation preset id (absent = auto), forced spells joined by `,`; a link with `v` but no `r`/`fs` = auto / none |
 | `wheel-optimizer:gems:v1:<vocation>` | localStorage | `OwnedGem[]` JSON, validated by `sanitizeGems` |

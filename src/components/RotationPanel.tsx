@@ -99,6 +99,12 @@ export function RotationPanel({ presets, spells, stanceOptions, revelations, val
             </p>
           )}
           <ul className="mt-1 space-y-0.5">
+            {usage.autoAttack !== undefined && (
+              <li className="flex justify-between gap-2 text-xs">
+                <span className="italic text-parchment-200">{t('rotation.autoAttack')}</span>
+                <span className="tabular-nums text-parchment-300">{Math.round(usage.autoAttack)}%</span>
+              </li>
+            )}
             {usage.spells.map((s) => (
               <li key={s.name} className="flex justify-between gap-2 text-xs">
                 <span className="text-parchment-200">

@@ -1,6 +1,6 @@
 /** Serialisation of the user's inputs (URL query string + localStorage). Pure. */
-import { VOCATIONS } from '../types';
-import type { CharacterStats, FightContext, FightMode, Vocation } from '../types';
+import { MELEE_SKILLS, VOCATIONS } from '../types';
+import type { CharacterStats, FightContext, FightMode, MeleeSkill, Vocation } from '../types';
 import { clamp } from './labels';
 
 export interface MonsterEntry {
@@ -20,6 +20,8 @@ export interface InputState {
   mainSkill: number | null;
   shielding: number | null;
   magicLevel: number | null;
+  /** D51: knight's trained melee skill (null = any weapon type). */
+  meleeSkill: MeleeSkill | null;
   /** Hunting spot: monsters with relative weights (empty = generic build). */
   monsters: MonsterEntry[];
   priority: number;
@@ -36,6 +38,7 @@ export const DEFAULT_INPUTS: InputState = {
   mainSkill: null,
   shielding: null,
   magicLevel: null,
+  meleeSkill: null,
   monsters: [],
   priority: 50,
   mode: 'hunt',
@@ -116,6 +119,7 @@ export function sanitize(raw: Record<string, unknown>): Partial<InputState> {
     const v = optionalInt(raw, k, 0, MAX_SKILL);
     if (v !== undefined) out[k] = v;
   }
+  if (raw.meleeSkill === null || MELEE_SKILLS.includes(raw.meleeSkill as MeleeSkill)) out.meleeSkill = (raw.meleeSkill as MeleeSkill | null) ?? null;
   const monsters = sanitizeMonsters(raw.monsters);
   if (monsters) out.monsters = monsters;
   // Legacy (iteration 2) single monster.
@@ -151,6 +155,7 @@ const KEYS = {
   mainSkill: 'sk',
   shielding: 'sh',
   magicLevel: 'ml',
+  meleeSkill: 'ms',
   monsters: 'm',
   priority: 'prio',
   mode: 'f',
@@ -174,6 +179,7 @@ export function fromQuery(search: string): Partial<InputState> {
     mainSkill: opt('mainSkill'),
     shielding: opt('shielding'),
     magicLevel: opt('magicLevel'),
+    meleeSkill: opt('meleeSkill'),
     priority: get('priority'),
     monsters: m === undefined ? undefined : decodeMonsters(m),
     mode: get('mode'),
@@ -201,6 +207,7 @@ export function toQuery(state: InputState, search = ''): string {
   opt('mainSkill', state.mainSkill);
   opt('shielding', state.shielding);
   opt('magicLevel', state.magicLevel);
+  opt('meleeSkill', state.vocation === 'knight' ? state.meleeSkill : null);
   q.set(KEYS.priority, String(state.priority));
   q.set(KEYS.mode, state.mode);
   for (const k of LEGACY_KEYS) q.delete(k);

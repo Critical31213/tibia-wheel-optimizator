@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
-import type { OwnedWeapon, Vocation } from '../types';
+import type { MeleeSkill, OwnedWeapon, Vocation } from '../types';
 import { useT } from '../i18n';
 import { getShapingOption, getWeapon, iconKeys, levelOptions, searchWeapons, shapingId, shapingOptions, type Weapon, type WeaponPerk } from '../lib/api';
 import { cx } from '../lib/labels';
@@ -214,11 +214,12 @@ function PerkGrid({ owned, weapon, onChange }: PerkGridProps) {
 interface WeaponCardProps {
   owned: OwnedWeapon;
   vocation: Vocation;
+  meleeSkill: MeleeSkill | null;
   onChange: (o: OwnedWeapon) => void;
   onRemove: () => void;
 }
 
-function WeaponCard({ owned, vocation, onChange, onRemove }: WeaponCardProps) {
+function WeaponCard({ owned, vocation, meleeSkill, onChange, onRemove }: WeaponCardProps) {
   const t = useT();
   const id = useId();
   const weapon = getWeapon(owned.weaponId);
@@ -233,6 +234,9 @@ function WeaponCard({ owned, vocation, onChange, onRemove }: WeaponCardProps) {
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-parchment-100">{weapon.name}</p>
           <WeaponMeta weapon={weapon} />
+          {vocation === 'knight' && meleeSkill && weapon.type !== meleeSkill && (
+            <p className="text-[11px] text-resist">{t('weapons.otherSkill', { skill: t(`skill.${meleeSkill}`) })}</p>
+          )}
         </div>
         <button
           type="button"
@@ -322,12 +326,13 @@ function WeaponCard({ owned, vocation, onChange, onRemove }: WeaponCardProps) {
 
 interface WeaponsPanelProps {
   vocation: Vocation;
+  meleeSkill: MeleeSkill | null;
   prefs: WeaponPrefs;
   onChange: (update: (prefs: WeaponPrefs) => WeaponPrefs) => void;
 }
 
 /** D47: collapsible list of owned weapons with proficiency level, perk choices and dust reshapes. */
-export function WeaponsPanel({ vocation, prefs, onChange }: WeaponsPanelProps) {
+export function WeaponsPanel({ vocation, meleeSkill, prefs, onChange }: WeaponsPanelProps) {
   const t = useT();
   const bodyId = useId();
   const [open, setOpen] = useState(() => prefs.weapons.length > 0);
@@ -363,6 +368,7 @@ export function WeaponsPanel({ vocation, prefs, onChange }: WeaponsPanelProps) {
                 key={w.weaponId}
                 owned={w}
                 vocation={vocation}
+                meleeSkill={meleeSkill}
                 onChange={(next) => update((all) => all.map((x) => (x.weaponId === w.weaponId ? next : x)))}
                 onRemove={() => update((all) => all.filter((x) => x.weaponId !== w.weaponId))}
               />

@@ -129,6 +129,21 @@ describe('weapon choice in the optimizer (D45)', () => {
     expect(r.rotation?.spells.some((s) => s.name === 'Shield Slam')).toBe(false);
   });
 
+  it('picks ammunition: storm arrows vs physical immunity, crossbow with spectral bolts vs bosses (D51)', () => {
+    const weapons = ['grand-sanguine-bow', 'grand-sanguine-crossbow'].map((weaponId) => ({ weaponId, level: 7 }));
+    const run = (mode: 'hunt' | 'boss', id?: string) =>
+      runOptimizer(input({ vocation: 'paladin', context: { mode }, monster: id ? MONSTERS.find((m) => m.id === id)! : null, weapons })).weapon!.best;
+    expect(run('hunt', 'dragon-lord')).toMatchObject({ weaponId: 'grand-sanguine-bow', ammo: 'diamond-arrow' });
+    expect(run('hunt', 'burster-spectre')).toMatchObject({ weaponId: 'grand-sanguine-bow', ammo: 'firestorm-arrow' });
+    expect(run('boss')).toMatchObject({ weaponId: 'grand-sanguine-crossbow', ammo: 'spectral-bolt' });
+  });
+
+  it('skips knight weapons of another melee skill and reports the auto-attack share (D51)', () => {
+    const r = runOptimizer(input({ meleeSkill: 'axe', weapons: [{ weaponId: 'stellar-moonsilver-epee', level: 7 }, { weaponId: 'grand-sanguine-battleaxe', level: 7 }] }));
+    expect(r.weapon!.ranking.map((x) => x.weaponId)).toEqual(['grand-sanguine-battleaxe']);
+    expect(r.rotation!.autoAttack).toBeGreaterThan(0);
+  });
+
   it('stays fast', () => {
     const t = performance.now();
     runOptimizer(input({

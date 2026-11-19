@@ -76,6 +76,7 @@ export default function App() {
             context: { mode },
             gems: deferredGems,
             character,
+            meleeSkill: deferred.vocation === 'knight' ? (deferred.meleeSkill ?? undefined) : undefined,
             alternatives: 0,
             rotationId: rotationId ?? undefined,
             forcedSpells: forcedSpells.length ? forcedSpells : undefined,
@@ -86,7 +87,7 @@ export default function App() {
             suggestWeapons: deferredWeapons.weapons.length && deferredWeapons.suggest ? true : undefined,
           }
         : null,
-    [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, rotationId, forcedSpells, forcedStage2, forcedRevelations, stance, deferredWeapons],
+    [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, deferred.meleeSkill, rotationId, forcedSpells, forcedStage2, forcedRevelations, stance, deferredWeapons],
   );
   const optimized = useOptimizer(request);
   // The shown build may lag the inputs while the worker computes; everything below follows its own vocation.
@@ -112,7 +113,7 @@ export default function App() {
           <FightContextPanel value={context} onChange={update} />
           <PrioritySlider value={inputs.priority} onChange={(priority) => update({ priority })} />
           <GemsPanel vocation={inputs.vocation} gems={gems} mods={wheel.mods} emptyVessels={emptyVessels} onChange={setGems} />
-          <WeaponsPanel key={inputs.vocation} vocation={inputs.vocation} prefs={weaponPrefs} onChange={setWeaponPrefs} />
+          <WeaponsPanel key={inputs.vocation} vocation={inputs.vocation} meleeSkill={inputs.meleeSkill} prefs={weaponPrefs} onChange={setWeaponPrefs} />
         </div>
 
         <div className="flex flex-col gap-4">

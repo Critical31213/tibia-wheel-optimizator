@@ -2,7 +2,7 @@ import { useId } from 'react';
 import type { OwnedWeapon, WeaponPick, WeaponResult } from '../types';
 import type { TFunction } from '../i18n';
 import { useT } from '../i18n';
-import { getShapingOption, getWeapon, levelOptions } from '../lib/api';
+import { getAmmo, getShapingOption, getWeapon, levelOptions } from '../lib/api';
 import { formatNumber } from '../lib/labels';
 import { perkLabel, shapingLabel } from '../lib/weapons';
 import { PerkIcon } from './PerkIcon';
@@ -11,6 +11,11 @@ import { WeaponMeta } from './WeaponsPanel';
 /** Alpha strike only pays off when the player hits a fresh target first, i.e. playing solo. */
 const SoloNote = ({ kind, t }: { kind?: string; t: TFunction }) =>
   kind === 'alphaStrike' ? <span className="text-weak"> ({t('weaponResult.solo')})</span> : null;
+
+const AmmoNote = ({ pick, t }: { pick: WeaponPick; t: TFunction }) => {
+  const a = pick.ammo ? getAmmo(pick.ammo) : undefined;
+  return a ? <p className="text-xs text-parchment-300">{t('weaponResult.ammo', { name: a.name })}</p> : null;
+};
 
 const signed = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : '±'}${formatNumber(Math.abs(Math.round(n * 10) / 10))}`;
 
@@ -70,6 +75,7 @@ export function WeaponResultPanel({ result, owned, suggest, busy, onSuggestChang
           <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm font-medium text-gold-300">
             {best.name} <WeaponMeta weapon={best} />
           </p>
+          <AmmoNote pick={result.best} t={t} />
           <div className="mt-1">
             <PickPerks pick={result.best} owned={bestOwned} />
           </div>
@@ -82,7 +88,10 @@ export function WeaponResultPanel({ result, owned, suggest, busy, onSuggestChang
           <ul className="flex flex-col gap-1">
             {others.map((p) => (
               <li key={p.weaponId} className="flex items-baseline justify-between gap-2 text-sm">
-                <span className="min-w-0 truncate text-parchment-100">{getWeapon(p.weaponId)?.name ?? p.weaponId}</span>
+                <span className="min-w-0 truncate text-parchment-100">
+                  {getWeapon(p.weaponId)?.name ?? p.weaponId}
+                  {p.ammo && <span className="text-xs text-parchment-400"> · {getAmmo(p.ammo)?.name}</span>}
+                </span>
                 <span className="shrink-0 text-xs tabular-nums text-parchment-400">{t('weaponResult.delta', { delta: signed(p.delta) })}</span>
               </li>
             ))}
@@ -141,6 +150,7 @@ export function WeaponResultPanel({ result, owned, suggest, busy, onSuggestChang
                     <span className="text-xs tabular-nums text-weak">{t('weaponResult.gain', { gain: signed(p.delta) })}</span>
                   </p>
                   {w && <WeaponMeta weapon={w} />}
+                  <AmmoNote pick={p} t={t} />
                   <div className="mt-1">
                     <PickPerks pick={p} />
                   </div>

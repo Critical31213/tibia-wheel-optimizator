@@ -71,7 +71,7 @@ weapon can have at most two reshaped slots.
 | Perk | Effect |
 | --- | --- |
 | skill | main skill when it matches the weapon (knight: its type; paladin: distance; monk: fist), magic level, shielding (mitigation) |
-| attack, weapon attack | spell formulas and auto-attack (bow + Diamond Arrow 37, crossbow + Spectral Bolt 78, melee incl. element attack) |
+| attack, weapon attack | spell formulas and auto-attack (bow / crossbow + the picked ammunition, see below; melee incl. element attack) |
 | magicLevel | element magic level of spells; healing magic level → healing |
 | augment | base damage (boosted part), crit chance / extra damage, cooldown (s), life / mana leech × the spell's damage share, healing × heal share |
 | crit, element crit, auto crit | spell / auto-attack crit (pp) |
@@ -88,6 +88,14 @@ Rending Inferniarch weapons cannot take the critical hit (Strike) imbuement: the
 Powerful Strike crit (10 % chance, +50 % extra damage) from spells and auto-attack (user, D48). Siphoning
 Inferniarch weapons cannot take the life leech imbuement (−half of `K.LIFE_LEECH_IMBUE`, the weapon's item) and
 Draining ones not the mana leech one (−8 pp, Powerful Void) (user, D49).
+
+Ammunition (D51, `src/data/proficiency/ammo.ts`, tibiopedia arrow / bolt tables): bows choose between Diamond Arrow
+(37, physical, 5x5 area → `AUTO_ATTACK_TARGETS` while hunting) and the storm arrows (21, all damage fire / ice / earth /
+energy, single target as no area is listed), crossbows use Spectral Bolt (78); only ammunition usable at the character
+level. `rankWeapons` picks the ammunition with the best loadout score before and after the perk choice, so elemental
+arrows win only where they pay off (e.g. physical-immune monsters) and bosses end up with crossbow + Spectral Bolt.
+`WeaponPick.ammo` reports it. Knights: with `meleeSkill` set, weapons of the other melee types are skipped (owned and
+suggested). `RotationUsage.autoAttack` is the auto-attack share of the build's damage (it was already in the model).
 
 Not valued: defence, armor penetration, hit chance, on-hit / on-kill, rune crit, mage auto-attack (skipped). Skills
 are entered without weapon bonuses; the main skill is assumed for every weapon type of the vocation.

@@ -30,7 +30,7 @@ import type {
   WeaponReshape,
   WeaponResult,
 } from '../types';
-import { shapedPerk, shapingId, shapingOptions, weaponsFor, type Perk as ProfPerk, type Weapon } from '../data/proficiency';
+import { ammoFor, shapedPerk, shapingId, shapingOptions, weaponsFor, type Ammo, type Perk as ProfPerk, type Weapon } from '../data/proficiency';
 import { choosePerks, loadoutCharacter, loadoutOf, loadoutParts, ownedOptions, type Loadout } from './proficiency';
 import { encodePlannerCode, gridForSliceId, plannerVesselIssues, type PlannerVessel } from '../data/wheel/plannerCode';
 import { resolveCharacterStats } from '../data/character';
@@ -673,7 +673,8 @@ function rotationUsage(p: Prepared, stages: number[], alloc: ArrayLike<number>):
     });
   }
   spells.sort((a, b) => b.share - a.share || a.name.localeCompare(b.name));
-  return { presetId: v.model.plan.id, auto: p.auto, spells };
+  const autoAttack = round1((100 * v.model.base) / rot.total);
+  return { presetId: v.model.plan.id, auto: p.auto, spells, ...(autoAttack > 0 ? { autoAttack } : {}) };
 }
 
 type Msg = { msg: EngineMessage; text: string };
@@ -1516,7 +1517,7 @@ export function planSpecs(input: OptimizerInput): PlanSpec[] {
     if (owned.length && !fit.length) return chosen ? spec : null;
     if (!fit.length || !plain.v) return spec;
     // D45: weapons ranked with this plan's stances; the best two get their own stance pick.
-    const ranked = rankWeapons(fit, loadoutScorer(input, spec, blend, plain.v)).slice(0, WEAPON_FINALISTS);
+    const ranked = rankWeapons(fit, loadoutScorer(input, spec, blend, plain.v), mi.level).slice(0, WEAPON_FINALISTS);
     let best = { spec, score: -Infinity };
     for (const weapon of ranked) {
       const { stances, v } = pickStances(input, preset, reference, blend, choiceLoadout(weapon));
@@ -1686,6 +1687,8 @@ interface WeaponChoice {
   options: ProfPerk[][];
   /** Option index per unlocked level. */
   choice: number[];
+  /** D51: ammunition picked for bows / crossbows. */
+  ammo?: Ammo;
 }
 
 /** Weapons ranked with their own stance pick per plan. */
@@ -1700,7 +1703,10 @@ const SUGGEST_PRESCREEN = 10;
 /** Weapons that break on use (not suggested). */
 const NOT_SUGGESTED = new Set(['ice-rapier']);
 
-const choiceLoadout = (w: WeaponChoice): Loadout => loadoutOf(w.weapon, w.options, w.choice);
+const choiceLoadout = (w: WeaponChoice): Loadout => loadoutOf(w.weapon, w.options, w.choice, w.ammo);
+
+/** D51: a knight's weapons of another melee skill than the trained one are skipped. */
+const skillFits = (input: OptimizerInput, w: Weapon) => input.vocation !== 'knight' || !input.meleeSkill || w.type === input.meleeSkill;
 
 /** Two-handed weapons leave no hand for the shield a plan requires. */
 const fitsPlan = (w: Weapon, preset: RotationPreset | null | undefined) => !(preset?.requires?.shield && w.hands === 2);
@@ -1709,7 +1715,7 @@ function ownedChoices(input: OptimizerInput, preset?: RotationPreset | null): Om
   const out: Omit<WeaponChoice, 'choice'>[] = [];
   for (const owned of input.weapons ?? []) {
     const r = ownedOptions(owned);
-    if (r && r.weapon.vocations.includes(input.vocation) && fitsPlan(r.weapon, preset)) out.push({ owned, ...r });
+    if (r && r.weapon.vocations.includes(input.vocation) && skillFits(input, r.weapon) && fitsPlan(r.weapon, preset)) out.push({ owned, ...r });
   }
   return out;
 }
@@ -1734,12 +1740,27 @@ function loadoutScorer(input: OptimizerInput, spec: Pick<PlanSpec, 'preset' | 'r
   };
 }
 
-/** Weapons with their best perks (manual choices kept), best first. */
-function rankWeapons(cands: Omit<WeaponChoice, 'choice'>[], score: (lo: Loadout) => number): (WeaponChoice & { score: number })[] {
+type Candidate = Omit<WeaponChoice, 'choice' | 'ammo'>;
+
+/** D51: the best ammunition of a bow / crossbow at the character level for these perks (undefined otherwise). */
+function bestAmmo(c: Candidate, choice: readonly number[], score: (lo: Loadout) => number, level: number): Ammo | undefined {
+  let best: Ammo | undefined;
+  let top = -Infinity;
+  for (const a of ammoFor(c.weapon, level)) {
+    const s = score(loadoutOf(c.weapon, c.options, choice, a));
+    if (s > top + 1e-9) [best, top] = [a, s];
+  }
+  return best;
+}
+
+/** Weapons with their best perks (manual choices kept) and ammunition, best first. */
+function rankWeapons(cands: Candidate[], score: (lo: Loadout) => number, level: number): (WeaponChoice & { score: number })[] {
   return cands
     .map((c) => {
-      const choice = choosePerks(c.options, c.owned.perks ?? [], (ch) => score(loadoutOf(c.weapon, c.options, ch)));
-      return { ...c, choice, score: score(loadoutOf(c.weapon, c.options, choice)) };
+      const first = bestAmmo(c, (c.owned.perks ?? []).map((x) => x ?? 0), score, level);
+      const choice = choosePerks(c.options, c.owned.perks ?? [], (ch) => score(loadoutOf(c.weapon, c.options, ch, first)));
+      const ammo = bestAmmo(c, choice, score, level);
+      return { ...c, choice, ammo, score: score(loadoutOf(c.weapon, c.options, choice, ammo)) };
     })
     .sort((a, b) => b.score - a.score || a.weapon.id.localeCompare(b.weapon.id));
 }
@@ -1752,11 +1773,11 @@ function buildRotation(p: Prepared, st: State): RotationInput {
 
 const weaponScorer = (p: Prepared, st: State) => loadoutScorer(p.input, p.spec!, p.blend, p.v, buildRotation(p, st));
 
-const sameChoice = (a: WeaponChoice, b: WeaponChoice) => a.weapon.id === b.weapon.id && a.choice.join() === b.choice.join();
+const sameChoice = (a: WeaponChoice, b: WeaponChoice) => a.weapon.id === b.weapon.id && a.choice.join() === b.choice.join() && a.ammo?.id === b.ammo?.id;
 
 function rechooseWeapon(p: Prepared, main: State, checkPlan: boolean): { p: Prepared; main: State } | null {
   if (!p.weapon || !p.spec) return null;
-  const top = rankWeapons(ownedChoices(p.input, p.spec.preset), weaponScorer(p, main))[0];
+  const top = rankWeapons(ownedChoices(p.input, p.spec.preset), weaponScorer(p, main), p.v.level)[0];
   if (!top || sameChoice(top, p.weapon)) return null;
   const q = prepare(p.input, p.input.priority, undefined, { ...p.spec, v: undefined, weapon: top });
   const st = refine(q, searchPlan(q));
@@ -1764,14 +1785,14 @@ function rechooseWeapon(p: Prepared, main: State, checkPlan: boolean): { p: Prep
   return objective(q, st) > objective(p, main) + 1e-9 ? { p: q, main: st } : null;
 }
 
-const pick = (w: WeaponChoice, delta: number): WeaponPick => ({ weaponId: w.weapon.id, perks: [...w.choice], delta: round1(delta) });
+const pick = (w: WeaponChoice, delta: number): WeaponPick => ({ weaponId: w.weapon.id, perks: [...w.choice], delta: round1(delta), ...(w.ammo ? { ammo: w.ammo.id } : {}) });
 
 function weaponResult(p: Prepared, main: State): WeaponResult | undefined {
   const chosen = p.weapon;
   if (!chosen || !p.spec) return undefined;
   const score = weaponScorer(p, main);
   const base = score(choiceLoadout(chosen));
-  const others = rankWeapons(ownedChoices(p.input, p.spec.preset).filter((c) => c.owned !== chosen.owned), score);
+  const others = rankWeapons(ownedChoices(p.input, p.spec.preset).filter((c) => c.owned !== chosen.owned), score, p.v.level);
   const best = pick(chosen, 0);
   return {
     best,
@@ -1794,7 +1815,7 @@ function reshapes(p: Prepared, w: WeaponChoice, score: (lo: Loadout) => number, 
     const choice = w.choice.map((c, i) => (i === L ? 0 : c));
     for (const o of opts) {
       const options = w.options.map((x, i) => (i === L ? [shapedPerk(o)] : x));
-      const gain = score(loadoutOf(w.weapon, options, choice)) - base;
+      const gain = score(loadoutOf(w.weapon, options, choice, w.ammo)) - base;
       if (gain > MIN_WEAPON_GAIN) out.push({ level: L + 1, replaces, option: shapingId(o), gain: round1(gain) });
     }
   });
@@ -1806,14 +1827,14 @@ function reshapes(p: Prepared, w: WeaponChoice, score: (lo: Loadout) => number, 
 function suggestions(p: Prepared, score: (lo: Loadout) => number, base: number): WeaponPick[] {
   const owned = new Set((p.input.weapons ?? []).map((w) => w.weaponId));
   const cands = weaponsFor(p.input.vocation, p.v.level)
-    .filter((w) => !owned.has(w.id) && !NOT_SUGGESTED.has(w.id) && fitsPlan(w, p.spec?.preset))
+    .filter((w) => !owned.has(w.id) && !NOT_SUGGESTED.has(w.id) && skillFits(p.input, w) && fitsPlan(w, p.spec?.preset))
     .map((weapon) => ({ owned: { weaponId: weapon.id, level: weapon.levels.length }, weapon, options: weapon.levels }));
   const screened = cands
-    .map((c) => ({ c, s: score(loadoutOf(c.weapon, c.options, [])) }))
+    .map((c) => ({ c, s: score(loadoutOf(c.weapon, c.options, [], bestAmmo(c, [], score, p.v.level))) }))
     .sort((a, b) => b.s - a.s)
     .slice(0, SUGGEST_PRESCREEN)
     .map((x) => x.c);
-  return rankWeapons(screened, score)
+  return rankWeapons(screened, score, p.v.level)
     .filter((w) => w.score > base + MIN_WEAPON_GAIN)
     .slice(0, 3)
     .map((w) => pick(w, w.score - base));
