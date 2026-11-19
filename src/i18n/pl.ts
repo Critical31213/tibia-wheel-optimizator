@@ -52,12 +52,6 @@ export const pl: Dictionary = {
   'monster.full': 'Maksymalnie {max} potworów',
   'monster.combined': 'Całe miejsce (średnia ważona)',
 
-  'alts.title': 'Buildy',
-  'alts.label': 'Pokazany build',
-  'alts.best': 'Najlepszy build',
-  'alts.altN': 'Alt {n}',
-  'alts.score': 'wynik {score}% najlepszego',
-  'alts.bestHint': 'Build z najwyższym wynikiem. Alternatywy pokazują inne kompromisy.',
 
   'export.title': 'Eksport do plannera',
   'export.code': 'Kod plannera',

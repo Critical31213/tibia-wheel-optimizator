@@ -1,5 +1,4 @@
-import { useDeferredValue, useMemo, useState } from 'react';
-import { BuildSwitcher } from './components/BuildSwitcher';
+import { useDeferredValue, useMemo } from 'react';
 import { CharacterPanel } from './components/CharacterPanel';
 import { ExportPanel } from './components/ExportPanel';
 import { FightContextPanel } from './components/FightContextPanel';
@@ -38,7 +37,6 @@ export default function App() {
   const monstersReady = useMonsterData();
   const deferred = useDeferredValue(inputs);
   const deferredGems = useDeferredValue(gems);
-  const [view, setView] = useState(0);
 
   const wheel = useMemo(() => getWheel(inputs.vocation), [inputs.vocation]);
   const maxPoints = wheel.totalCapacity;
@@ -72,7 +70,7 @@ export default function App() {
             context: { mode },
             gems: deferredGems,
             character,
-            alternatives: 2,
+            alternatives: 0,
             rotationId: rotationId ?? undefined,
             forcedSpells: forcedSpells.length ? forcedSpells : undefined,
             forcedStage2: forcedStage2.length ? forcedStage2 : undefined,
@@ -83,9 +81,7 @@ export default function App() {
     [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, rotationId, forcedSpells, forcedStage2, forcedRevelations, stance],
   );
   const resultWheel = useMemo(() => getWheel(deferred.vocation), [deferred.vocation]);
-  const alternatives = result?.alternatives ?? [];
-  const viewIndex = view <= alternatives.length ? view : 0;
-  const shown: BuildResult | null = result && viewIndex > 0 ? alternatives[viewIndex - 1].result : result;
+  const shown: BuildResult | null = result;
   const emptyVessels = useMemo(
     () => (shown && deferred.vocation === inputs.vocation ? emptyUnlockedByQuality(shown.vessels) : null),
     [shown, deferred.vocation, inputs.vocation],
@@ -110,11 +106,6 @@ export default function App() {
         </div>
 
         <div className="flex flex-col gap-4">
-          {result && alternatives.length > 0 && (
-            <Panel title={t('alts.title')} headingId="alts-heading">
-              <BuildSwitcher alternatives={alternatives} value={viewIndex} onChange={setView} />
-            </Panel>
-          )}
           <Panel title={t('app.wheelTitle', { vocation: VOCATION_LABELS[deferred.vocation] })} headingId="wheel-heading">
             {gems.length === 0 && (
               <p role="note" className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">

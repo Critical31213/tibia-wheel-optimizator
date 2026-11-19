@@ -59,7 +59,6 @@ App
 ├─ FightContextPanel   value: FightContext, onChange(patch)
 ├─ PrioritySlider      value, onChange(priority)
 ├─ GemsPanel           vocation, gems, mods, emptyVessels (viewed build, per quality), onChange(updater)
-├─ Panel › BuildSwitcher alternatives, value (0 = best), onChange   (only when the engine returns alternatives)
 ├─ Panel › RotationPanel presets, spells (forceable), value: SpellPrefs, onChange(patch), usage = viewed build `rotation`
 ├─ Panel › WheelChart  wheel, result | null   (the *viewed* build: best or alternative)
 ├─ Panel › ResultsPanel wheel, result   (empty-state text when points = 0)
@@ -114,8 +113,7 @@ Gems are deliberately **not** in the URL (too long); a shared link carries every
 - **Hunting spot**: up to 10 monsters, weight 0.1–100 (default 1, one decimal). One monster → `MonsterCard`;
   several → weighted-average element chips (`combinedModifiers`) and damage types ordered by weight. Hunt mode shows
   "Single-target spells are ignored in hunt mode" (D16).
-- **Alternatives**: `BuildSwitcher` (SegmentedControl) appears only when `result.alternatives` is non-empty;
-  label / trade-off rendered with `engineText(labelMsg | tradeoffMsg, fallback)`, score as "% of best".
+- **Alternatives**: not shown (D36); the app asks the engine for none.
 - **Export**: `plannerUrl(code)` = `https://www.test.tibia.com/community/?subtopic=wheelofdestinyplanner&code=<encoded>`;
   copy result announced in a `role="status"` line; empty state when `plannerCode` is undefined.
 

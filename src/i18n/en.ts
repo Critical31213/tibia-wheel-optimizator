@@ -58,12 +58,6 @@ export const en = {
   'monster.full': 'Maximum {max} monsters',
   'monster.combined': 'Whole spot (weighted average)',
 
-  'alts.title': 'Builds',
-  'alts.label': 'Shown build',
-  'alts.best': 'Best build',
-  'alts.altN': 'Alt {n}',
-  'alts.score': 'score {score}% of best',
-  'alts.bestHint': 'The highest-scoring build. Alternatives show other trade-offs.',
 
   'export.title': 'Export to planner',
   'export.code': 'Planner code',

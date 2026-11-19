@@ -42,7 +42,7 @@ RUNTIME (static SPA)
         ──▶ src/App ── characterOf() → character, resolveMonsters() → monsters ──▶ src/lib/api.ts
   localStorage per vocation (gems) ──▶ │   OptimizerInput ▶ / ◀ OptimizerResult (+ alternatives, plannerCode)
                                        ▼
-   BuildSwitcher (best / alt n) → WheelChart, ResultsPanel, ExportPanel (lib/planner → plannerUrl), VesselsPanel
+   WheelChart, ResultsPanel, ExportPanel (lib/planner → plannerUrl), VesselsPanel
                  components ◀── src/i18n (PL/EN; engine.<key> for EngineMessage)
 ```
 
@@ -118,9 +118,8 @@ The UI reaches both modules only through `src/lib/api.ts`, which re-exports the 
 `src/data` with a dynamic `import()` (separate chunk; `useMonsterData()` signals readiness).
 
 Data flow: UI collects `OptimizerInput` (`characterOf(inputs)`, `resolveMonsters(inputs.monsters)`,
-`monster: null`, `alternatives: 2`, `rotationId` / `forcedSpells` from `usePersistentSpellPrefs`) → `optimize()` returns `OptimizerResult` (allocation per slice, fill
-path, activated perks, stat summary, rationale, vessels, `plannerCode`, `alternatives`) → `BuildSwitcher`
-selects the shown build (best or `alternatives[i].result`) → wheel, summary, export code and vessels render it.
+`monster: null`, `alternatives: 0` (D36), `rotationId` / `forcedSpells` from `usePersistentSpellPrefs`) → `optimize()` returns `OptimizerResult` (allocation per slice, fill
+path, activated perks, stat summary, rationale, vessels, `plannerCode`) → wheel, summary, export code and vessels render the best build.
 
 ## 5. Data integration (S1 Data)
 
