@@ -55,6 +55,7 @@ import {
   withRoom,
   round1,
   upgrades,
+  modSwaps,
   vesselAssignments,
 } from './gems';
 import { type EngineMessageKey, text } from './messages';
@@ -1499,6 +1500,7 @@ function assemble(p: Prepared, best: State): BuildResult {
     gemRecommendations: withRoom(env, vessels, recommendations(env)),
     // Fragment Workshop upgrades only once every unlocked vessel holds a gem.
     upgradeRecommendations: vessels.every((vs) => !vs.unlocked || vs.gem) ? upgrades(env, vessels) : [],
+    modSwaps: modSwaps(env, vessels),
     spells: spellUsages(v, stages, wheel),
     plannerCode: plannerCodeFor(input.vocation, allocation, vessels),
     rotation: rotationUsage(p, stages, best.alloc),

@@ -339,6 +339,10 @@ export const pl: Dictionary = {
   'upgrades.apply': 'Ulepsz',
   'upgrades.gems': 'gemów: {n}',
   'upgrades.toMax': 'do IV:',
+  'swaps.title': 'Wymiana modów w gemach',
+  'swaps.note': 'Najlepsza zamiana każdego modu w gemach w vesselach. Nowy mod ma stopień, jaki postać ma już na tym modzie (I, jeśli brak). Pokazany tylko zysk, bez kosztu wymiany.',
+  'swaps.none': 'Brak zamian z zyskiem.',
+  'swaps.apply': 'Wymień',
 
   'spells.title': 'Spelle w tym kontekście',
   'spells.targets': '~{n} celów',

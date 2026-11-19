@@ -14,6 +14,7 @@ import type {
   GemRecommendation,
   ModGrade,
   ModKind,
+  ModSwapRecommendation,
   OwnedGem,
   UpgradeRecommendation,
   VesselAssignment,
@@ -364,13 +365,7 @@ export function recommendations(env: GemEnv): GemRecommendation[] {
  * the stage with vs without its own points (valued on top of them it would look worthless and always replaceable).
  */
 function placedParts(env: GemEnv, gem: OwnedGem, vessel: GemQuality): Parts {
-  const ref = gem.supreme;
-  const m = ref && activeSlots(gem.quality, vessel).includes('supreme') ? findSupreme(env.wheel, ref.modId) : undefined;
-  const d = m?.category === 'revelationMastery' ? revelationIndex(env.wheel.revelations, m.revelation) : -1;
-  if (!m || !ref || d < 0) return gemParts(env, gem, vessel);
-  const x = m.values[ref.grade - 1] ?? 0;
-  const facts = { ...env.facts, revPoints: env.facts.revPoints.map((p, i) => (i === d ? p - x : p)) };
-  return gemParts({ ...env, facts }, gem, vessel);
+  return gemParts(withoutOwnRm(env, gem, vessel), gem, vessel);
 }
 
 export function withRoom(env: GemEnv, vessels: readonly VesselAssignment[], recs: GemRecommendation[]): GemRecommendation[] {
@@ -451,6 +446,56 @@ export function upgrades(env: GemEnv, vessels: VesselAssignment[]): UpgradeRecom
     });
   }
   return out.sort((a, b) => b.gain - a.gain || a.kind.localeCompare(b.kind) || a.modId - b.modId);
+}
+
+/** Env without the revelation points of `gem`'s own RM mod (D43), so its supreme slot is valued as with vs without. */
+function withoutOwnRm(env: GemEnv, gem: OwnedGem, vessel: GemQuality): GemEnv {
+  const ref = gem.supreme;
+  const m = ref && activeSlots(gem.quality, vessel).includes('supreme') ? findSupreme(env.wheel, ref.modId) : undefined;
+  const d = m?.category === 'revelationMastery' ? revelationIndex(env.wheel.revelations, m.revelation) : -1;
+  if (!m || !ref || d < 0) return env;
+  const x = m.values[ref.grade - 1] ?? 0;
+  return { ...env, facts: { ...env.facts, revPoints: env.facts.revPoints.map((p, i) => (i === d ? p - x : p)) } };
+}
+
+/**
+ * D71: per active slot of each placed owned gem, the best replacement mod (slot rules as for new gems, not the gem's
+ * other basic mod) at the character's grade on that mod. Gain only; the swap cost is not judged.
+ */
+export function modSwaps(env: GemEnv, vessels: readonly VesselAssignment[]): ModSwapRecommendation[] {
+  const out: ModSwapRecommendation[] = [];
+  for (const vs of vessels) {
+    const gem = vs.gem;
+    if (vs.source !== 'owned' || !gem || !vs.unlocked) continue;
+    const base = withoutOwnRm(env, gem, vs.quality);
+    const beforeParts = gemParts(base, gem, vs.quality);
+    const before = base.blend(beforeParts);
+    for (const slot of activeSlots(gem.quality, vs.quality)) {
+      const ref = gem[slot];
+      if (!ref) continue;
+      const other = slot === 'basic1' ? gem.basic2 : slot === 'basic2' ? gem.basic1 : null;
+      const ranked = slot === 'supreme' ? rankSupreme(base, NEW_GEM_GRADE) : rankBasic(base, slot === 'basic1' ? 1 : 2, NEW_GEM_GRADE);
+      const best = ranked.find((r) => r.id !== ref.modId && r.id !== other?.modId);
+      if (!best) continue;
+      const next: OwnedGem = { ...gem, [slot]: { modId: best.id, grade: best.grade as ModGrade } };
+      const afterParts = gemParts(base, next, vs.quality);
+      const gain = base.blend(afterParts) - before;
+      if (gain <= 0.005) continue;
+      const cur = slot === 'supreme' ? findSupreme(env.wheel, ref.modId) : findBasic(env.wheel, ref.modId);
+      out.push({
+        gemId: gem.id,
+        vesselId: vs.vesselId,
+        quality: gem.quality,
+        slot,
+        kind: kindOf(slot),
+        from: { modId: ref.modId, name: cur?.name ?? `#${ref.modId}`, grade: ref.grade },
+        to: { modId: best.id, name: best.name, grade: best.grade as ModGrade },
+        gain: Math.round(gain * 100) / 100,
+        effect: effectOf(env.v, sub(afterParts, beforeParts)),
+      });
+    }
+  }
+  return out.sort((a, b) => b.gain - a.gain || a.vesselId - b.vesselId);
 }
 
 /** Revelation points added by owned RM gems placed in active greater vessels, per domain. */

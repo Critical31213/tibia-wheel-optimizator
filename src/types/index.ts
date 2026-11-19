@@ -305,6 +305,19 @@ export interface UpgradeRecommendation {
   effectToMax?: GainEffect;
 }
 
+/** D71: replace one mod of a placed owned gem; the new mod has the character's grade on it (I when unknown). */
+export interface ModSwapRecommendation {
+  gemId: string;
+  vesselId: number;
+  quality: GemQuality;
+  slot: 'basic1' | 'basic2' | 'supreme';
+  kind: ModKind;
+  from: { modId: number; name: string; grade: ModGrade };
+  to: { modId: number; name: string; grade: ModGrade };
+  gain: number;
+  effect?: GainEffect;
+}
+
 /**
  * Translatable engine message: `key` is looked up in the UI i18n
  * dictionary (`engine.<key>`), `params` fill `{name}` placeholders.
@@ -503,6 +516,8 @@ export interface OptimizerResult {
   gemRecommendations: GemRecommendation[];
   /** Most valuable grade upgrades of owned gem mods, best first. */
   upgradeRecommendations: UpgradeRecommendation[];
+  /** D71: best mod swap per slot of each placed owned gem, best first. */
+  modSwaps: ModSwapRecommendation[];
   /** Spells considered and how useful they are in this context. */
   spells: SpellUsage[];
   /** Export code for the official Wheel of Destiny planner (incl. gems). */

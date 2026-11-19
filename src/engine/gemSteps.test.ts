@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { OwnedGem } from '../types';
+import { getWheelData } from '../data/wheel';
 import { optimize } from './index';
 
 const HUNT = { mode: 'hunt' } as const;
@@ -108,6 +109,38 @@ describe('D43: recommended gems have room and are used', () => {
         expect(after.vessels.some((v) => v.gem?.id === gem.id), `step ${step}: ${rec.mods.map((m) => m.name).join(' + ')}`).toBe(true);
       }
       gems = [...gems, gemOf(`s${step}`, r.gemRecommendations[0])];
+    }
+  });
+});
+
+describe('D71: gem mod swaps', () => {
+  const sorc = { vocation: 'sorcerer' as const, points: 4000, monster: null, priority: 50, context: HUNT, alternatives: 0 };
+  const drain = getWheelData('sorcerer').mods.basic.find((m) => m.slots.includes(2) && m.name === 'Mana Drain Resistance / Life Drain Resistance')!;
+
+  it('proposes the best mod for a weak slot, at the character grade on the new mod', () => {
+    const base = optimize(sorc);
+    const set = fullSet(base);
+    const i = set.findIndex((g) => g.quality === 'greater' && g.basic2);
+    const best = set[i].basic2!;
+    const weak = { ...set[i], id: 'weak', basic2: { modId: drain.id, grade: 2 as const } };
+    const r = optimize({ ...sorc, gems: [...set.filter((_, j) => j !== i), weak] });
+    const s = r.modSwaps.find((x) => x.gemId === 'weak' && x.slot === 'basic2')!;
+    expect(s.from).toMatchObject({ modId: drain.id, grade: 2 });
+    expect(s.to.modId).toBe(best.modId);
+    expect(s.gain).toBeGreaterThan(0);
+    expect(r.modSwaps.every((x) => x.gain > 0 && x.from.modId !== x.to.modId)).toBe(true);
+    expect(s.to.grade).toBe(1);
+    // An unplaced owned gem shows the best mod at grade III: the character has grade III on it.
+    const spare: OwnedGem = { id: 'spare', quality: 'regular', basic1: null, basic2: { ...best, grade: 3 }, supreme: null };
+    const graded = optimize({ ...sorc, gems: [...set.filter((_, j) => j !== i), weak, spare] });
+    const s3 = graded.modSwaps.find((x) => x.gemId === 'weak' && x.slot === 'basic2')!;
+    expect(s3.to).toMatchObject({ modId: best.modId, grade: 3 });
+    expect(s3.gain).toBeGreaterThan(s.gain);
+    // Never proposes the gem's other basic mod.
+    for (const x of r.modSwaps) {
+      const g = r.vessels.find((v) => v.gem?.id === x.gemId)!.gem!;
+      const other = x.slot === 'basic1' ? g.basic2 : x.slot === 'basic2' ? g.basic1 : null;
+      expect(x.to.modId).not.toBe(other?.modId);
     }
   });
 });

@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { GemQuality, GemRecommendation, ModDefinition, ModGrade, OwnedGem, UpgradeRecommendation, Vocation } from '../types';
+import type { GemQuality, GemRecommendation, ModDefinition, ModGrade, ModSwapRecommendation, OwnedGem, UpgradeRecommendation, Vocation } from '../types';
 import type { BuildResult } from '../lib/api';
 import { engineText, useT } from '../i18n';
 import { findMod, GEM_QUALITIES, slotKind, slotsForQuality } from '../lib/gems';
@@ -51,10 +51,12 @@ interface VesselsPanelProps {
   onAddGem?: (rec: GemRecommendation) => void;
   /** Applies a +1 grade upgrade to every gem with the mod (hidden when absent). */
   onUpgrade?: (u: UpgradeRecommendation) => void;
+  /** D71: replaces the mod in that gem (hidden when absent). */
+  onSwap?: (s: ModSwapRecommendation) => void;
 }
 
 /** Vessel placement, gem recommendations, upgrades and per-context spell usage. */
-export function VesselsPanel({ vocation, result, mods, onAddGem, onUpgrade }: VesselsPanelProps) {
+export function VesselsPanel({ vocation, result, mods, onAddGem, onUpgrade, onSwap }: VesselsPanelProps) {
   const t = useT();
   const spellsId = useId();
   const [spellsOpen, setSpellsOpen] = useState(false);
@@ -182,6 +184,35 @@ export function VesselsPanel({ vocation, result, mods, onAddGem, onUpgrade }: Ve
               {onUpgrade && (
                 <button type="button" onClick={() => onUpgrade(u)} className="rounded-md border border-gold-600 bg-gold-700/30 px-2 py-0.5 text-xs font-medium text-gold-300 hover:bg-gold-700/50 shrink-0">
                   {t('upgrades.apply')}
+                </button>
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+
+      <SubHeading>{t('swaps.title')}</SubHeading>
+      <p className="mb-1 text-xs text-parchment-400">{t('swaps.note')}</p>
+      {!result.modSwaps?.length ? (
+        <Empty>{t('swaps.none')}</Empty>
+      ) : (
+        <ol className="divide-y divide-ink-700 rounded-lg border border-ink-700">
+          {result.modSwaps.map((s) => (
+            <li key={`${s.gemId}-${s.slot}`} className="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-1.5 text-sm">
+              <GemIcon quality={s.quality} />
+              <span className="shrink-0 text-xs text-parchment-400">
+                {t('vessels.vesselN', { n: s.vesselId + 1 })} · {t(`slot.${s.slot}`)}
+              </span>
+              <span className="min-w-0 flex-1 text-parchment-200">
+                <span className="text-parchment-400 line-through">
+                  {s.from.name} {ROMAN[s.from.grade]}
+                </span>{' '}
+                → {s.to.name} <span className="text-gold-300">{ROMAN[s.to.grade]}</span>
+              </span>
+              <Gain effect={s.effect} score={s.gain} />
+              {onSwap && (
+                <button type="button" onClick={() => onSwap(s)} className="rounded-md border border-gold-600 bg-gold-700/30 px-2 py-0.5 text-xs font-medium text-gold-300 hover:bg-gold-700/50 shrink-0">
+                  {t('swaps.apply')}
                 </button>
               )}
             </li>

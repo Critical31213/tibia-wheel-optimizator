@@ -345,6 +345,10 @@ export const en = {
   'upgrades.apply': 'Upgrade',
   'upgrades.gems': 'gems: {n}',
   'upgrades.toMax': 'to IV:',
+  'swaps.title': 'Gem mod swaps',
+  'swaps.note': 'Best replacement for each mod of the gems in vessels. The new mod has the grade the character already has on it (I when none). Gain only; the swap cost is not included.',
+  'swaps.none': 'No swap with a gain.',
+  'swaps.apply': 'Swap',
 
   'spells.title': 'Spells in this context',
   'spells.targets': '~{n} targets',

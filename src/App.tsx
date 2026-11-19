@@ -17,7 +17,7 @@ import { WeaponResultPanel } from './components/WeaponResultPanel';
 import { WeaponsPanel } from './components/WeaponsPanel';
 import { WheelChart } from './components/WheelChart';
 import { usePersistentGems } from './hooks/usePersistentGems';
-import { gemFromRecommendation, setModGrade } from './lib/gems';
+import { gemFromRecommendation, setModGrade, updateGem } from './lib/gems';
 import { usePersistentInputs } from './hooks/usePersistentInputs';
 import { usePersistentSpellPrefs } from './hooks/usePersistentSpellPrefs';
 import { usePersistentWeapons } from './hooks/usePersistentWeapons';
@@ -177,6 +177,15 @@ export default function App() {
                 mods={resultWheel.mods}
                 onAddGem={current ? (rec) => setGems((all) => [...all, gemFromRecommendation(rec, all)]) : undefined}
                 onUpgrade={current ? (u) => setGems((all) => setModGrade(all, u.kind, u.modId, u.toGrade)) : undefined}
+                onSwap={
+                  current
+                    ? (s) =>
+                        setGems((all) => {
+                          const g = all.find((x) => x.id === s.gemId);
+                          return g ? updateGem(all, { ...g, [s.slot]: { modId: s.to.modId, grade: s.to.grade } }) : all;
+                        })
+                    : undefined
+                }
               />
             </Panel>
           )}
