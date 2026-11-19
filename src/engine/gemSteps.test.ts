@@ -89,3 +89,25 @@ describe('D34: augment pairs valued mostly at stage II', () => {
     expect(r.rotation?.spells[0].name).toBe('Strong Ethereal Spear');
   });
 });
+
+describe('D43: recommended gems have room and are used', () => {
+  it.each([
+    ['knight', 1000, 'boss'],
+    ['sorcerer', 1500, 'boss'],
+    ['paladin', 2500, 'hunt'],
+    ['druid', 2500, 'boss'],
+  ] as const)('%s %i %s: every recommendation, once owned, sits in a vessel (4 steps)', (vocation, points, mode) => {
+    const base = { vocation, points, monster: null, priority: 50, context: { mode }, alternatives: 0 } as const;
+    let gems: OwnedGem[] = [];
+    for (let step = 0; step < 4; step++) {
+      const r = optimize({ ...base, gems });
+      if (!r.gemRecommendations.length) break;
+      for (const [k, rec] of r.gemRecommendations.entries()) {
+        const gem = gemOf(`s${step}r${k}`, rec);
+        const after = optimize({ ...base, gems: [...gems, gem] });
+        expect(after.vessels.some((v) => v.gem?.id === gem.id), `step ${step}: ${rec.mods.map((m) => m.name).join(' + ')}`).toBe(true);
+      }
+      gems = [...gems, gemOf(`s${step}`, r.gemRecommendations[0])];
+    }
+  });
+});

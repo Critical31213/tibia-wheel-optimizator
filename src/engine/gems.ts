@@ -350,11 +350,25 @@ export function recommendations(env: GemEnv): GemRecommendation[] {
  * D30: a gem needs room. With every unlocked vessel of its quality filled, it only replaces the weakest gem there
  * (gain = difference; none → not recommended). Qualities without an unlocked vessel keep their recommendations.
  */
+/**
+ * D43: value of a gem already in a vessel. `env.facts` include placed RM gems' points, so an RM mod is valued as
+ * the stage with vs without its own points (valued on top of them it would look worthless and always replaceable).
+ */
+function placedValue(env: GemEnv, gem: OwnedGem, vessel: GemQuality): number {
+  const ref = gem.supreme;
+  const m = ref && activeSlots(gem.quality, vessel).includes('supreme') ? findSupreme(env.wheel, ref.modId) : undefined;
+  const d = m?.category === 'revelationMastery' ? revelationIndex(env.wheel.revelations, m.revelation) : -1;
+  if (!m || !ref || d < 0) return env.blend(gemParts(env, gem, vessel));
+  const x = m.values[ref.grade - 1] ?? 0;
+  const facts = { ...env.facts, revPoints: env.facts.revPoints.map((p, i) => (i === d ? p - x : p)) };
+  return env.blend(gemParts({ ...env, facts }, gem, vessel));
+}
+
 export function withRoom(env: GemEnv, vessels: readonly VesselAssignment[], recs: GemRecommendation[]): GemRecommendation[] {
   return recs.flatMap((r) => {
     const same = vessels.filter((vs) => vs.unlocked && vs.quality === r.quality);
     if (!same.length || same.some((vs) => !vs.gem)) return [r];
-    const placed = same.flatMap((vs) => (vs.gem ? [env.blend(gemParts(env, vs.gem, vs.quality))] : []));
+    const placed = same.flatMap((vs) => (vs.gem ? [placedValue(env, vs.gem, vs.quality)] : []));
     const gain = placed.length ? round1(r.gain - Math.min(...placed)) : 0;
     return gain > 0 ? [{ ...r, gain, replaces: true }] : [];
   });

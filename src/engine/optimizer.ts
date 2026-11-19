@@ -1516,6 +1516,21 @@ export function runOptimizer(raw: OptimizerInput): OptimizerResult {
   return result;
 }
 
+const RM_PROBE_ID = 'rm-probe';
+
+/** D43: vessels of state `st` holding the owned gems of `p` (as in `assemble`, without the RM re-placement). */
+function vesselsAt(p: Prepared, st: State): { env: GemEnv; vessels: VesselAssignment[] } {
+  const { wheel, v, blend, gems } = p;
+  const unlocked = Math.min(wheel.definition.vessels.length, wheel.vesselTiles.filter((i) => isFull(wheel, st.alloc, i)).length);
+  const gridRev = DOMAIN_ORDER.map((_, d) => st.domainPts[d] + RM_SLICE_POINTS * st.rmFull[d]);
+  const effects = wheelEffectsFor(wheel, st.alloc);
+  const env: GemEnv = { v, wheel, blend, facts: factsFor(gridRev, effects), grades: modGrades(gems) };
+  const vessels = vesselAssignments(env, unlocked, placeGems(env, gems, unlocked));
+  // Same facts as the shown build: placed RM gems' points included (placedValue subtracts them per gem).
+  const rm = placedRmPoints(env, vessels);
+  return { env: { ...env, facts: factsFor(gridRev.map((x, d) => x + rm[d]), effects) }, vessels };
+}
+
 /**
  * Revelation Mastery gems are valued by re-optimizing the wheel with the gem owned (grade I, in a greater
  * vessel): the gain covers a new stage as well as points freed for other slices. Light searches keep it cheap;
@@ -1533,7 +1548,7 @@ function withRmReoptimized(input: OptimizerInput, p: Prepared, main: State, recs
   const out = [...rest];
   const grades = modGrades(p.gems);
   const probe = (supreme: GemModRef | null) => {
-    const gem: OwnedGem = { id: 'rm-probe', quality: 'greater', basic1: basic(0), basic2: basic(1), supreme };
+    const gem: OwnedGem = { id: RM_PROBE_ID, quality: 'greater', basic1: basic(0), basic2: basic(1), supreme };
     const gems = [...p.gems, gem];
     // Same rotation plan and valuation; only the owned gems (vessel values, RM offsets) change.
     const q: Prepared = { ...prepare({ ...input, gems }, input.priority, p), gemRm: ownedRmOffsets(p.wheel, gems) };
@@ -1542,6 +1557,7 @@ function withRmReoptimized(input: OptimizerInput, p: Prepared, main: State, recs
   const basicsGain = recs.find((r) => r.quality === 'regular')?.gain ?? 0;
   const plain = probe(null);
   const plainObj = objective(plain.p, plain.main);
+  const mainObj = objective(p, main);
   const before = gridStages(p, main);
   for (const m of p.wheel.supremeMods) {
     if (m.category !== 'revelationMastery') continue;
@@ -1553,12 +1569,24 @@ function withRmReoptimized(input: OptimizerInput, p: Prepared, main: State, recs
     const obj = objective(hypo.p, hypo.main);
     // RM value = the same greater gem with vs without the mod (both re-optimized); basics as valued statically.
     const rmGain = obj - plainObj;
-    if (rmGain <= 0.05) continue;
+    // D43: the re-optimized wheel with the gem must also beat the build the player has now.
+    if (rmGain <= 0.05 || obj <= mainObj + 0.05) continue;
     const gain = basicsGain + rmGain;
     const stage = gridStages(hypo.p, hypo.main)[d];
     const revelation = m.revelation ?? '';
     const msg = stage > before[d] ? text('gem.rmReopt', { revelation, stage }) : text('gem.rmReoptFree', { revelation });
-    out.push({
+    // D43: the D30 room rule, checked on the re-optimized wheel (it may unlock a new greater vessel for the gem).
+    let st = hypo.main;
+    const unlockedGreater = (vs: VesselAssignment[]) => vs.filter((x) => x.unlocked && x.quality === 'greater').length;
+    if (unlockedGreater(vesselsAt(p, st).vessels) > unlockedGreater(vesselsAt(p, main).vessels)) {
+      // Room only from a vessel the light probe unlocked: confirm with a full search.
+      st = searchPlan(hypo.p);
+      if (objective(hypo.p, st) <= mainObj + 0.05) continue;
+    }
+    // Gem placement must actually put the new gem in a vessel (else it would sit unused).
+    if (!vesselsAt(hypo.p, st).vessels.some((x) => x.gem?.id === RM_PROBE_ID)) continue;
+    const room = vesselsAt(p, st);
+    out.push(...withRoom(room.env, room.vessels, [{
       quality: 'greater',
       mods: [
         ...(greater?.mods.filter((x) => x.kind === 'basic') ?? []),
@@ -1568,7 +1596,7 @@ function withRmReoptimized(input: OptimizerInput, p: Prepared, main: State, recs
       reason: msg.text,
       reasonMsg: msg.msg,
       similar: [],
-    });
+    }]));
   }
   return out.sort((a, b) => b.gain - a.gain);
 }
