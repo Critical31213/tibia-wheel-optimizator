@@ -541,9 +541,35 @@ function presetRotation(model: SpellModel, r: RotationInput): RotationResult {
     alts.sort((a, b) => b.perCast - a.perCast || a.s.name.localeCompare(b.s.name));
     items.push({ ...c, cap: alts.reduce((x, a) => x + a.cap, 0), ratio: e.ratio, alts });
   }
-  items.sort((a, b) => a.cap / a.ratio - b.cap / b.ratio || a.s.name.localeCompare(b.s.name));
-  let ratioSum = items.reduce((a, x) => a + x.ratio, 0);
-  for (const c of items) {
+  const spenders = items.filter((c) => HARMONY_SPENDERS.has(c.s.name));
+  const builders = items.filter((c) => !HARMONY_SPENDERS.has(c.s.name));
+  if (!spenders.length || !builders.length) {
+    total += waterFill(items, left, rates);
+    return { total, rates };
+  }
+  // D68: a Harmony spender needs HARMONY_BUILDERS builder casts before it; turns a builder's cooldown frees go to builders.
+  const ratioS = spenders.reduce((a, x) => a + x.ratio, 0);
+  const ratioB = builders.reduce((a, x) => a + x.ratio, 0);
+  const slot = Math.min(spenders.reduce((a, x) => a + x.cap, 0), (left * ratioS) / (ratioS + ratioB));
+  const probe = new Map<string, { rate: number; perCast: number }>();
+  waterFill(builders, left - slot, probe);
+  const built = [...probe.values()].reduce((a, x) => a + x.rate, 0);
+  const spend = Math.min(slot, built / HARMONY_BUILDERS);
+  total += waterFill(builders, left - spend, rates);
+  total += waterFill(spenders, spend, rates);
+  return { total, rates };
+}
+
+/** Builder casts needed before each Harmony spender. */
+export const HARMONY_BUILDERS = 5;
+
+/** Water-fill `budget` turns over `items` in their ratios, each within its cap; slot spells best per cast first. Returns damage. */
+function waterFill(items: (Cand & { ratio: number; alts: Cand[] })[], budget: number, rates: Map<string, { rate: number; perCast: number }>): number {
+  const sorted = [...items].sort((a, b) => a.cap / a.ratio - b.cap / b.ratio || a.s.name.localeCompare(b.s.name));
+  let left = budget;
+  let total = 0;
+  let ratioSum = sorted.reduce((a, x) => a + x.ratio, 0);
+  for (const c of sorted) {
     const rate = Math.max(0, Math.min(c.cap, (left * c.ratio) / ratioSum));
     left -= rate;
     ratioSum -= c.ratio;
@@ -556,7 +582,7 @@ function presetRotation(model: SpellModel, r: RotationInput): RotationResult {
       rates.set(a.s.name, { rate: x, perCast: a.perCast });
     }
   }
-  return { total, rates };
+  return total;
 }
 
 /** Rotation of the model's plan: preset schedule, or greedy (highest damage per cast first, capped at 1 / cooldown). */

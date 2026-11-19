@@ -35,3 +35,14 @@ describe('D67: rotation damage window', () => {
     expect(Math.abs(spells.reduce((a, s) => a + s.damage!.total, 0) + w.autoAttack - w.total)).toBeLessThanOrEqual(spells.length + 1);
   });
 });
+
+describe('D68: five builders before each spender', () => {
+  it.each(['em-voh', 'em-voh-so', 'em-voj', 'em-tfb', 'em-tfb-so'])('%s: builder casts = 5 × spender casts, turns all used', (id) => {
+    const r = optimize({ vocation: 'monk', points: 1000, monster: null, priority: 0, context: { mode: 'hunt' }, alternatives: 0, rotationId: id });
+    const spells = r.rotation!.spells;
+    const spend = spells.filter((s) => s.name === 'Sweeping Takedown' || s.name === 'Spiritual Outburst').reduce((a, s) => a + s.ratio, 0);
+    const build = spells.filter((s) => s.name !== 'Sweeping Takedown' && s.name !== 'Spiritual Outburst').reduce((a, s) => a + s.ratio, 0);
+    expect(build).toBeCloseTo(5 * spend, 0);
+    expect(build + spend).toBeCloseTo(30, 0);
+  });
+});
