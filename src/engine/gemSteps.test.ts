@@ -81,3 +81,11 @@ describe('D30: recommendations need a free vessel', () => {
     expect(free.gemRecommendations.some((g) => g.replaces)).toBe(false);
   });
 });
+
+describe('D34: augment pairs valued mostly at stage II', () => {
+  it('boss paladin takes both Strong Ethereal Spear augments at a low budget', () => {
+    const r = optimize({ vocation: 'paladin', points: 600, monster: null, priority: 0, context: { mode: 'boss' }, character: { level: 800 }, alternatives: 0 });
+    expect(r.convictions.filter((c) => c.name.startsWith('Augmented Strong Ethereal Spear'))).toHaveLength(2);
+    expect(r.rotation?.spells[0].name).toBe('Strong Ethereal Spear');
+  });
+});

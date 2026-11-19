@@ -50,6 +50,7 @@ Roles:
 | D31 | 2026-11-19 | Life leech from wheel nodes, augments and supreme mods is valued by the D29 model: +1 pp = leech EHP / imbuement leech (knight/paladin/monk 50, sorcerer/druid 25). Without gems, leech nodes on the path are now taken when worth it. A notice by the wheel says gems are missing and can change the build a lot. Mana leech unchanged. | User: check whether leech nodes pay off without gems; suggest adding gems. |
 | D32 | 2026-11-19 | Manual stance: Auto or a fixed stance set (incl. none) in the rotation panel; stored per vocation with the rotation prefs (localStorage, URL `st`). A manual stance applies to every plan, also over a preset's own stance. | User request. |
 | D33 | 2026-11-19 | Monster weight up to 99 999 (step 1, wider field), so a weight can be kills per hour. | User request. |
+| D34 | 2026-11-19 | Augment pairs whose value is mostly in stage II (e.g. Strong Ethereal Spear: I −2 s cooldown, II +380 % base damage) get up to 2 extra searches per plan, seeded with the cheapest paths to both slices; the best valid objective wins. The beam valued the first slice by stage I only and missed far pairs (boss paladin 600–800 pts: offense 25 → 56). | User: boss paladin should take 2× Strong Ethereal Spear (SES > Ethereal Barrage > Divine Barrage/Caldera). |
 
 ---
 

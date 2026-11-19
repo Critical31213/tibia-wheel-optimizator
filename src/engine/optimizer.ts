@@ -906,12 +906,39 @@ interface ForcedInfo {
   noAugment: string[];
 }
 
-/** Cheapest unlock path (Dijkstra over slice capacities) to an augment slice of each forced spell. */
-function forcedSeed(wheel: EngineWheel, spells: readonly string[], budget: number): ForcedInfo {
-  const out: ForcedInfo = { seed: [], taken: [], impossible: [], noAugment: [] };
+/** Cheapest unlock path (Dijkstra over slice capacities, filled slices free) to one of `targets`; new slices only. */
+function cheapestPath(wheel: EngineWheel, full: ReadonlySet<number>, targets: readonly number[]): { cost: number; path: number[] } | null {
   const n = wheel.slices.length;
   const next: number[][] = wheel.slices.map(() => []);
   wheel.slices.forEach((s) => s.unlockedBy.forEach((j) => next[j].push(s.idx)));
+  const cost = (i: number) => (full.has(i) ? 0 : wheel.slices[i].capacity);
+  const dist = new Array<number>(n).fill(Infinity);
+  const prev = new Array<number>(n).fill(-1);
+  const done = new Array<boolean>(n).fill(false);
+  wheel.slices.forEach((s) => s.initiallyUnlocked && (dist[s.idx] = cost(s.idx)));
+  for (;;) {
+    let u = -1;
+    for (let i = 0; i < n; i++) if (!done[i] && dist[i] < Infinity && (u < 0 || dist[i] < dist[u])) u = i;
+    if (u < 0) break;
+    done[u] = true;
+    for (const j of next[u]) {
+      const d = dist[u] + cost(j);
+      if (d < dist[j]) {
+        dist[j] = d;
+        prev[j] = u;
+      }
+    }
+  }
+  const target = targets.reduce((a, b) => (dist[b] < dist[a] ? b : a));
+  if (!(dist[target] < Infinity)) return null;
+  const path: number[] = [];
+  for (let i = target; i >= 0; i = prev[i]) if (!full.has(i)) path.unshift(i);
+  return { cost: dist[target], path };
+}
+
+/** Cheapest unlock path to an augment slice of each forced spell. */
+function forcedSeed(wheel: EngineWheel, spells: readonly string[], budget: number): ForcedInfo {
+  const out: ForcedInfo = { seed: [], taken: [], impossible: [], noAugment: [] };
   const full = new Set<number>();
   let used = 0;
   for (const spell of [...new Set(spells)]) {
@@ -924,37 +951,34 @@ function forcedSeed(wheel: EngineWheel, spells: readonly string[], budget: numbe
       out.taken.push(spell);
       continue;
     }
-    const cost = (i: number) => (full.has(i) ? 0 : wheel.slices[i].capacity);
-    const dist = new Array<number>(n).fill(Infinity);
-    const prev = new Array<number>(n).fill(-1);
-    const done = new Array<boolean>(n).fill(false);
-    wheel.slices.forEach((s) => s.initiallyUnlocked && (dist[s.idx] = cost(s.idx)));
-    for (;;) {
-      let u = -1;
-      for (let i = 0; i < n; i++) if (!done[i] && dist[i] < Infinity && (u < 0 || dist[i] < dist[u])) u = i;
-      if (u < 0) break;
-      done[u] = true;
-      for (const j of next[u]) {
-        const d = dist[u] + cost(j);
-        if (d < dist[j]) {
-          dist[j] = d;
-          prev[j] = u;
-        }
-      }
-    }
-    const target = targets.reduce((a, b) => (dist[b] < dist[a] ? b : a));
-    if (!(dist[target] < Infinity) || used + dist[target] > budget) {
+    const p = cheapestPath(wheel, full, targets);
+    if (!p || used + p.cost > budget) {
       out.impossible.push(spell);
       continue;
     }
-    const path: number[] = [];
-    for (let i = target; i >= 0; i = prev[i]) if (!full.has(i)) path.unshift(i);
-    path.forEach((i) => full.add(i));
-    out.seed.push(...path);
-    used += dist[target];
+    p.path.forEach((i) => full.add(i));
+    out.seed.push(...p.path);
+    used += p.cost;
     out.taken.push(spell);
   }
   return out;
+}
+
+/** Seed: `base` plus the cheapest paths to both slices of an augment pair; null when over budget. */
+function pairSeed(wheel: EngineWheel, base: readonly number[], pair: readonly [number, number], budget: number): number[] | null {
+  const full = new Set(base);
+  const seed = [...base];
+  let used = base.reduce((a, i) => a + wheel.slices[i].capacity, 0);
+  for (let k = 0; k < 2; k++) {
+    const left = pair.filter((i) => !full.has(i));
+    if (!left.length) break;
+    const p = cheapestPath(wheel, full, left);
+    if (!p || used + p.cost > budget) return null;
+    p.path.forEach((i) => full.add(i));
+    seed.push(...p.path);
+    used += p.cost;
+  }
+  return seed;
 }
 
 interface Prepared {
@@ -1027,10 +1051,46 @@ const runSearch = (p: Prepared, tables = p.tables, opts = FULL_SEARCH) => search
 const GATED_BOOST = 10;
 
 /**
- * Search for one rotation plan. A plan gated on a revelation (D20) whose search misses that revelation gets a
- * second (full) run with the revelation boosted, so it is judged on a valid build; the better valid state wins.
+ * Search for one rotation plan, plus seeded searches for stage-II augment pairs (D34); the best valid state wins.
  */
 function searchPlan(p: Prepared, opts = FULL_SEARCH): State {
+  let st = searchGated(p, opts);
+  let obj = planValid(p, gridStages(p, st)) ? objective(p, st) : -Infinity;
+  for (const pair of pairTries(p, st)) {
+    const seed = pairSeed(p.wheel, p.forced.seed, pair, p.budget);
+    if (!seed) continue;
+    const alt = searchGated({ ...p, forced: { ...p.forced, seed } }, opts);
+    const o = planValid(p, gridStages(p, alt)) ? objective(p, alt) : -Infinity;
+    if (o > obj + 1e-9) {
+      st = alt;
+      obj = o;
+    }
+  }
+  return st;
+}
+
+/** D34: tries per plan for augment pairs whose value is mostly in stage II. */
+const PAIR_TRIES = 2;
+
+/**
+ * D34: augment pairs worth more as a pair than as two singles (stage II ≫ stage I), not both in `st`. The beam
+ * values the first slice by stage I only, so it rarely walks to two far slices; these get a seeded search.
+ */
+function pairTries(p: Prepared, st: State): [number, number][] {
+  const { wheel, tables: t } = p;
+  return wheel.slices
+    .filter((sl) => sl.kind === 'augment' && sl.twin > sl.idx && !(isFull(wheel, st.alloc, sl.idx) && isFull(wheel, st.alloc, sl.twin)))
+    .filter((sl) => t.aug2[sl.twin] > Math.max(0, t.aug1[sl.idx]))
+    .sort((a, b) => t.aug2[b.twin] - t.aug2[a.twin])
+    .slice(0, PAIR_TRIES)
+    .map((sl): [number, number] => [sl.idx, sl.twin]);
+}
+
+/**
+ * A plan gated on a revelation (D20) whose search misses that revelation gets a second (full) run with the
+ * revelation boosted, so it is judged on a valid build.
+ */
+function searchGated(p: Prepared, opts: SearchOpts): State {
   const st = runSearch(p, p.tables, opts);
   const d = revelationIndex(p.wheel.revelations, p.v.model.plan.requires);
   if (d < 0 || planValid(p, gridStages(p, st))) return st;

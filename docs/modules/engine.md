@@ -47,6 +47,7 @@ src/engine/
 - **Vessels.** There are 8 vessels, numbered with a **0-based** `vesselId` in planner order (lesser, regular, greater, lesser, greater, regular, greater, greater). Vessel *n* (0-based) unlocks when *n + 1* Gem Vessel slices are full, in any domain.
 - **Gems and slots.** A lesser gem has `basic1`. A regular gem has `basic1` and `basic2`. A greater gem has both basics and `supreme`.
   - D28: a gem fits only a vessel of its own quality (lesser → lesser, regular → regular, greater → greater); then all its slots are active (`fits`, `activeSlots`). Placement gives mismatched pairs weight 0.
+  - D34: `searchPlan` adds seeded searches (`pairTries`, `pairSeed`, `cheapestPath`) for the top 2 augment pairs with stage II > stage I that the plain search did not fill.
   - D31: life leech (nodes, augments, supreme mods) per +1 pp = `leech / threat × 100 / LIFE_LEECH_IMBUE[vocation]` (`leechPoint`).
   - D32: `input.stances` (names, `[]` = none) replaces the automatic stance pick in `pickStances`.
   - D30: `withRoom`: with every unlocked vessel of a quality filled, a recommendation of that quality becomes a replacement of the weakest placed gem (`replaces`, gain = difference) or is dropped. Qualities without an unlocked vessel keep their recommendations.
