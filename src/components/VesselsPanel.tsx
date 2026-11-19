@@ -1,6 +1,6 @@
 import { useId, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { GemRecommendation, ModDefinition, ModGrade, OwnedGem, UpgradeRecommendation, Vocation } from '../types';
+import type { GemQuality, GemRecommendation, ModDefinition, ModGrade, OwnedGem, UpgradeRecommendation, Vocation } from '../types';
 import type { BuildResult } from '../lib/api';
 import { engineText, useT } from '../i18n';
 import { findMod, GEM_QUALITIES, slotKind, slotsForQuality } from '../lib/gems';
@@ -59,6 +59,13 @@ export function VesselsPanel({ vocation, result, mods, onAddGem, onUpgrade }: Ve
   const t = useT();
   const spellsId = useId();
   const [spellsOpen, setSpellsOpen] = useState(false);
+  const [closed, setClosed] = useState<ReadonlySet<GemQuality>>(new Set());
+  const toggle = (q: GemQuality) =>
+    setClosed((s) => {
+      const n = new Set(s);
+      if (!n.delete(q)) n.add(q);
+      return n;
+    });
   const recs = useMemo(() => recommendationsByQuality(result.gemRecommendations), [result.gemRecommendations]);
 
   return (
@@ -104,11 +111,20 @@ export function VesselsPanel({ vocation, result, mods, onAddGem, onUpgrade }: Ve
       <div className="flex flex-col gap-3">
         {GEM_QUALITIES.map((q) => (
           <section key={q} aria-label={gemName(vocation, q)}>
-            <h4 className="mb-1 flex items-center gap-2 text-sm font-medium text-parchment-100">
-              <GemIcon quality={q} />
-              {gemName(vocation, q)}
+            <h4 className="mb-1">
+              <button
+                type="button"
+                aria-expanded={!closed.has(q)}
+                onClick={() => toggle(q)}
+                className="flex w-full items-center gap-2 text-left text-sm font-medium text-parchment-100 hover:text-gold-300"
+              >
+                <span aria-hidden="true" className="w-3 text-xs text-parchment-400">{closed.has(q) ? '▸' : '▾'}</span>
+                <GemIcon quality={q} />
+                <span className="min-w-0 flex-1 truncate">{gemName(vocation, q)}</span>
+                <span className="text-xs font-normal text-parchment-400">{recs[q].length}</span>
+              </button>
             </h4>
-            {recs[q].length === 0 ? (
+            {closed.has(q) ? null : recs[q].length === 0 ? (
               <p className="text-sm text-parchment-400">—</p>
             ) : (
               <ol className="space-y-2">
@@ -127,6 +143,7 @@ export function VesselsPanel({ vocation, result, mods, onAddGem, onUpgrade }: Ve
                         </button>
                       )}
                     </div>
+                    {r.replaces && <p className="mt-1 text-xs text-amber-300">{t('recs.replaces')}</p>}
                     {r.reason && <p className="mt-1 text-xs text-parchment-400">{engineText(t, r.reasonMsg, r.reason)}</p>}
                     {!!r.similar?.length && (
                       <p className="mt-1 text-xs text-parchment-300">

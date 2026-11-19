@@ -346,6 +346,20 @@ export function recommendations(env: GemEnv): GemRecommendation[] {
     .sort((a, b) => b.gain - a.gain || QUALITY_RANK[b.quality] - QUALITY_RANK[a.quality]);
 }
 
+/**
+ * D30: a gem needs room. With every unlocked vessel of its quality filled, it only replaces the weakest gem there
+ * (gain = difference; none → not recommended). Qualities without an unlocked vessel keep their recommendations.
+ */
+export function withRoom(env: GemEnv, vessels: readonly VesselAssignment[], recs: GemRecommendation[]): GemRecommendation[] {
+  return recs.flatMap((r) => {
+    const same = vessels.filter((vs) => vs.unlocked && vs.quality === r.quality);
+    if (!same.length || same.some((vs) => !vs.gem)) return [r];
+    const placed = same.flatMap((vs) => (vs.gem ? [env.blend(gemParts(env, vs.gem, vs.quality))] : []));
+    const gain = placed.length ? round1(r.gain - Math.min(...placed)) : 0;
+    return gain > 0 ? [{ ...r, gain, replaces: true }] : [];
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Vessels + upgrades
 

@@ -190,6 +190,7 @@ export const pl: Dictionary = {
   'recs.gain': 'Zysk {gain}',
   'recs.similar': 'Prawie równie dobre zamienniki:',
   'recs.add': 'Dodaj do moich gemów',
+  'recs.replaces': 'Wszystkie vessele tej wielkości są zajęte: zastępuje najsłabszy gem (zysk względem niego).',
 
   'upgrades.title': 'Najlepsze ulepszenia',
   'upgrades.none': 'Brak ulepszeń do zaproponowania — dodaj swoje gemy powyżej.',

@@ -112,7 +112,7 @@ export const HEAL_SHARE: Record<string, number> = {
 export const TEAM_HEALS = new Set(['Heal Friend', 'Mass Healing', 'Mass Spirit Mend']);
 
 /** Auto-attack targets while hunting: avg hit ≈ level term + 0.5 × 0.085 × skill × attack; paladin diamond arrows hit an area. */
-const AUTO_ATTACK_TARGETS: Record<Vocation, number> = { knight: 1, paladin: 3, sorcerer: 1, druid: 1, monk: 1 };
+export const AUTO_ATTACK_TARGETS: Record<Vocation, number> = { knight: 1, paladin: 3, sorcerer: 1, druid: 1, monk: 1 };
 
 interface HitPart {
   /** Raw hit without bonuses. */

@@ -196,6 +196,7 @@ export const en = {
   'recs.gain': 'Gain {gain}',
   'recs.similar': 'Near-equal substitutes:',
   'recs.add': 'Add to my gems',
+  'recs.replaces': 'All vessels of this size are full: replaces your weakest one (gain vs that gem).',
 
   'upgrades.title': 'Best upgrades',
   'upgrades.none': 'No upgrades to suggest — add your gems above.',

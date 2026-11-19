@@ -54,8 +54,10 @@ describe('D27: shared mod grades, cooldown gems in a full rotation', () => {
     expect(up[0].fromGrade).toBe(3);
     expect(up[0].gems).toBeGreaterThan(1);
     // A recommended gem carries the character's grade.
-    const again = r.gemRecommendations.find((g) => g.quality === 'greater')!;
-    const hpRec = again.mods.find((m) => m.kind === 'basic' && m.modId === hp.modId);
+    // D30: greater vessels are full, so a greater recommendation only replaces the weakest gem.
+    const again = r.gemRecommendations.find((g) => g.quality === 'greater');
+    if (again) expect(again.replaces).toBe(true);
+    const hpRec = again?.mods.find((m) => m.kind === 'basic' && m.modId === hp.modId);
     if (hpRec) expect(hpRec.grade).toBe(3);
   });
 
@@ -63,5 +65,19 @@ describe('D27: shared mod grades, cooldown gems in a full rotation', () => {
     const r = optimize({ vocation: 'sorcerer', points: 950, monster: null, priority: 0, character: { level: 1000 }, alternatives: 0 });
     expect(r.rotation?.presetId).toBe('ms-echo-gdb');
     expect(r.gemRecommendations.some((g) => g.mods.some((m) => m.kind === 'supreme' && m.name === 'Augmented Energy Wave' && /cooldown/i.test(g.reason)))).toBe(false);
+  });
+});
+
+describe('D30: recommendations need a free vessel', () => {
+  it('with every vessel of a quality holding the recommended gem, the same gem is not recommended again', () => {
+    const sorc = { vocation: 'sorcerer' as const, points: 4000, monster: null, priority: 50, context: HUNT, alternatives: 0 };
+    const r = optimize({ ...sorc, gems: fullSet(optimize(sorc)) });
+    expect(r.vessels.every((v) => !v.unlocked || v.gem)).toBe(true);
+    for (const g of r.gemRecommendations) {
+      expect(g.replaces).toBe(true);
+      expect(g.gain).toBeGreaterThan(0);
+    }
+    const free = optimize(sorc);
+    expect(free.gemRecommendations.some((g) => g.replaces)).toBe(false);
   });
 });

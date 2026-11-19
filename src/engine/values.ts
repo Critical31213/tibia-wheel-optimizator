@@ -11,7 +11,9 @@ import {
   cooldownGain,
   damageShare,
   deltaOff,
+  healPerCast,
   healShare,
+  HEAL_SHARE,
   NO_MODS,
   NO_STAGES,
   type RotationInput,
@@ -19,7 +21,12 @@ import {
   type SpellMods,
   spellCooldown,
   spotElementMultiplier,
+  AUTO_ATTACK_TARGETS,
+  rotation,
+  targetsAt,
+  TEAM_HEALS,
 } from './spells';
+import { TURN_SECONDS } from '../data/damage';
 import { MOMENTUM_PER_GRADE, REVELATION_FLAT_BONUS, stageFor, type EngineRevelation } from './wheel/build';
 
 export interface Parts {
@@ -35,6 +42,8 @@ export const K = {
   HEAL_EHP: 0.5,
   /** Leech is strongly devalued (D14). Per +1 % leech. */
   LIFE_LEECH_DEF: 0.15,
+  /** D29: imbuement life leech % (EK/RP/MS: 2× Powerful Vampirism; ED/monk: sometimes, so half). */
+  LIFE_LEECH_IMBUE: { knight: 50, paladin: 50, sorcerer: 50, druid: 25, monk: 25 } as Record<Vocation, number>,
   MANA_LEECH_OFF: 0.1,
   MANA_LEECH_DEF: 0.05,
   MANA_COST_UTIL: 0.05,
@@ -78,6 +87,8 @@ export interface ValuationContext {
   level: number;
   /** Uniform defense multiplier from monster max damage. */
   threat: number;
+  /** D29: % EHP per +1 % damage (life leech). */
+  leech: number;
   /** Base max HP / mana at the level. */
   hp: number;
   mana: number;
@@ -103,6 +114,30 @@ export function add(a: Parts, b: Parts, k = 1): Parts {
 
 export function sub(a: Parts, b: Parts): Parts {
   return add(a, b, -1);
+}
+
+/**
+ * D29: % EHP per +1 % damage via imbuement life leech. Leech per hit (Canary calculateLeechAmount) =
+ * damage × leech × (0.1n + 0.9) / n for n targets; its share of sustain vs the main heal cast every turn × HEAL_EHP.
+ */
+export function leechEhp(model: SpellModel, threat: number): number {
+  const f = (n: number) => (0.1 * Math.max(1, n) + 0.9) / Math.max(1, n);
+  const r = rotation(model, { stages: NO_STAGES });
+  let dmg = model.base * f(model.context.mode === 'boss' ? 1 : AUTO_ATTACK_TARGETS[model.vocation]);
+  for (const [name, x] of r.rates) {
+    const s = model.spells.get(name);
+    if (s) dmg += x.rate * x.perCast * f(targetsAt(model, s, 0));
+  }
+  const leech = (dmg * K.LIFE_LEECH_IMBUE[model.vocation]) / 100 / TURN_SECONDS;
+  let heal = 0;
+  let best = -1;
+  for (const s of model.spells.values()) {
+    const sh = HEAL_SHARE[s.name] ?? 0.2;
+    if (s.kind !== 'healing' || TEAM_HEALS.has(s.name) || sh <= best) continue;
+    best = sh;
+    heal = healPerCast(model, s.name) / TURN_SECONDS;
+  }
+  return leech > 0 ? (leech / (leech + heal)) * K.HEAL_EHP * threat : 0;
 }
 
 /** threat = clamp(maxDamage / 1000, 0.6, 1.6); 1 when unknown. */
@@ -442,7 +477,8 @@ function passiveRevelation(v: ValuationContext, name: string, stage: number): Pa
   const th = v.threat;
   switch (name) {
     case 'Gift of Life':
-      return { off: 0, def: stageVal([3, 4.5, 6], stage) * th * (v.context.mode === 'boss' ? 1.3 : 1), util: 0 };
+      // D29: halved while hunting (one death save per cooldown matters less than in a boss fight).
+      return { off: 0, def: stageVal([3, 4.5, 6], stage) * th * (v.context.mode === 'boss' ? 1.3 : 0.5), util: 0 };
     case 'Combat Mastery':
       return { off: 0, def: stageVal([2, 2.4, 2.8], stage) * th, util: 0 };
     case 'Divine Empowerment': {

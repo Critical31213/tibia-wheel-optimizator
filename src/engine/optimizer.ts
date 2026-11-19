@@ -41,6 +41,7 @@ import {
   placedRmPoints,
   placeGems,
   recommendations,
+  withRoom,
   round1,
   upgrades,
   vesselAssignments,
@@ -72,6 +73,7 @@ import {
   hpParts,
   incomingShares,
   K,
+  leechEhp,
   mitigationParts,
   type Parts,
   parseEffects,
@@ -124,10 +126,13 @@ export interface Weights {
   util: number;
 }
 
-export function weightsFor(priority: number): Weights {
+/** `leech` = % EHP per +1 % damage (D29: life leech sustain), added to the offense weight. */
+export function weightsFor(priority: number, leech = 0): Weights {
   const p = clampPriority(priority) / 100;
-  return { off: Math.max(MIN_WEIGHT, 1 - p), def: Math.max(MIN_WEIGHT, p), util: UTIL_WEIGHT };
+  const def = Math.max(MIN_WEIGHT, p);
+  return { off: Math.max(MIN_WEIGHT, 1 - p) + def * leech, def, util: UTIL_WEIGHT };
 }
+
 
 const clampPriority = (p: number) => Math.min(100, Math.max(0, Number.isFinite(p) ? p : 50));
 
@@ -881,6 +886,7 @@ export function valuationFor(
     level,
     threat,
     ...facts,
+    leech: leechEhp(model, threat),
     stanceDef: stanceDefense(model, mi0.character, stances, K.HEAL_EHP) * threat,
     incoming: incomingShares(monsters),
     skillOff: Math.max(0, skillOff),
@@ -982,7 +988,7 @@ function prepare(input: OptimizerInput, priority = input.priority, base?: Prepar
   const v = base?.v ?? spec?.v ?? valuationFor(input, spec?.preset ?? null, spec?.reference, spec?.stances);
   const budget = Math.min(wheel.definition.totalCapacity, pointsOf(input));
   const gems = input.gems ?? [];
-  const blend = blendWith(weightsFor(priority));
+  const blend = blendWith(weightsFor(priority, v.leech));
   // Pre-search owned-gem estimate (D23: no recommended gems): revelation spells at the stage ~60 % of the budget reaches; RM gems are handled by gemRm.
   const assumed = stageFor(Math.min(1000, Math.round(budget * 0.6)));
   const preEnv: GemEnv = { v, wheel, blend, facts: factsFor([1e9, 1e9, 1e9, 1e9], new Map(), [assumed, assumed, assumed, assumed]) };
@@ -1078,7 +1084,7 @@ function assemble(p: Prepared, best: State): BuildResult {
     rationale: why.map((x) => x.text),
     rationaleMsgs: why.map((x) => x.msg),
     vessels,
-    gemRecommendations: recommendations(env),
+    gemRecommendations: withRoom(env, vessels, recommendations(env)),
     // Fragment Workshop upgrades only once every unlocked vessel holds a gem.
     upgradeRecommendations: vessels.every((vs) => !vs.unlocked || vs.gem) ? upgrades(env, vessels) : [],
     spells: spellUsages(v, stages, wheel),
@@ -1258,12 +1264,13 @@ export function planSpecs(input: OptimizerInput): PlanSpec[] {
   const all = getRotationPresets(input.vocation);
   const autoPlans: (RotationPreset | null)[] = [...all, ...(boss || !all.length ? [null] : [])];
   const presets = chosen ? [chosen] : autoPlans;
-  const base = modelInputs(input).model;
+  const mi = modelInputs(input);
+  const base = mi.model;
   // Same reference in manual and auto mode, so offense values stay comparable.
   const reference = Math.max(1, ...autoPlans.filter((x) => !x?.requires?.revelation).map((x) => planTotal(base, x)));
   const wheel = getEngineWheel(input.vocation);
   const forced = forcedSeed(wheel, input.forcedSpells ?? [], Math.min(wheel.definition.totalCapacity, pointsOf(input)));
-  const blend = blendWith(weightsFor(input.priority));
+  const blend = blendWith(weightsFor(input.priority, leechEhp(base, threatOf(spotMonster(mi.monsters)))));
   return presets.map((preset) => {
     const { stances, v } = pickStances(input, preset, reference, blend);
     return { preset, stances, v, reference, auto: !chosen, forced };
