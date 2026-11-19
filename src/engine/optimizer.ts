@@ -35,7 +35,7 @@ import { ammoFor, shapedPerk, shapingId, shapingOptions, weaponsFor, type Ammo, 
 import { choosePerks, loadoutCharacter, loadoutOf, loadoutParts, ownedOptions, type Loadout } from './proficiency';
 import { encodePlannerCode, gridForSliceId, plannerVesselIssues, type PlannerVessel } from '../data/wheel/plannerCode';
 import { resolveCharacterStats } from '../data/character';
-import { BALLISTIC_MASTERY, healingAverage, pierceDamageMod, POSITIONAL_TACTICS } from '../data/damage';
+import { BALLISTIC_MASTERY, healingAverage, pierceDamageMod, POSITIONAL_TACTICS, TURN_SECONDS } from '../data/damage';
 import { getRotationPresets } from '../data/damage/rotations';
 import { getStance, stanceCombos, type StanceDef } from '../data/damage/stances';
 import { stanceBuilder, stanceDefense, stancedCharacter } from './stances';
@@ -71,6 +71,7 @@ import {
   REVELATION_SPELLS,
   rotation,
   rotationTotal,
+  targetsAt,
   spellCooldown,
   type RotationInput,
   type SpellModel,
@@ -712,21 +713,30 @@ function spellUsages(v: ValuationContext, stages: number[], wheel: EngineWheel):
 }
 
 /** Casts per minute (30 combat turns). */
-const PER_MINUTE = 60 / 2;
+const PER_MINUTE = 60 / TURN_SECONDS;
+
+/** D67: damage window shown under the rotation (s). */
+const DAMAGE_WINDOW = 30;
 
 function rotationUsage(p: Prepared, stages: number[], alloc: ArrayLike<number>): RotationUsage {
   const { v, wheel } = p;
   const augments = wheel.slices.filter((s) => s.kind === 'augment' && isFull(wheel, alloc, s.idx)).map((s) => s.tile);
-  const rot = rotation(v.model, { stages, mods: augmentMods(v, augments) });
+  const mods = augmentMods(v, augments);
+  const vesselSlices = wheel.vesselTiles.filter((i) => isFull(wheel, alloc, i)).length;
+  const flat = stages.reduce((a, st) => a + REVELATION_FLAT_BONUS[st], 0) + vesselSlices;
+  const rot = rotation(v.model, { stages, mods, flat });
+  const turns = DAMAGE_WINDOW / TURN_SECONDS;
   const spells: RotationUsage['spells'] = [];
   for (const [name, x] of rot.rates) {
     if (x.rate <= 0) continue;
     const s = v.model.spells.get(name);
+    const targets = s ? targetsAt(v.model, s, s.stageDomain >= 0 ? stages[s.stageDomain] ?? 0 : 0, mods.get(name)?.extraTargets ?? 0) : 1;
     spells.push({
       name,
       ratio: round1(x.rate * PER_MINUTE),
       share: round1((100 * x.rate * x.perCast) / rot.total),
       ...(s && s.revelation >= 0 ? { fromRevelation: true } : {}),
+      damage: { casts: round1(x.rate * turns), targets: round1(s?.singleTarget ? 1 : targets), perCast: Math.round(x.perCast), total: Math.round(x.rate * turns * x.perCast) },
     });
   }
   if (v.context.mode === 'boss') {
@@ -739,7 +749,8 @@ function rotationUsage(p: Prepared, stages: number[], alloc: ArrayLike<number>):
   }
   spells.sort((a, b) => b.share - a.share || a.name.localeCompare(b.name));
   const autoAttack = round1((100 * v.model.base) / rot.total);
-  return { presetId: v.model.plan.id, auto: p.auto, spells, ...(autoAttack > 0 ? { autoAttack } : {}) };
+  const window = { seconds: DAMAGE_WINDOW, autoAttack: Math.round(v.model.base * turns), total: Math.round(rot.total * turns) };
+  return { presetId: v.model.plan.id, auto: p.auto, spells, ...(autoAttack > 0 ? { autoAttack } : {}), window };
 }
 
 type Msg = { msg: EngineMessage; text: string };

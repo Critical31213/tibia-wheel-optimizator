@@ -2,7 +2,7 @@ import { useId } from 'react';
 import { GREEDY_ROTATION_ID, type RotationPreset, type RotationUsage } from '../types';
 import { useT } from '../i18n';
 import { MAX_FORCED_SPELLS, stanceNames } from '../lib/spellPrefs';
-import { cx, ROMAN } from '../lib/labels';
+import { cx, formatNumber, ROMAN } from '../lib/labels';
 import type { RevelationOption, RevelationReach } from '../types';
 
 const STAGE = ['', 'I', 'II', 'III'];
@@ -122,6 +122,7 @@ export function RotationPanel({ presets, spells, stanceOptions, revelations, val
           {usage.spells.some((s) => s.fromRevelation) && (
             <p className="mt-1 text-[11px] text-parchment-400">★ {t('rotation.fromRevelation')}</p>
           )}
+          {usage.window && <RotationDamage usage={usage} window={usage.window} />}
         </div>
       )}
 
@@ -217,5 +218,57 @@ export function RotationPanel({ presets, spells, stanceOptions, revelations, val
         </div>
       </div>
     </div>
+  );
+}
+
+/** D67: average damage of the whole rotation over the engine's window (test view). */
+function RotationDamage({ usage, window: w }: { usage: RotationUsage; window: NonNullable<RotationUsage['window']> }) {
+  const t = useT();
+  const rows = usage.spells.filter((s) => s.damage);
+  const num = (n: number) => formatNumber(Math.round(n));
+  const cell = 'px-1.5 py-0.5 text-right tabular-nums';
+  return (
+    <details className="mt-2 text-xs">
+      <summary className="cursor-pointer text-parchment-300">{t('rotation.damageTitle', { seconds: w.seconds })}</summary>
+      <div className="mt-1 overflow-x-auto">
+        <table className="w-full text-parchment-200">
+          <thead className="text-parchment-400">
+            <tr>
+              <th className="px-1.5 py-0.5 text-left font-normal">{t('rotation.damageSpell')}</th>
+              <th className={cx(cell, 'font-normal')}>{t('rotation.damageCasts')}</th>
+              <th className={cx(cell, 'font-normal')}>{t('rotation.damageTargets')}</th>
+              <th className={cx(cell, 'font-normal')}>{t('rotation.damagePerCast')}</th>
+              <th className={cx(cell, 'font-normal')}>{t('rotation.damageTotal')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((s) => (
+              <tr key={s.name} className="border-t border-ink-700">
+                <td className="px-1.5 py-0.5">{s.name}</td>
+                <td className={cell}>{s.damage!.casts.toFixed(1)}</td>
+                <td className={cell}>{s.damage!.targets.toFixed(1)}</td>
+                <td className={cell}>{num(s.damage!.perCast)}</td>
+                <td className={cell}>{num(s.damage!.total)}</td>
+              </tr>
+            ))}
+            {w.autoAttack > 0 && (
+              <tr className="border-t border-ink-700">
+                <td className="px-1.5 py-0.5 italic">{t('rotation.autoAttack')}</td>
+                <td className={cell} colSpan={3} />
+                <td className={cell}>{num(w.autoAttack)}</td>
+              </tr>
+            )}
+            <tr className="border-t border-ink-600 font-semibold text-parchment-100">
+              <td className="px-1.5 py-0.5">{t('rotation.damageSum')}</td>
+              <td className={cell} colSpan={3}>
+                <span className="font-normal text-parchment-300">{t('rotation.damagePerSecond', { dps: num(w.total / w.seconds) })}</span>
+              </td>
+              <td className={cell}>{num(w.total)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.damageNote')}</p>
+    </details>
   );
 }

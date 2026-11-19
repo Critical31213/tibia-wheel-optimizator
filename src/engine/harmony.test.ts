@@ -24,3 +24,14 @@ describe('D66: monk Harmony spender slot', () => {
     expect(rates(r).has('Spiritual Outburst')).toBe(false);
   });
 });
+
+describe('D67: rotation damage window', () => {
+  it('30 s: 15 turns of casts; the sum is auto-attack plus every spell', () => {
+    const r = optimize({ vocation: 'monk', points: 661, monster: null, priority: 0, context: { mode: 'hunt' }, alternatives: 0 });
+    const w = r.rotation!.window!;
+    const spells = r.rotation!.spells.filter((s) => s.damage);
+    expect(w.seconds).toBe(30);
+    expect(spells.reduce((a, s) => a + s.damage!.casts, 0)).toBeCloseTo(15, 0);
+    expect(Math.abs(spells.reduce((a, s) => a + s.damage!.total, 0) + w.autoAttack - w.total)).toBeLessThanOrEqual(spells.length + 1);
+  });
+});

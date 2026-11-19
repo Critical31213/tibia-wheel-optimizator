@@ -191,9 +191,22 @@ export interface RotationUsage {
   /** True when the engine picked it (no manual choice). */
   auto: boolean;
   /** Spells actually cast incl. revelation-unlocked ones and resolved element alternatives; share in %. */
-  spells: { name: string; ratio: number; share: number; fromRevelation?: boolean }[];
+  spells: { name: string; ratio: number; share: number; fromRevelation?: boolean; damage?: SpellDamage }[];
   /** D51: auto-attack share of the damage (%), not in `spells`. */
   autoAttack?: number;
+  /** D67: average damage of the whole rotation over `seconds` (with the build's revelations, augments and flat bonus). */
+  window?: { seconds: number; autoAttack: number; total: number };
+}
+
+/** D67: average damage of one spell over `RotationUsage.window`. */
+export interface SpellDamage {
+  /** Average casts in the window. */
+  casts: number;
+  /** Average targets hit per cast. */
+  targets: number;
+  /** Average damage of one cast (all targets, element, crit). */
+  perCast: number;
+  total: number;
 }
 
 // ---------------------------------------------------------------------------

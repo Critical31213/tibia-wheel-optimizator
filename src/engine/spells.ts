@@ -79,17 +79,8 @@ const PASSIVE_MULT: Record<string, { mult: number[]; applies: (s: SpellEval) => 
  * Applies to spells dealing that type (natural + converted share); nothing without an elemental stance.
  */
 export const LORD_OF_DESTRUCTION = { name: 'Lord of Destruction', fireMult: [1.0148, 1.0222, 1.0296], critChance: [2, 3, 4], critExtra: [15, 25.5, 30] };
-/** Monk spells that spend Harmony (Ascetic). Approximate. */
-export const HARMONY_SPENDERS = new Set([
-  'Greater Flurry of Blows',
-  'Sweeping Takedown',
-  'Thousand Fist Blows',
-  'Spiritual Outburst',
-  'Devastating Knockout',
-  'Greater Tiger Clash',
-  'Forceful Uppercut',
-  'Mystic Repulse',
-]);
+/** Monk spells that spend Harmony (Ascetic). AoE: only Sweeping Takedown and Spiritual Outburst (D67); the rest build it. */
+export const HARMONY_SPENDERS = new Set(['Sweeping Takedown', 'Spiritual Outburst', 'Devastating Knockout', 'Greater Tiger Clash', 'Forceful Uppercut']);
 
 /** Base cooldowns (s) of non-damage spells with cooldown augments. */
 const SUPPORT_COOLDOWN: Record<string, number | [number, number, number]> = {
