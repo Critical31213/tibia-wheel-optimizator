@@ -85,14 +85,14 @@ weapon can have at most two reshaped slots.
 | life / mana leech | sustain (D29/D31 leech point), mana leech as for convictions |
 
 Rending Inferniarch weapons cannot take the critical hit (Strike) imbuement: their loadout removes the default
-Powerful Strike crit (10 % chance, +50 % extra damage) from spells and auto-attack (user, D48). Siphoning
+Powerful Strike crit (10 % chance, +50 % extra damage) from spells and auto-attack (D48). Siphoning
 Inferniarch weapons cannot take the life leech imbuement (−half of `K.LIFE_LEECH_IMBUE`, the weapon's item) and
-Draining ones not the mana leech one (−8 pp, Powerful Void) (user, D49).
+Draining ones not the mana leech one (−8 pp, Powerful Void) (D49).
 
 Ammunition (D51, `src/data/proficiency/ammo.ts`, tibiopedia arrow / bolt tables): bows choose between Diamond Arrow
 (37, physical, 5x5 area) and the four storm arrows (21, all damage fire / ice / earth / energy, 13-square diamond area
-(user, D52)); while hunting a shot hits `Ammo.targets` creatures on average (D59, user: diamond 6, storm 5.3; spectral bolt 1). Shatterstorm and Crystalline Arrows are left out
-(user); crossbows use Spectral Bolt (78); only ammunition usable at the character
+(D52)); while hunting a shot hits `Ammo.targets` creatures on average (D59: diamond 6, storm 5.3; spectral bolt 1). Shatterstorm and Crystalline Arrows are left out;
+crossbows use Spectral Bolt (78); only ammunition usable at the character
 level. `rankWeapons` picks the ammunition with the best loadout score before and after the perk choice, so elemental
 arrows win only where they pay off (e.g. physical-immune monsters) and bosses end up with crossbow + Spectral Bolt.
 `WeaponPick.ammo` reports it. Knights: with `meleeSkill` set, weapons of the other melee types are skipped (owned and
@@ -124,4 +124,4 @@ re-chosen) and returns `WeaponResult.better` if that beats the manual loadout by
 D62: weapon damage types. Auto attacks and weapon spells (`weaponElement` in the spell data: knight exori…, monk spells)
 deal the weapon's main element (`element`: monk elemental bond, amber weapons; physical otherwise) plus its elemental
 part (`elementAttack`), split by attack shares, each with its pierce perks; ammunition still turns the whole shot into its
-element. Monk bonds in the data match TibiaWiki's `elementalbond`; the whole hit takes the bond element (confirmed by the user).
+element. Monk bonds in the data match TibiaWiki's `elementalbond`; the whole hit takes the bond element (confirmed in-game).

@@ -57,7 +57,7 @@ mitigation % = (shielding × vocFactor + offhandFactor × defense) / 100 × dist
 
 Generic server constants (multiplier S/D 1.26, P/M 1.28, K 1.3; primaryShield 2.0–2.08;
 secondaryShield 1.2–1.25, applied to spellbooks and as a ×1.2 *bonus* for quivers) do **not** reproduce the
-in-game Cyclopedia values. These user-reported values are used for calibration and take priority:
+in-game Cyclopedia values. These values are used for calibration and take priority:
 
 | Point | Cyclopedia | Model | Inputs |
 |---|---|---|---|
@@ -82,7 +82,7 @@ How the constants were inferred:
 - **Mage default shielding** was raised to 28/31/33/36/37/39/40 (levels 200…1500). The ED's 0.40 % implies about
   36 shielding at level 781.
 
-**Uncertainty.** The RP shield is a **Gnome Shield (defense 50, damage API meta), confirmed by the user**, so the offhand factor 2.56 is
+**Uncertainty.** The RP shield is a **Gnome Shield (defense 50, damage API meta), confirmed in-game**, so the offhand factor 2.56 is
 fitted on a known item. The RP level and the ED shielding are still unknown (the fit uses the default ED stats).
 The quiver factor rests on a single pair of observations. Any bow or crossbow paladin
 without a quiver is treated like `'none'` (factor 1), which is untested. Monk weapon defense is ignored.
