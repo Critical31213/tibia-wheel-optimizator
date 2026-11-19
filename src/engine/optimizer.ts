@@ -481,7 +481,8 @@ function ownedRmOffsets(wheel: EngineWheel, gems: OwnedGem[]): number[][] {
       return d >= 0 ? { d, pts: m.values[g.supreme!.grade - 1] ?? 0, id: g.id } : null;
     })
     .filter((x): x is { d: number; pts: number; id: string } => !!x)
-    .sort((a, b) => b.pts - a.pts || a.id.localeCompare(b.id));
+    // D59: ties by domain, not gem id, so a recommendation probe and the gem the player adds land the same way.
+    .sort((a, b) => b.pts - a.pts || a.d - b.d || a.id.localeCompare(b.id));
   return Array.from({ length: vessels.length + 1 }, (_, c) => {
     const out = [0, 0, 0, 0];
     rm.forEach((g, k) => {

@@ -86,7 +86,7 @@ Every source yields `Parts = { off, def, util }`. They are blended as `score = w
   - `planFor` resolves `or` alternatives by per-cast damage vs the spot at stage 3, drops revelation-granted spells and merges duplicates.
   - Preset rotation: active revelation spells (Divine Grenade, Executioner's Throw, bursts, Spiritual Outburst…) are cast first, on cooldown. The remaining turns are water-filled over the preset ratios, each spell capped at 1 / (cooldown / 2 s). Shared cooldown groups keep only their best spell.
   - Greedy plan: spells filled by per-cast damage within cooldowns; Avatars count only in boss mode.
-  - Auto-attack fills the remaining turns. Weapon vocations use g(L) + 0.5·0.085·skill·attack; mages use g(L). Paladin auto-attack hits 3 targets in hunt (bow) and 1 in boss (crossbow).
+  - Auto-attack fills the remaining turns. Weapon vocations use g(L) + 0.5·0.085·skill·attack; mages use g(L). Paladin auto-attack hits 6 targets in hunt (bow, diamond arrows; storm arrows 5.3, D59) and 1 in boss (crossbow).
   - `result.rotation` = `{presetId, auto, spells[{name, ratio (casts/min), share %, fromRevelation}]}` for the main build and each alternative.
 - **`off` unit:** `100 · ΔT / Tref`. Tref is shared by every plan (the best preset without a revelation requirement, no wheel bonuses), so plans are comparable; `model.baseOff` is each plan's own T0 offset vs Tref.
 - **Transit slices:** augments and gem mods of spells outside the rotation are worth 0 (`spell.notInRotation`) unless the spell is forced or a heal. Utility spells (Divine Dazzle) count only when forced (`spell.forced`). Augment damage deltas are clamped at ≥ 0.

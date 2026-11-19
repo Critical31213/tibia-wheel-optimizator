@@ -123,7 +123,7 @@ export function sub(a: Parts, b: Parts): Parts {
 export function leechEhp(model: SpellModel, threat: number): number {
   const f = (n: number) => (0.1 * Math.max(1, n) + 0.9) / Math.max(1, n);
   const r = rotation(model, { stages: NO_STAGES });
-  let dmg = model.base * f(model.context.mode === 'boss' ? 1 : AUTO_ATTACK_TARGETS[model.vocation]);
+  let dmg = model.base * f(model.autoTargets ?? (model.context.mode === 'boss' ? 1 : AUTO_ATTACK_TARGETS[model.vocation]));
   for (const [name, x] of r.rates) {
     const s = model.spells.get(name);
     if (s) dmg += x.rate * x.perCast * f(targetsAt(model, s, 0));

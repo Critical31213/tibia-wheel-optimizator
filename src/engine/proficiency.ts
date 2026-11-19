@@ -189,6 +189,7 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
   }
 
   let base = model.base;
+  let targets: number | undefined;
   if (!isMage(model.vocation)) {
     const attack = loadoutAttack(model.vocation, lo) ?? 0;
     const physical = w.elementAttack ? attack - w.elementAttack.value : attack;
@@ -205,8 +206,9 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
       autoAttackHit(model.vocation, c, attack) +
       perks.reduce((a, p) => a + (p.kind === 'autoSkillScaling' ? p.value * scalingSkill(c, p) : 0), 0) +
       range * PROF.RANGE_SHARE;
-    const area = model.vocation !== 'paladin' || (w.type === 'bow' && (lo.ammo?.area ?? true));
-    const targets = mode === 'boss' || !area ? 1 : AUTO_ATTACK_TARGETS[model.vocation];
+    // Paladins: bows without known ammunition assume diamond arrows; crossbows (spectral bolts) hit one target.
+    const hunt = model.vocation !== 'paladin' ? AUTO_ATTACK_TARGETS[model.vocation] : w.type === 'bow' ? (lo.ammo?.targets ?? AUTO_ATTACK_TARGETS.paladin) : (lo.ammo?.targets ?? 1);
+    targets = mode === 'boss' ? 1 : hunt;
     const [pc, pd] = elemCrit(autoElement);
     const crit = critEV(
       critChance + pc + pp((p) => p.kind === 'autoCritChance'),
@@ -218,7 +220,7 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
     if (p.kind !== 'homingMissile' || !p.element) continue;
     base += PROF.CASTS_PER_TURN * p.value * (p.levelMultiplier ?? 0) * c.level * spotElementMultiplier(model.monsters, p.element) * mult;
   }
-  return { ...model, spells, base, flat: (model.flat ?? 0) + flat, weaponId: w.id };
+  return { ...model, spells, base, flat: (model.flat ?? 0) + flat, weaponId: w.id, ...(targets !== undefined ? { autoTargets: targets } : {}) };
 }
 
 /** Spot multiplier of an element with extra pierce (on top of the stances' pierce). */

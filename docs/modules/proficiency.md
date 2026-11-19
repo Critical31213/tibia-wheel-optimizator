@@ -91,7 +91,7 @@ Draining ones not the mana leech one (−8 pp, Powerful Void) (user, D49).
 
 Ammunition (D51, `src/data/proficiency/ammo.ts`, tibiopedia arrow / bolt tables): bows choose between Diamond Arrow
 (37, physical, 5x5 area) and the four storm arrows (21, all damage fire / ice / earth / energy, 13-square diamond area
-(user, D52)); both areas count as `AUTO_ATTACK_TARGETS` while hunting. Shatterstorm and Crystalline Arrows are left out
+(user, D52)); while hunting a shot hits `Ammo.targets` creatures on average (D59, user: diamond 6, storm 5.3; spectral bolt 1). Shatterstorm and Crystalline Arrows are left out
 (user); crossbows use Spectral Bolt (78); only ammunition usable at the character
 level. `rankWeapons` picks the ammunition with the best loadout score before and after the perk choice, so elemental
 arrows win only where they pay off (e.g. physical-immune monsters) and bosses end up with crossbow + Spectral Bolt.
