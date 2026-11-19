@@ -128,13 +128,12 @@ export function WeaponMeta({ weapon }: { weapon: Weapon }) {
     <span className="shrink-0 text-xs text-parchment-400">
       {t(`weapons.type.${weapon.type}`)} · {t('weapons.minLevel', { n: weapon.minLevel })}
       {weapon.hands === 2 && vocationUsesShield(weapon) ? ` · ${t('weapons.hands2')}` : ''}
-      <WeaponElement weapon={weapon} />
     </span>
   );
 }
 
 /** D62: damage types of knight and monk weapons (auto attacks and weapon spells). */
-function WeaponElement({ weapon: w }: { weapon: Weapon }) {
+export function WeaponElement({ weapon: w }: { weapon: Weapon }) {
   const t = useT();
   if (!w.vocations.some((v) => v === 'knight' || v === 'monk')) return null;
   const el = (e: string) => t(`element.${e}` as 'element.fire').toLowerCase();
@@ -143,10 +142,9 @@ function WeaponElement({ weapon: w }: { weapon: Weapon }) {
     ? t('weapons.elementSplit', { main: el(main), a: w.attack, element: el(w.elementAttack.element), b: w.elementAttack.value })
     : el(main);
   return (
-    <span title={t('weapons.elementTip')} className={main === 'physical' && !w.elementAttack ? '' : 'text-gold-300'}>
-      {' · '}
+    <p title={t('weapons.elementTip')} className={cx('text-xs whitespace-nowrap', main === 'physical' && !w.elementAttack ? 'text-parchment-400' : 'text-gold-300')}>
       {text}
-    </span>
+    </p>
   );
 }
 
@@ -336,6 +334,7 @@ function WeaponCard({ owned, vocation, meleeSkill, onChange, onRemove }: WeaponC
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-parchment-100">{weapon.name}</p>
           <WeaponMeta weapon={weapon} />
+          <WeaponElement weapon={weapon} />
           {vocation === 'knight' && meleeSkill && weapon.type !== meleeSkill && (
             <p className="text-[11px] text-resist">{t('weapons.otherSkill', { skill: t(`skill.${meleeSkill}`) })}</p>
           )}

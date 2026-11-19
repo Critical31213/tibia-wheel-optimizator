@@ -8,7 +8,7 @@ import { perkLabel, shapingLabel } from '../lib/weapons';
 import { Gain } from './Gain';
 import { PerkIcon } from './PerkIcon';
 import { Tip } from './Tip';
-import { WeaponMeta } from './WeaponsPanel';
+import { WeaponElement, WeaponMeta } from './WeaponsPanel';
 
 /** Alpha strike only pays off when the player hits a fresh target first, i.e. playing solo. */
 const SoloNote = ({ kind, t }: { kind?: string; t: TFunction }) =>
@@ -131,6 +131,7 @@ export function WeaponResultPanel({ result, owned, suggest, busy, onSuggestChang
           <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm font-medium text-gold-300">
             {best.name} <WeaponMeta weapon={best} />
           </p>
+          <WeaponElement weapon={best} />
           <AmmoNote pick={result.best} t={t} />
           <div className="mt-1">
             <PickPerks pick={result.best} owned={bestOwned} />
