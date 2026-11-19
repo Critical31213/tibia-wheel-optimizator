@@ -124,4 +124,4 @@ re-chosen) and returns `WeaponResult.better` if that beats the manual loadout by
 D62: weapon damage types. Auto attacks and weapon spells (`weaponElement` in the spell data: knight exori…, monk spells)
 deal the weapon's main element (`element`: monk elemental bond, amber weapons; physical otherwise) plus its elemental
 part (`elementAttack`), split by attack shares, each with its pierce perks; ammunition still turns the whole shot into its
-element. Monk bonds in the data match TibiaWiki's `elementalbond`.
+element. Monk bonds in the data match TibiaWiki's `elementalbond`; the whole hit takes the bond element (confirmed by the user).
