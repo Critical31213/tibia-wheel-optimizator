@@ -338,8 +338,26 @@ export interface OptimizerInput {
   rotationId?: string;
   /** Spells whose wheel augment must be taken (e.g. utility spells needed at a spot). */
   forcedSpells?: string[];
+  /** D35: forced spells whose augment must reach stage II (both slices); a subset of `forcedSpells`. */
+  forcedStage2?: string[];
+  /** D35: revelations that must reach at least this stage. */
+  forcedRevelations?: ForcedRevelation[];
   /** D32: stance names chosen by the user ([] = none); undefined = engine picks per plan. */
   stances?: string[];
+}
+
+export interface ForcedRevelation {
+  name: string;
+  stage: 1 | 2 | 3;
+}
+
+/** D35: whether a revelation stage is reachable: now, with a (new or upgraded) Revelation Mastery gem, or not at all. */
+export type RevelationReach = { status: 'ok' } | { status: 'gem' | 'upgrade'; grade: 1 | 2 | 3 | 4 } | { status: 'impossible' };
+
+export interface RevelationOption {
+  name: string;
+  /** Index 0 = stage I. */
+  stages: RevelationReach[];
 }
 
 export interface StatLine {

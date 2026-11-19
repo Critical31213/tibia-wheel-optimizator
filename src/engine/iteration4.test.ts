@@ -140,7 +140,7 @@ describe('D22: area augments and near-equal gem substitutes', () => {
     const sup = greater.mods.find((x) => x.kind === 'supreme')!;
     for (const s of greater.similar ?? []) expect(s.relative).toBeGreaterThanOrEqual(90);
     // Grade I (new gem): Executioner's Throw's cooldown mod edges out Fierce Berserk.
-    expect(['Augmented Fierce Berserk', "Augmented Executioner's Throw"]).toContain(sup.name);
+    expect(sup.name).toMatch(/^Augmented (Fierce Berserk|Executioner's Throw)( \(|$)/);
   });
 });
 

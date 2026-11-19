@@ -146,6 +146,13 @@ export const en = {
   'rotation.forced': 'Force augment for spell',
   'rotation.forcedAdd': 'Add spell…',
   'rotation.forcedRemove': 'Remove {name}',
+  'rotation.forcedStage': 'Augment stage for {name}',
+  'rotation.forcedRev': 'Force revelation stage',
+  'rotation.forcedRevNone': 'auto',
+  'rotation.revGem': 'needs RM gem {grade}',
+  'rotation.revUpgrade': 'upgrade RM gem to {grade}',
+  'rotation.revImpossible': 'out of reach',
+  'rotation.forcedRevHint': 'The build reaches at least this stage. Locked stages need more points or a Revelation Mastery gem.',
   'rotation.forcedHint': 'The build will take the wheel augment of these spells (e.g. utility spells).',
 
   'priority.title': 'Priority',

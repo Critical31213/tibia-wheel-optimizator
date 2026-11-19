@@ -28,7 +28,7 @@ screens it is two columns (controls left, results right).
 | `src/components/ResultsPanel.tsx` | Scores, revelations, convictions, stats, rationale, fill order. |
 | `src/components/SegmentedControl.tsx` | Generic compact `radiogroup` (roving tabindex, arrows/Home/End, `disabled`). |
 | `src/components/FightContextPanel.tsx` | Hunt / Boss toggle (hunt style removed, D20); Avatar / single-target hints. |
-| `src/components/RotationPanel.tsx` | Rotation select (Auto + vocation presets, note / requirements), used rotation of the viewed build (share %, ★ = revelation spell, auto-picked), stance select (Auto / manual set, D32; prefs key `st`), stances of the viewed build (D24), forced spell augments (select + removable chips). |
+| `src/components/RotationPanel.tsx` | Rotation select (Auto + vocation presets, note / requirements), used rotation of the viewed build (share %, ★ = revelation spell, auto-picked), stance select (Auto / manual set, D32; prefs key `st`), stances of the viewed build (D24), two columns: forced spell augments (select + chips with stage I/II toggle, D35) and forced revelation stages (select per revelation; unreachable stages disabled with an RM gem / upgrade / out-of-reach note). Prefs keys `fs2`, `fr`. |
 | `src/hooks/usePersistentSpellPrefs.ts` | `rotationId` + `forcedSpells` per vocation (localStorage) mirrored to URL `r` / `fs`. |
 | `src/lib/spellPrefs.ts` | Spell-prefs sanitising + URL / JSON codec (tested). |
 | `src/components/GemsPanel.tsx` | Collapsible "My gems" editor in Lesser / Regular / Greater subsections (mods per slot, grade I–IV), empty-vessel highlight. |

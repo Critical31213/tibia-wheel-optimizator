@@ -64,7 +64,7 @@ describe('D27: shared mod grades, cooldown gems in a full rotation', () => {
   it('a cooldown gem adds nothing when the preset rotation is already full', () => {
     const r = optimize({ vocation: 'sorcerer', points: 950, monster: null, priority: 0, character: { level: 1000 }, alternatives: 0 });
     expect(r.rotation?.presetId).toBe('ms-echo-gdb');
-    expect(r.gemRecommendations.some((g) => g.mods.some((m) => m.kind === 'supreme' && m.name === 'Augmented Energy Wave' && /cooldown/i.test(g.reason)))).toBe(false);
+    expect(r.gemRecommendations.some((g) => g.mods.some((m) => m.kind === 'supreme' && m.name.startsWith('Augmented Energy Wave') && /cooldown/i.test(g.reason)))).toBe(false);
   });
 });
 

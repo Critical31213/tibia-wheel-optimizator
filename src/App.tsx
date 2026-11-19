@@ -18,7 +18,7 @@ import { gemFromRecommendation, setModGrade } from './lib/gems';
 import { usePersistentInputs } from './hooks/usePersistentInputs';
 import { usePersistentSpellPrefs } from './hooks/usePersistentSpellPrefs';
 import { useT } from './i18n';
-import { getForceableSpells, getMonsterById, getRotationPresets, getStanceOptions, getWheel, optimize, useMonsterData } from './lib/api';
+import { getForceableSpells, getMonsterById, getRotationPresets, getStanceOptions, getWheel, optimize, revelationOptions, useMonsterData } from './lib/api';
 import { stanceNames } from './lib/spellPrefs';
 import type { BuildResult } from './lib/api';
 import { characterOf, contextOf } from './lib/inputState';
@@ -55,7 +55,11 @@ export default function App() {
   );
   const character = useMemo(() => characterOf(deferred), [deferred]);
   const { mode } = deferred;
-  const { rotationId, forcedSpells, stance } = deferredPrefs;
+  const { rotationId, forcedSpells, forcedStage2, forcedRevelations, stance } = deferredPrefs;
+  const revelationReach = useMemo(
+    () => revelationOptions({ vocation: deferred.vocation, points, gems: deferredGems, character }),
+    [deferred.vocation, points, deferredGems, character],
+  );
   const result = useMemo(
     () =>
       points > 0
@@ -71,10 +75,12 @@ export default function App() {
             alternatives: 2,
             rotationId: rotationId ?? undefined,
             forcedSpells: forcedSpells.length ? forcedSpells : undefined,
+            forcedStage2: forcedStage2.length ? forcedStage2 : undefined,
+            forcedRevelations: forcedRevelations.length ? forcedRevelations : undefined,
             stances: stance === null ? undefined : stanceNames(stance),
           })
         : null,
-    [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, rotationId, forcedSpells, stance],
+    [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, rotationId, forcedSpells, forcedStage2, forcedRevelations, stance],
   );
   const resultWheel = useMemo(() => getWheel(deferred.vocation), [deferred.vocation]);
   const alternatives = result?.alternatives ?? [];
@@ -123,6 +129,7 @@ export default function App() {
               presets={presets}
               spells={forceable}
               stanceOptions={stanceOptions}
+              revelations={revelationReach}
               value={spellPrefs}
               onChange={updateSpellPrefs}
               usage={deferred.vocation === inputs.vocation ? shown?.rotation : undefined}

@@ -23,6 +23,8 @@ export const ENGINE_MESSAGES = {
   'rationale.forced': 'Augments taken because you forced them: {spells}.',
   'rationale.forcedImpossible': 'Not enough points to reach the augment of {spells}.',
   'rationale.forcedNoAugment': '{spells}: no wheel augment; only gem mods can boost it.',
+  'rationale.forcedExtra': '{spells}: stage II was taken too, because it pays off.',
+  'rationale.revelationBlocked': 'Forced revelation stage out of reach with these points and gems: {revelations}.',
   'rationale.boss': 'Boss fight: every spell counts ~1 target, so single-target damage and Avatar matter most.',
   'rationale.avatarIgnored': '{avatar} is ignored while hunting (valued in boss mode only).',
   'rationale.weak': '{monster} takes {list} damage, so {spells} were favoured.',

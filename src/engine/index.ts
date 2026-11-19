@@ -4,6 +4,7 @@
  */
 import type { OptimizerInput, OptimizerResult, Vocation, WheelDefinition } from '../types';
 import { runOptimizer } from './optimizer';
+export { revelationOptions } from './optimizer';
 import { getEngineWheel } from './wheel/build';
 
 /** Wheel definition for a vocation (cached; treat as read-only). */

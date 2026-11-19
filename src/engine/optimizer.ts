@@ -18,6 +18,8 @@ import type {
   OptimizerResult,
   OwnedGem,
   Perk,
+  RevelationOption,
+  RevelationReach,
   RotationPreset,
   RotationUsage,
   SpellUsage,
@@ -693,6 +695,9 @@ function rationale(p: Prepared, best: State, stages: number[], revPoints: number
   const f = p.forced;
   if (f.taken.length) out.push(text('rationale.forced', { spells: f.taken.join(', ') }));
   if (f.impossible.length) out.push(text('rationale.forcedImpossible', { spells: f.impossible.join(', ') }));
+  const extra = f.taken.filter((s) => !p.input.forcedStage2?.includes(s) && wheel.slices.some((sl) => sl.kind === 'augment' && sl.twin > sl.idx && sl.tile.conviction.augment?.spells.includes(s) && isFull(wheel, best.alloc, sl.idx) && isFull(wheel, best.alloc, sl.twin)));
+  if (extra.length) out.push(text('rationale.forcedExtra', { spells: extra.join(', ') }));
+  if (p.revBlocked.length) out.push(text('rationale.revelationBlocked', { revelations: p.revBlocked.join(', ') }));
   if (f.noAugment.length) out.push(text('rationale.forcedNoAugment', { spells: f.noAugment.join(', ') }));
 
   if (model.monsters.length > 1) {
@@ -937,14 +942,32 @@ function cheapestPath(wheel: EngineWheel, full: ReadonlySet<number>, targets: re
 }
 
 /** Cheapest unlock path to an augment slice of each forced spell. */
-function forcedSeed(wheel: EngineWheel, spells: readonly string[], budget: number): ForcedInfo {
+function forcedSeed(wheel: EngineWheel, spells: readonly string[], budget: number, stage2: readonly string[] = []): ForcedInfo {
   const out: ForcedInfo = { seed: [], taken: [], impossible: [], noAugment: [] };
   const full = new Set<number>();
   let used = 0;
   for (const spell of [...new Set(spells)]) {
-    const targets = wheel.slices.filter((s) => s.kind === 'augment' && s.tile.conviction.augment?.spells.includes(spell)).map((s) => s.idx);
+    const augs = wheel.slices.filter((s) => s.kind === 'augment' && s.tile.conviction.augment?.spells.includes(spell));
+    const targets = augs.map((s) => s.idx);
     if (!targets.length) {
       out.noAugment.push(spell);
+      continue;
+    }
+    if (stage2.includes(spell)) {
+      // D35: both slices of the cheapest pair.
+      let best: { cost: number; path: number[] } | null = null;
+      for (const s of augs) {
+        if (s.twin < s.idx) continue;
+        const p = pairPath(wheel, full, [s.idx, s.twin]);
+        if (p && (!best || p.cost < best.cost)) best = p;
+      }
+      if (!best || used + best.cost > budget) out.impossible.push(spell);
+      else {
+        best.path.forEach((i) => full.add(i));
+        out.seed.push(...best.path);
+        used += best.cost;
+        out.taken.push(spell);
+      }
       continue;
     }
     if (targets.some((t) => full.has(t))) {
@@ -964,21 +987,111 @@ function forcedSeed(wheel: EngineWheel, spells: readonly string[], budget: numbe
   return out;
 }
 
-/** Seed: `base` plus the cheapest paths to both slices of an augment pair; null when over budget. */
-function pairSeed(wheel: EngineWheel, base: readonly number[], pair: readonly [number, number], budget: number): number[] | null {
-  const full = new Set(base);
-  const seed = [...base];
-  let used = base.reduce((a, i) => a + wheel.slices[i].capacity, 0);
+/** Cheapest new slices (and their cost) to fill both slices of an augment pair, given the filled set. */
+function pairPath(wheel: EngineWheel, filled: ReadonlySet<number>, pair: readonly [number, number]): { cost: number; path: number[] } | null {
+  const full = new Set(filled);
+  const path: number[] = [];
+  let cost = 0;
   for (let k = 0; k < 2; k++) {
     const left = pair.filter((i) => !full.has(i));
     if (!left.length) break;
     const p = cheapestPath(wheel, full, left);
-    if (!p || used + p.cost > budget) return null;
+    if (!p) return null;
     p.path.forEach((i) => full.add(i));
-    seed.push(...p.path);
-    used += p.cost;
+    path.push(...p.path);
+    cost += p.cost;
   }
-  return seed;
+  return { cost, path };
+}
+
+/** Seed: `base` plus the cheapest paths to both slices of an augment pair; null when over budget. */
+function pairSeed(wheel: EngineWheel, base: readonly number[], pair: readonly [number, number], budget: number): number[] | null {
+  const p = pairPath(wheel, new Set(base), pair);
+  const used = base.reduce((a, i) => a + wheel.slices[i].capacity, 0);
+  return p && used + p.cost <= budget ? [...base, ...p.path] : null;
+}
+
+/**
+ * D35: fewest wheel points that bring domain `d` to `need` revelation points (domain slices from the centre,
+ * RM slices add their bonus; a partial last slice counts). Greedy by revelation points per wheel point.
+ */
+function domainCost(wheel: EngineWheel, d: number, need: number): number {
+  if (need <= 0) return 0;
+  const alloc = new Int32Array(wheel.slices.length);
+  let have = 0;
+  let cost = 0;
+  for (;;) {
+    let best = -1;
+    let bestRatio = -1;
+    for (const s of wheel.slices) {
+      if (s.domainIdx !== d || alloc[s.idx] > 0) continue;
+      if (!s.initiallyUnlocked && !s.unlockedBy.some((j) => isFull(wheel, alloc, j))) continue;
+      const ratio = (s.capacity + (s.kind === 'rm' ? RM_SLICE_POINTS : 0)) / s.capacity;
+      if (ratio > bestRatio + 1e-9 || (Math.abs(ratio - bestRatio) < 1e-9 && s.capacity < wheel.slices[best].capacity)) {
+        best = s.idx;
+        bestRatio = ratio;
+      }
+    }
+    if (best < 0) return Infinity;
+    const s = wheel.slices[best];
+    const gain = s.capacity + (s.kind === 'rm' ? RM_SLICE_POINTS : 0);
+    if (have + gain >= need && s.kind !== 'rm') return cost + (need - have);
+    alloc[best] = s.capacity;
+    have += gain;
+    cost += s.capacity;
+    if (have >= need) return cost;
+  }
+}
+
+/** D35: reach of every revelation stage for the input's budget and owned gems. */
+export function revelationOptions(input: Pick<OptimizerInput, 'vocation' | 'points' | 'gems' | 'character'>): RevelationOption[] {
+  const wheel = getEngineWheel(input.vocation);
+  const budget = Math.min(wheel.definition.totalCapacity, pointsOf(input as OptimizerInput));
+  const offsets = ownedRmOffsets(wheel, input.gems ?? []);
+  const owned = offsets[offsets.length - 1];
+  return wheel.revelations.map((r) => {
+    const d = r.domainIdx;
+    const mod = wheel.supremeMods.find((m) => m.category === 'revelationMastery' && m.revelation === r.data.name);
+    const gem = (input.gems ?? []).find((g) => g.quality === 'greater' && g.supreme?.modId === mod?.id);
+    const fits = (offset: number, t: number) => domainCost(wheel, d, t - offset) <= budget;
+    const stages = REVELATION_THRESHOLDS.map((t): RevelationReach => {
+      if (fits(owned[d], t)) return { status: 'ok' };
+      if (mod) {
+        const base = owned[d] - (gem ? (mod.values[gem.supreme!.grade - 1] ?? 0) : 0);
+        for (let g = gem ? gem.supreme!.grade + 1 : 1; g <= 4; g++) {
+          if (fits(base + (mod.values[g - 1] ?? 0), t)) return { status: gem ? 'upgrade' : 'gem', grade: g as 1 | 2 | 3 | 4 };
+        }
+      }
+      return { status: 'impossible' };
+    });
+    return { name: r.data.name, stages };
+  });
+}
+
+/** D35: minimum stage per domain from the forced revelations reachable now; the rest are reported. */
+function forcedStages(input: OptimizerInput, wheel: EngineWheel): { min: number[]; blocked: string[] } {
+  const min = [0, 0, 0, 0];
+  const blocked: string[] = [];
+  const forced = input.forcedRevelations ?? [];
+  if (!forced.length) return { min, blocked };
+  const reach = revelationOptions(input);
+  for (const f of forced) {
+    const d = revelationIndex(wheel.revelations, f.name);
+    if (d < 0) continue;
+    if (reach[d]?.stages[f.stage - 1]?.status === 'ok') min[d] = Math.max(min[d], f.stage);
+    else blocked.push(`${f.name} ${ROMAN_STAGE[f.stage]}`);
+  }
+  return { min, blocked };
+}
+
+const ROMAN_STAGE = ['', 'I', 'II', 'III'];
+/** D35: revelation value below a forced stage. */
+const FORCED_PENALTY = 1e4;
+
+/** D35: tables with a penalty on revelation stages below the forced ones. */
+function forceTables(t: Tables, min: readonly number[]): Tables {
+  if (min.every((x) => x === 0)) return t;
+  return { ...t, rev: t.rev.map((r, d) => Float64Array.from(r, (x, k) => (k < min[d] ? x - FORCED_PENALTY : x))) };
 }
 
 interface Prepared {
@@ -994,6 +1107,9 @@ interface Prepared {
   forced: ForcedInfo;
   /** Rotation picked by the engine (no manual preset). */
   auto: boolean;
+  /** D35: forced minimum revelation stage per domain; forced stages out of reach. */
+  minStages: number[];
+  revBlocked: string[];
 }
 
 interface PlanSpec {
@@ -1018,6 +1134,7 @@ function prepare(input: OptimizerInput, priority = input.priority, base?: Prepar
   const preEnv: GemEnv = { v, wheel, blend, facts: factsFor([1e9, 1e9, 1e9, 1e9], new Map(), [assumed, assumed, assumed, assumed]) };
   const vesselP = vesselTable(preEnv, gems);
   const parts = base ? { ...base.parts, vesselP } : partTables(wheel, v, vesselP);
+  const fs = base ? { min: base.minStages, blocked: base.revBlocked } : forcedStages(input, wheel);
   return {
     input,
     wheel,
@@ -1027,9 +1144,11 @@ function prepare(input: OptimizerInput, priority = input.priority, base?: Prepar
     gemRm: base?.gemRm ?? ownedRmOffsets(wheel, gems),
     parts,
     blend,
-    tables: blendTables(parts, blend),
-    forced: base?.forced ?? spec?.forced ?? forcedSeed(wheel, input.forcedSpells ?? [], budget),
+    tables: forceTables(blendTables(parts, blend), fs.min),
+    forced: base?.forced ?? spec?.forced ?? forcedSeed(wheel, input.forcedSpells ?? [], budget, input.forcedStage2),
     auto: base?.auto ?? spec?.auto ?? false,
+    minStages: fs.min,
+    revBlocked: fs.blocked,
   };
 }
 
@@ -1040,6 +1159,7 @@ const objective = (p: Prepared, st: State) => p.blend(rawTotals(p.wheel, p.parts
 
 /** D20: a preset requiring a revelation is valid only when the build reaches it. */
 function planValid(p: Prepared, stages: number[]): boolean {
+  if (stages.some((s, d) => s < p.minStages[d])) return false;
   const req = p.v.model.plan.requires;
   if (!req) return true;
   const d = revelationIndex(p.wheel.revelations, req);
@@ -1094,7 +1214,7 @@ function searchGated(p: Prepared, opts: SearchOpts): State {
   const st = runSearch(p, p.tables, opts);
   const d = revelationIndex(p.wheel.revelations, p.v.model.plan.requires);
   if (d < 0 || planValid(p, gridStages(p, st))) return st;
-  const boosted = runSearch(p, blendTables(p.parts, p.blend, [0, 1, 2, 3].map((x) => (x === d ? GATED_BOOST : 1))), FULL_SEARCH);
+  const boosted = runSearch(p, forceTables(blendTables(p.parts, p.blend, [0, 1, 2, 3].map((x) => (x === d ? GATED_BOOST : 1))), p.minStages), FULL_SEARCH);
   return planValid(p, gridStages(p, boosted)) ? boosted : st;
 }
 
@@ -1246,7 +1366,7 @@ function alternatives(p: Prepared, plans: Prepared[], main: State, count: number
   for (const c of cands) {
     if (found.length >= count) break;
     const q = c.priority === prio ? base : prepare(base.input, c.priority, base);
-    const st = runSearch(base, c.revScale.every((x) => x === 1) ? q.tables : blendTables(q.parts, q.blend, c.revScale), LIGHT_SEARCH);
+    const st = runSearch(base, c.revScale.every((x) => x === 1) ? q.tables : forceTables(blendTables(q.parts, q.blend, c.revScale), q.minStages), LIGHT_SEARCH);
     const plan = bestPlan(plans, st);
     if (plan.obj > mainObj + 1e-9) {
       main = st;
@@ -1304,7 +1424,7 @@ function refine(p: Prepared, best: State): State {
   const stages = gridStages(p, best);
   for (let d = 0; d < 4; d++) {
     if (stages[d] < 1 || stages[d] > 2) continue;
-    const st = runSearch(p, blendTables(p.parts, p.blend, [0, 1, 2, 3].map((x) => (x === d ? 0.2 : 1))), LIGHT_SEARCH);
+    const st = runSearch(p, forceTables(blendTables(p.parts, p.blend, [0, 1, 2, 3].map((x) => (x === d ? 0.2 : 1))), p.minStages), LIGHT_SEARCH);
     const obj = objective(p, st);
     if (obj > bestObj + 1e-9 && (!p.auto || planValid(p, gridStages(p, st)))) {
       best = st;
@@ -1329,7 +1449,7 @@ export function planSpecs(input: OptimizerInput): PlanSpec[] {
   // Same reference in manual and auto mode, so offense values stay comparable.
   const reference = Math.max(1, ...autoPlans.filter((x) => !x?.requires?.revelation).map((x) => planTotal(base, x)));
   const wheel = getEngineWheel(input.vocation);
-  const forced = forcedSeed(wheel, input.forcedSpells ?? [], Math.min(wheel.definition.totalCapacity, pointsOf(input)));
+  const forced = forcedSeed(wheel, input.forcedSpells ?? [], Math.min(wheel.definition.totalCapacity, pointsOf(input)), input.forcedStage2);
   const blend = blendWith(weightsFor(input.priority, leechEhp(base, threatOf(spotMonster(mi.monsters)))));
   return presets.map((preset) => {
     const { stances, v } = pickStances(input, preset, reference, blend);

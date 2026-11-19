@@ -239,7 +239,7 @@ function build(vocation: Vocation): EngineWheel {
   }));
 
   const basicMods = data.mods.basic;
-  const supremeMods = data.mods.supreme;
+  const supremeMods = distinctNames(data.mods.supreme);
   const mods: ModDefinition[] = [
     ...basicMods.map(
       (m): ModDefinition => ({
@@ -308,4 +308,20 @@ export function stageFor(points: number, thresholds: readonly number[] = REVELAT
   let stage = 0;
   for (let k = 0; k < thresholds.length; k++) if (points >= thresholds[k]) stage = k + 1;
   return stage;
+}
+
+/** Supreme mods sharing a name (one spell's damage / crit / cooldown / healing mods) get the effect in the name. */
+const AUG_SUFFIX: Partial<Record<WheelSupremeMod['category'], string>> = {
+  augDamage: 'Base Damage',
+  augCrit: 'Critical Damage',
+  augCooldown: 'Cooldown',
+  augHealing: 'Healing',
+};
+function distinctNames(mods: readonly WheelSupremeMod[]): WheelSupremeMod[] {
+  const count = new Map<string, number>();
+  for (const m of mods) count.set(m.name, (count.get(m.name) ?? 0) + 1);
+  return mods.map((m) => {
+    const suffix = AUG_SUFFIX[m.category];
+    return (count.get(m.name) ?? 0) > 1 && suffix ? { ...m, name: `${m.name} (${suffix})` } : m;
+  });
 }

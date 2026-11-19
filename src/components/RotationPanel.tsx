@@ -2,6 +2,10 @@ import { useId } from 'react';
 import { GREEDY_ROTATION_ID, type RotationPreset, type RotationUsage } from '../types';
 import { useT } from '../i18n';
 import { MAX_FORCED_SPELLS, stanceNames } from '../lib/spellPrefs';
+import { cx, ROMAN } from '../lib/labels';
+import type { RevelationOption, RevelationReach } from '../types';
+
+const STAGE = ['', 'I', 'II', 'III'];
 import type { SpellPrefs } from '../lib/spellPrefs';
 
 interface RotationPanelProps {
@@ -10,6 +14,8 @@ interface RotationPanelProps {
   spells: string[];
   /** Selectable stance set keys (D32). */
   stanceOptions: string[];
+  /** D35: revelations and how reachable each stage is. */
+  revelations: RevelationOption[];
   value: SpellPrefs;
   onChange: (patch: Partial<SpellPrefs>) => void;
   /** Rotation used by the viewed build. */
@@ -22,7 +28,7 @@ interface RotationPanelProps {
 const AUTO = '*';
 
 /** Rotation choice (auto / preset), the rotation the viewed build is based on, and forced spell augments. */
-export function RotationPanel({ presets, spells, stanceOptions, value, onChange, usage, stances }: RotationPanelProps) {
+export function RotationPanel({ presets, spells, stanceOptions, revelations, value, onChange, usage, stances }: RotationPanelProps) {
   const t = useT();
   const id = useId();
   const selected = presets.find((p) => p.id === value.rotationId);
@@ -32,6 +38,8 @@ export function RotationPanel({ presets, spells, stanceOptions, value, onChange,
       p.requires?.revelation && t('rotation.needsRevelation', { name: p.requires.revelation }),
       p.requires?.shield && t('rotation.needsShield'),
     ].filter(Boolean) as string[];
+  const reachNote = (r: RevelationReach) =>
+    r.status === 'ok' ? '' : r.status === 'impossible' ? t('rotation.revImpossible') : t(r.status === 'gem' ? 'rotation.revGem' : 'rotation.revUpgrade', { grade: ROMAN[r.grade] });
   const stanceLabel = (k: string) => (k ? stanceNames(k).join(' + ') : t('rotation.noStance'));
   const addable = spells.filter((s) => !value.forcedSpells.includes(s));
 
@@ -111,41 +119,97 @@ export function RotationPanel({ presets, spells, stanceOptions, value, onChange,
         </div>
       )}
 
-      <label htmlFor={`${id}-fs`} className="mt-4 block text-xs text-parchment-300">
-        {t('rotation.forced')}
-      </label>
-      <select
-        id={`${id}-fs`}
-        value=""
-        disabled={addable.length === 0 || value.forcedSpells.length >= MAX_FORCED_SPELLS}
-        onChange={(e) => e.target.value && onChange({ forcedSpells: [...value.forcedSpells, e.target.value] })}
-        className="field mt-1 w-full py-1.5 text-sm"
-      >
-        <option value="">{t('rotation.forcedAdd')}</option>
-        {addable.map((s) => (
-          <option key={s} value={s}>
-            {s}
-          </option>
-        ))}
-      </select>
-      {value.forcedSpells.length > 0 && (
-        <ul className="mt-2 flex flex-wrap gap-1.5">
-          {value.forcedSpells.map((s) => (
-            <li key={s} className="flex items-center gap-1 rounded-full border border-ink-600 px-2 py-0.5 text-xs text-parchment-200">
-              {s}
-              <button
-                type="button"
-                aria-label={t('rotation.forcedRemove', { name: s })}
-                onClick={() => onChange({ forcedSpells: value.forcedSpells.filter((x) => x !== s) })}
-                className="text-parchment-400 hover:text-parchment-50"
-              >
-                ×
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.forcedHint')}</p>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 sm:divide-x sm:divide-ink-700">
+        <div>
+          <label htmlFor={`${id}-fs`} className="block text-xs text-parchment-300">
+            {t('rotation.forced')}
+          </label>
+          <select
+            id={`${id}-fs`}
+            value=""
+            disabled={addable.length === 0 || value.forcedSpells.length >= MAX_FORCED_SPELLS}
+            onChange={(e) => e.target.value && onChange({ forcedSpells: [...value.forcedSpells, e.target.value] })}
+            className="field mt-1 w-full py-1.5 text-sm"
+          >
+            <option value="">{t('rotation.forcedAdd')}</option>
+            {addable.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          {value.forcedSpells.length > 0 && (
+            <ul className="mt-2 flex flex-col gap-1.5">
+              {value.forcedSpells.map((s) => {
+                const two = value.forcedStage2.includes(s);
+                return (
+                  <li key={s} className="flex items-center gap-2 rounded-md border border-ink-600 px-2 py-1 text-xs text-parchment-200">
+                    <span className="min-w-0 flex-1 truncate">{s}</span>
+                    <span role="group" aria-label={t('rotation.forcedStage', { name: s })} className="flex shrink-0 overflow-hidden rounded border border-ink-600">
+                      {[1, 2].map((n) => (
+                        <button
+                          key={n}
+                          type="button"
+                          aria-pressed={two === (n === 2)}
+                          onClick={() => onChange({ forcedStage2: n === 2 ? [...value.forcedStage2.filter((x) => x !== s), s] : value.forcedStage2.filter((x) => x !== s) })}
+                          className={cx('px-1.5 py-0.5', two === (n === 2) ? 'bg-gold-700/50 text-gold-200' : 'text-parchment-400 hover:text-parchment-100')}
+                        >
+                          {STAGE[n]}
+                        </button>
+                      ))}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label={t('rotation.forcedRemove', { name: s })}
+                      onClick={() => onChange({ forcedSpells: value.forcedSpells.filter((x) => x !== s), forcedStage2: value.forcedStage2.filter((x) => x !== s) })}
+                      className="text-parchment-400 hover:text-parchment-50"
+                    >
+                      ×
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.forcedHint')}</p>
+        </div>
+
+        <div className="sm:pl-4">
+          <p className="text-xs text-parchment-300">{t('rotation.forcedRev')}</p>
+          <ul className="mt-1 flex flex-col gap-1.5">
+            {revelations.map((r) => {
+              const cur = value.forcedRevelations.find((f) => f.name === r.name)?.stage ?? 0;
+              const note = cur ? reachNote(r.stages[cur - 1]) : '';
+              return (
+                <li key={r.name} className="text-xs">
+                  <label className="flex items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate text-parchment-200">{r.name}</span>
+                    <select
+                      value={cur}
+                      onChange={(e) => {
+                        const stage = Number(e.target.value) as 0 | 1 | 2 | 3;
+                        const rest = value.forcedRevelations.filter((f) => f.name !== r.name);
+                        onChange({ forcedRevelations: stage ? [...rest, { name: r.name, stage }] : rest });
+                      }}
+                      className="field w-40 shrink-0 py-1 text-xs"
+                    >
+                      <option value={0}>{t('rotation.forcedRevNone')}</option>
+                      {r.stages.map((reach, i) => (
+                        <option key={i} value={i + 1} disabled={reach.status !== 'ok' && cur !== i + 1}>
+                          {STAGE[i + 1]}
+                          {reach.status !== 'ok' ? ` — ${reachNote(reach)}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {note && <p className="mt-0.5 text-[11px] text-amber-300">{STAGE[cur]}: {note}</p>}
+                </li>
+              );
+            })}
+          </ul>
+          <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.forcedRevHint')}</p>
+        </div>
+      </div>
     </div>
   );
 }

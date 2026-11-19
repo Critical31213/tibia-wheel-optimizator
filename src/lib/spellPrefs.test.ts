@@ -8,7 +8,7 @@ import {
   spellPrefsStorageKey,
   spellPrefsToQuery,
 } from './spellPrefs';
-import { getStanceOptions, getForceableSpells, getRotationPresets } from './api';
+import { getForceableSpells, getRevelationNames, getRotationPresets, getStanceOptions } from './api';
 
 const IDS = ['ms-gfw-echo', 'ms-gfw-geb'];
 const SPELLS = ["Hell's Core", 'Great Fire Wave', 'Ultimate Healing'];
@@ -18,6 +18,8 @@ describe('spell prefs', () => {
     expect(sanitizeSpellPrefs({ rotationId: 'ek-mas', forcedSpells: ['great fire wave', 'GREAT FIRE WAVE', 'Nope', 3] }, IDS, SPELLS)).toEqual({
       rotationId: null,
       forcedSpells: ['Great Fire Wave'],
+      forcedStage2: [],
+      forcedRevelations: [],
       stance: null,
     });
     const many = Array.from({ length: 20 }, (_, i) => `s${i}`);
@@ -27,12 +29,21 @@ describe('spell prefs', () => {
   });
 
   it('round-trips through the URL and localStorage JSON', () => {
-    const prefs = { rotationId: 'ms-gfw-geb', forcedSpells: ["Hell's Core", 'Ultimate Healing'], stance: 'Master of Flames+Aura of Exposed Weakness' };
+    const prefs = {
+      rotationId: 'ms-gfw-geb',
+      forcedSpells: ["Hell's Core", 'Ultimate Healing'],
+      forcedStage2: ["Hell's Core"],
+      forcedRevelations: [{ name: 'Beam Mastery', stage: 2 as const }],
+      stance: 'Master of Flames+Aura of Exposed Weakness',
+    };
     const ST = getStanceOptions('sorcerer');
+    const RV = getRevelationNames('sorcerer');
     const search = spellPrefsToQuery(prefs, '?v=sorcerer&p=100');
     expect(new URLSearchParams(search).get('v')).toBe('sorcerer');
-    expect(spellPrefsFromQuery(search, IDS, SPELLS, ST)).toEqual(prefs);
-    expect(parseSpellPrefs(JSON.stringify(prefs), IDS, SPELLS, ST)).toEqual(prefs);
+    expect(spellPrefsFromQuery(search, IDS, SPELLS, ST, RV)).toEqual(prefs);
+    expect(parseSpellPrefs(JSON.stringify(prefs), IDS, SPELLS, ST, RV)).toEqual(prefs);
+    // Stage II only for forced spells; unknown revelations / stages dropped.
+    expect(spellPrefsFromQuery('?fs2=Hell%27s+Core&fr=Nope:2,Beam+Mastery:4', IDS, SPELLS, ST, RV)).toMatchObject({ forcedStage2: [], forcedRevelations: [] });
     expect(spellPrefsFromQuery('?st=', IDS, SPELLS, ST)?.stance).toBe('');
     expect(spellPrefsFromQuery('?st=Blood+Rage', IDS, SPELLS, ST)?.stance).toBeNull();
     expect(spellPrefsToQuery(EMPTY_SPELL_PREFS, search)).toBe('?v=sorcerer&p=100');
