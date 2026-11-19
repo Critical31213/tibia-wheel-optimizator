@@ -246,3 +246,11 @@ Plans carry their weapon; the choice, re-choice and `result.weapon` are describe
 | `iteration3.test.ts` | Character level and skills, HP > mitigation (RP 400), HP still beats Mitigation Multiplier for EK 1500 at priority 100 (D18), leech devalued, RM look-ahead and owned RM gem, multi-monster weighting, distinct alternatives, planner code decode and unlock path, official planner WASM round-trip (`skipIf` when `scripts/.cache/wod/skillgrid.cjs` is missing). |
 | `iteration5.test.ts` | D23: no `recommended` vessel source (main + alternatives, planner code carries only owned gems), recommendations without owned gems, vessel slice = flat bonus without gems, owned-gem vessel valuation matches the placement, owned gems placed in the build; distinct focus labels. |
 | `iteration4.test.ts` | D18 (RP 600 lesser = HP, no capacity/mana gems, HP > mitigation for all vocations 200–1500, no healing gems for mages); D20 (non-beam rotation for a low-level sorcerer, beams only with Beam Mastery, Wrath of Nature vs an earth-weak spot, Divine Grenade in the rotation iff active, manual rotation); transit augments = 0; forced augment taken or reported impossible. |
+
+## Gain effects (D55)
+
+Gem recommendations, upgrades (`effect`, `effectToMax`), weapon picks and reshapes carry `effect: GainEffect`
+(`effectOf` in `gems.ts`): `dmg` = the unblended `Parts.off` (% damage per turn), `ehp` = `Parts.def / threat` (% effective HP).
+The blended `gain` / `delta` stays the ranking value. Replacement gems subtract the weakest placed gem's effect;
+re-optimized Revelation Mastery gems add the regular basics' effect to the with/without wheel difference
+(`objectiveParts`). Weapons use `loadoutValuer` (unblended `loadoutScorer`).

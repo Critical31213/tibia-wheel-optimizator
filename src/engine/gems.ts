@@ -8,6 +8,7 @@
  */
 import type {
   EngineMessage,
+  GainEffect,
   GemModRef,
   GemQuality,
   GemRecommendation,
@@ -30,6 +31,7 @@ import {
   type Parts,
   RESIST_EFFECT,
   revelationIndex,
+  sub,
   supremeModParts,
   type ValuationContext,
   ZERO,
@@ -303,6 +305,12 @@ export function round1(x: number): number {
   return Math.round(x * 10) / 10;
 }
 
+/** D55: Parts → % damage and % EHP (`def` carries the monster threat factor). */
+export function effectOf(v: Pick<ValuationContext, 'threat'>, p: Parts): GainEffect {
+  const r2 = (x: number) => Math.round(x * 100) / 100 || 0;
+  return { dmg: r2(p.off), ehp: r2(p.def / Math.max(1e-9, v.threat)) };
+}
+
 /** D22: substitutes within this share of the chosen mod's gain are listed as near-equal. */
 export const SIMILAR_THRESHOLD = 0.9;
 
@@ -338,6 +346,7 @@ export function recommendations(env: GemEnv): GemRecommendation[] {
         quality: g.quality,
         mods: g.picks.map((p) => ({ kind: p.kind, modId: p.id, name: p.name, grade: p.grade as ModGrade })),
         gain: round1(g.score),
+        effect: effectOf(env.v, g.parts),
         reason: r.text,
         reasonMsg: r.msg,
         similar: similarFor(env, g.picks),
@@ -354,23 +363,27 @@ export function recommendations(env: GemEnv): GemRecommendation[] {
  * D43: value of a gem already in a vessel. `env.facts` include placed RM gems' points, so an RM mod is valued as
  * the stage with vs without its own points (valued on top of them it would look worthless and always replaceable).
  */
-function placedValue(env: GemEnv, gem: OwnedGem, vessel: GemQuality): number {
+function placedParts(env: GemEnv, gem: OwnedGem, vessel: GemQuality): Parts {
   const ref = gem.supreme;
   const m = ref && activeSlots(gem.quality, vessel).includes('supreme') ? findSupreme(env.wheel, ref.modId) : undefined;
   const d = m?.category === 'revelationMastery' ? revelationIndex(env.wheel.revelations, m.revelation) : -1;
-  if (!m || !ref || d < 0) return env.blend(gemParts(env, gem, vessel));
+  if (!m || !ref || d < 0) return gemParts(env, gem, vessel);
   const x = m.values[ref.grade - 1] ?? 0;
   const facts = { ...env.facts, revPoints: env.facts.revPoints.map((p, i) => (i === d ? p - x : p)) };
-  return env.blend(gemParts({ ...env, facts }, gem, vessel));
+  return gemParts({ ...env, facts }, gem, vessel);
 }
 
 export function withRoom(env: GemEnv, vessels: readonly VesselAssignment[], recs: GemRecommendation[]): GemRecommendation[] {
   return recs.flatMap((r) => {
     const same = vessels.filter((vs) => vs.unlocked && vs.quality === r.quality);
     if (!same.length || same.some((vs) => !vs.gem)) return [r];
-    const placed = same.flatMap((vs) => (vs.gem ? [placedValue(env, vs.gem, vs.quality)] : []));
-    const gain = placed.length ? round1(r.gain - Math.min(...placed)) : 0;
-    return gain > 0 ? [{ ...r, gain, replaces: true }] : [];
+    const placed = same.flatMap((vs) => (vs.gem ? [placedParts(env, vs.gem, vs.quality)] : []));
+    if (!placed.length) return [];
+    const weakest = placed.reduce((a, b) => (env.blend(b) < env.blend(a) ? b : a));
+    const gain = round1(r.gain - env.blend(weakest));
+    const w = effectOf(env.v, weakest);
+    const effect = r.effect && { dmg: Math.round((r.effect.dmg - w.dmg) * 100) / 100, ehp: Math.round((r.effect.ehp - w.ehp) * 100) / 100 };
+    return gain > 0 ? [{ ...r, gain, effect, replaces: true }] : [];
   });
 }
 
@@ -414,11 +427,13 @@ export function upgrades(env: GemEnv, vessels: VesselAssignment[]): UpgradeRecom
   for (const [key, m] of byMod) {
     if (m.grade >= 4) continue;
     const to = (m.grade + 1) as ModGrade;
-    const at = (grade: number) => uses.filter((u) => u.key === key).reduce((a, u) => a + env.blend(modParts(env, u.slot, u.modId, grade)), 0);
-    const cur = at(m.grade);
-    const gain = at(to) - cur;
+    const atP = (grade: number) => uses.filter((u) => u.key === key).reduce((a, u) => add(a, modParts(env, u.slot, u.modId, grade)), ZERO);
+    const curP = atP(m.grade);
+    const nextP = sub(atP(to), curP);
+    const maxP = to === 4 ? nextP : sub(atP(4), curP);
+    const gain = env.blend(nextP);
     if (gain <= 1e-6) continue;
-    const gainToMax = to === 4 ? gain : at(4) - cur;
+    const gainToMax = env.blend(maxP);
     const mod = m.slot === 'supreme' ? findSupreme(env.wheel, m.modId) : findBasic(env.wheel, m.modId);
     out.push({
       gemId: m.gemIds[0],
@@ -430,7 +445,9 @@ export function upgrades(env: GemEnv, vessels: VesselAssignment[]): UpgradeRecom
       fromGrade: m.grade,
       toGrade: to,
       gain: Math.round(gain * 100) / 100,
+      effect: effectOf(env.v, nextP),
       gainToMax: Math.round(gainToMax * 100) / 100,
+      effectToMax: effectOf(env.v, maxP),
     });
   }
   return out.sort((a, b) => b.gain - a.gain || a.kind.localeCompare(b.kind) || a.modId - b.modId);

@@ -6,6 +6,7 @@ import { engineText, useT } from '../i18n';
 import { findMod, GEM_QUALITIES, slotKind, slotsForQuality } from '../lib/gems';
 import { recommendationsByQuality } from '../lib/vessels';
 import { cx, formatNumber, gemName, ROMAN } from '../lib/labels';
+import { Gain } from './Gain';
 import { GemIcon } from './GemIcon';
 
 function SubHeading({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
@@ -18,8 +19,6 @@ function SubHeading({ children, aside }: { children: ReactNode; aside?: ReactNod
 }
 
 const Empty = ({ children }: { children: string }) => <p className="text-sm text-parchment-400">{children}</p>;
-
-const gain = (n: number) => `+${formatNumber(Math.round(n * 10) / 10)}`;
 
 function ModChip({ name, grade }: { name: string; grade: ModGrade }) {
   return (
@@ -136,7 +135,7 @@ export function VesselsPanel({ vocation, result, mods, onAddGem, onUpgrade }: Ve
                           <ModChip key={`${m.kind}-${m.modId}`} name={m.name} grade={m.grade} />
                         ))}
                       </ul>
-                      <span className="shrink-0 text-xs tabular-nums text-weak">{t('recs.gain', { gain: gain(r.gain) })}</span>
+                      <Gain effect={r.effect} score={r.gain} />
                       {onAddGem && (
                         <button type="button" onClick={() => onAddGem(r)} className="rounded-md border border-gold-600 bg-gold-700/30 px-2 py-0.5 text-xs font-medium text-gold-300 hover:bg-gold-700/50 shrink-0">
                           + {t('recs.add')}
@@ -173,10 +172,11 @@ export function VesselsPanel({ vocation, result, mods, onAddGem, onUpgrade }: Ve
               <span className="shrink-0 tabular-nums text-gold-300">
                 {ROMAN[u.fromGrade]} → {ROMAN[u.toGrade]}
               </span>
-              <span className="w-16 shrink-0 text-right text-xs tabular-nums text-weak">{t('upgrades.gain', { gain: gain(u.gain) })}</span>
+              <Gain effect={u.effect} score={u.gain} />
               {u.gainToMax !== undefined && u.toGrade < 4 && (
-                <span className="hidden w-24 shrink-0 text-right text-[11px] tabular-nums text-parchment-400 sm:inline">
-                  {t('upgrades.toMax', { gain: gain(u.gainToMax) })}
+                <span className="hidden shrink-0 items-center gap-1 text-[11px] text-parchment-400 sm:inline-flex">
+                  {t('upgrades.toMax')}
+                  <Gain effect={u.effectToMax} score={u.gainToMax} className="opacity-75" />
                 </span>
               )}
               {onUpgrade && (

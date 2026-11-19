@@ -124,6 +124,15 @@ describe('weapon choice in the optimizer (D45)', () => {
     }
   });
 
+  it('splits gains into % damage and % EHP (D55)', () => {
+    const r = runOptimizer(input({ weapons: [{ weaponId: 'sanguine-cudgel', level: 7 }], suggestWeapons: true }));
+    const all = [...r.gemRecommendations, ...r.upgradeRecommendations, ...r.weapon!.reshapes, ...(r.weapon!.suggestions ?? [])];
+    expect(all.length).toBeGreaterThan(0);
+    for (const g of all) expect(g.effect && Number.isFinite(g.effect.dmg) && Number.isFinite(g.effect.ehp)).toBe(true);
+    // A gain that improves the score improves damage or EHP.
+    for (const g of r.weapon!.suggestions ?? []) expect(Math.max(g.effect!.dmg, g.effect!.ehp)).toBeGreaterThan(0);
+  });
+
   it('does not pair a two-handed weapon with the shield rotation', () => {
     const r = runOptimizer(input({ weapons: [{ weaponId: 'grand-sanguine-battleaxe', level: 7 }] }));
     expect(r.rotation?.spells.some((s) => s.name === 'Shield Slam')).toBe(false);

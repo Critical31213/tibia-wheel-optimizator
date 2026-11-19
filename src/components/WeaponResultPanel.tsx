@@ -3,8 +3,9 @@ import type { OwnedWeapon, WeaponPick, WeaponResult } from '../types';
 import type { TFunction } from '../i18n';
 import { useT } from '../i18n';
 import { getAmmo, getShapingOption, getWeapon, levelOptions } from '../lib/api';
-import { cx, formatNumber } from '../lib/labels';
+import { cx } from '../lib/labels';
 import { perkLabel, shapingLabel } from '../lib/weapons';
+import { Gain } from './Gain';
 import { PerkIcon } from './PerkIcon';
 import { Tip } from './Tip';
 import { WeaponMeta } from './WeaponsPanel';
@@ -17,8 +18,6 @@ const AmmoNote = ({ pick, t }: { pick: WeaponPick; t: TFunction }) => {
   const a = pick.ammo ? getAmmo(pick.ammo) : undefined;
   return a ? <p className="text-xs text-parchment-300">{t('weaponResult.ammo', { name: a.name })}</p> : null;
 };
-
-const signed = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : '±'}${formatNumber(Math.abs(Math.round(n * 10) / 10))}`;
 
 interface WeaponResultPanelProps {
   result: WeaponResult;
@@ -95,7 +94,7 @@ export function WeaponResultPanel({ result, owned, suggest, busy, onSuggestChang
                   {getWeapon(p.weaponId)?.name ?? p.weaponId}
                   {p.ammo && <span className="text-xs text-parchment-400"> · {getAmmo(p.ammo)?.name}</span>}
                 </span>
-                <span className="shrink-0 text-xs tabular-nums text-parchment-400">{t('weaponResult.delta', { delta: signed(p.delta) })}</span>
+                <Gain effect={p.effect} score={p.delta} />
               </li>
             ))}
           </ul>
@@ -119,7 +118,7 @@ export function WeaponResultPanel({ result, owned, suggest, busy, onSuggestChang
                       <span className="block text-xs text-parchment-400">{t('weaponResult.replaces', { perk: perkLabel(t, replaced) })}</span>
                     )}
                   </span>
-                  <span className="shrink-0 text-xs tabular-nums text-weak">{t('weaponResult.gain', { gain: signed(r.gain) })}</span>
+                  <Gain effect={r.effect} score={r.gain} />
                 </li>
               );
             })}
@@ -150,7 +149,7 @@ export function WeaponResultPanel({ result, owned, suggest, busy, onSuggestChang
                 <li key={p.weaponId}>
                   <p className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm">
                     <span className="text-parchment-100">{w?.name ?? p.weaponId}</span>
-                    <span className="text-xs tabular-nums text-weak">{t('weaponResult.gain', { gain: signed(p.delta) })}</span>
+                    <Gain effect={p.effect} score={p.delta} />
                   </p>
                   {w && <WeaponMeta weapon={w} />}
                   <AmmoNote pick={p} t={t} />

@@ -249,11 +249,18 @@ export interface VesselAssignment {
   source: 'owned' | 'recommended' | 'empty';
 }
 
+/** D55: a gain split into % damage per turn and % effective HP (the blended `gain` mixes both by priority). */
+export interface GainEffect {
+  dmg: number;
+  ehp: number;
+}
+
 export interface GemRecommendation {
   quality: GemQuality;
   mods: { kind: ModKind; modId: number; name: string; grade: ModGrade }[];
   /** Relative score gain (same units as offense/defense scores). */
   gain: number;
+  effect?: GainEffect;
   reason: string;
   reasonMsg?: EngineMessage;
   /** Near-equal substitutes (D22): other mods for a slot within ~10 % of the chosen mod's gain. */
@@ -274,8 +281,10 @@ export interface UpgradeRecommendation {
   fromGrade: ModGrade;
   toGrade: ModGrade;
   gain: number;
+  effect?: GainEffect;
   /** Gain of upgrading straight to grade IV. */
   gainToMax?: number;
+  effectToMax?: GainEffect;
 }
 
 /**
@@ -391,6 +400,7 @@ export interface WeaponPick {
   perks: number[];
   /** Objective difference vs the chosen weapon (0 for it; negative = worse). */
   delta: number;
+  effect?: GainEffect;
   /** D51: ammunition id (bows, crossbows). */
   ammo?: string;
 }
@@ -401,6 +411,7 @@ export interface WeaponReshape {
   option: string;
   /** Objective gain of the reshape (rank 10). */
   gain: number;
+  effect?: GainEffect;
 }
 
 export interface WeaponResult {

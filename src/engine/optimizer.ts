@@ -10,6 +10,7 @@ import type {
   Domain,
   EngineMessage,
   Element,
+  GainEffect,
   FightContext,
   GemModRef,
   GemRecommendation,
@@ -40,6 +41,7 @@ import { getStance, stanceCombos, type StanceDef } from '../data/damage/stances'
 import { stanceBuilder, stanceDefense, stancedCharacter } from './stances';
 import {
   activeSlots,
+  effectOf,
   type GemEnv,
   gemParts,
   modGrades,
@@ -92,6 +94,7 @@ import {
   revelationParts,
   type SpellEffect,
   spotMonster,
+  sub,
   threatOf,
   UTILITY_SPELLS,
   type ValuationContext,
@@ -1212,7 +1215,8 @@ function prepare(input: OptimizerInput, priority = input.priority, base?: Prepar
 const gridStages = (p: Prepared, st: State) => DOMAIN_ORDER.map((_, d) => stageFor(st.domainPts[d] + RM_SLICE_POINTS * st.rmFull[d] + p.gemRm[st.vessels][d]));
 
 /** Objective of a state under the main build's valuation. */
-const objective = (p: Prepared, st: State) => p.blend(rawTotals(p.wheel, p.parts, st.alloc, gridStages(p, st)));
+const objectiveParts = (p: Prepared, st: State) => rawTotals(p.wheel, p.parts, st.alloc, gridStages(p, st));
+const objective = (p: Prepared, st: State) => p.blend(objectiveParts(p, st));
 
 /** D20: a preset requiring a revelation is valid only when the build reaches it. */
 function planValid(p: Prepared, stages: number[]): boolean {
@@ -1596,7 +1600,8 @@ function withRmReoptimized(input: OptimizerInput, p: Prepared, main: State, recs
     const q: Prepared = { ...prepare({ ...input, gems }, input.priority, p), gemRm: ownedRmOffsets(p.wheel, gems) };
     return { p: q, main: searchPlan(q, PROBE_SEARCH) };
   };
-  const basicsGain = recs.find((r) => r.quality === 'regular')?.gain ?? 0;
+  const regular = recs.find((r) => r.quality === 'regular');
+  const basicsGain = regular?.gain ?? 0;
   const plain = probe(null);
   const plainObj = objective(plain.p, plain.main);
   const mainObj = objective(p, main);
@@ -1611,6 +1616,7 @@ function withRmReoptimized(input: OptimizerInput, p: Prepared, main: State, recs
     const obj = objective(hypo.p, hypo.main);
     // RM value = the same greater gem with vs without the mod (both re-optimized); basics as valued statically.
     const rmGain = obj - plainObj;
+    const rmEffect = effectOf(p.v, sub(objectiveParts(hypo.p, hypo.main), objectiveParts(plain.p, plain.main)));
     // D43: the re-optimized wheel with the gem must also beat the build the player has now.
     if (rmGain <= 0.05 || obj <= mainObj + 0.05) continue;
     const gain = basicsGain + rmGain;
@@ -1635,6 +1641,7 @@ function withRmReoptimized(input: OptimizerInput, p: Prepared, main: State, recs
         { kind: 'supreme', modId: m.id, name: m.name, grade },
       ],
       gain: round1(gain),
+      effect: { dmg: round1((regular?.effect?.dmg ?? 0) + rmEffect.dmg), ehp: round1((regular?.effect?.ehp ?? 0) + rmEffect.ehp) },
       reason: msg.text,
       reasonMsg: msg.msg,
       similar: [],
@@ -1726,17 +1733,23 @@ function ownedChoices(input: OptimizerInput, preset?: RotationPreset | null): Om
  * `baseParts` up to the plan-constant terms.
  */
 function loadoutScorer(input: OptimizerInput, spec: Pick<PlanSpec, 'preset' | 'reference' | 'stances'>, blend: (p: Parts) => number, v0: ValuationContext, ri: RotationInput = NO_BONUS) {
+  const val = loadoutValuer(input, spec, v0, ri);
+  return (lo: Loadout): number => blend(val(lo));
+}
+
+/** Unblended `loadoutScorer`. */
+function loadoutValuer(input: OptimizerInput, spec: Pick<PlanSpec, 'preset' | 'reference' | 'stances'>, v0: ValuationContext, ri: RotationInput = NO_BONUS) {
   const mi = modelInputs(input);
   const offhand = v0.model.plan.shield ? 'shield' : undefined;
   const { preset, reference, stances } = spec;
-  return (lo: Loadout): number => {
+  return (lo: Loadout): Parts => {
     const c = stancedCharacter(loadoutCharacter(mi.character, input.vocation, lo), stances);
     const m0 = stanceBuilder(input.vocation, mi.context, mi.monsters, stances, preset, lo)(c);
     const model: SpellModel = { ...m0, plan: planFor(m0, preset), total: reference };
     const off = (100 * (rotationTotal(model, ri) - reference)) / reference;
     const mitigation = characterFacts(input.vocation, mi.level, c.shielding, offhand).mitigation;
     const def = 100 * ((100 - v0.mitigationRef) / Math.max(50, 100 - mitigation) - 1) * v0.threat;
-    return blend(add({ off, def, util: 0 }, loadoutParts({ ...v0, model }, lo)));
+    return add({ off, def, util: 0 }, loadoutParts({ ...v0, model }, lo));
   };
 }
 
@@ -1771,6 +1784,7 @@ function buildRotation(p: Prepared, st: State): RotationInput {
   return { stages: gridStages(p, st), mods: augmentMods(p.v, augments) };
 }
 
+const weaponValuer = (p: Prepared, st: State) => loadoutValuer(p.input, p.spec!, p.v, buildRotation(p, st));
 const weaponScorer = (p: Prepared, st: State) => loadoutScorer(p.input, p.spec!, p.blend, p.v, buildRotation(p, st));
 
 const sameChoice = (a: WeaponChoice, b: WeaponChoice) => a.weapon.id === b.weapon.id && a.choice.join() === b.choice.join() && a.ammo?.id === b.ammo?.id;
@@ -1785,25 +1799,37 @@ function rechooseWeapon(p: Prepared, main: State, checkPlan: boolean): { p: Prep
   return objective(q, st) > objective(p, main) + 1e-9 ? { p: q, main: st } : null;
 }
 
-const pick = (w: WeaponChoice, delta: number): WeaponPick => ({ weaponId: w.weapon.id, perks: [...w.choice], delta: round1(delta), ...(w.ammo ? { ammo: w.ammo.id } : {}) });
+/** Loadout value vs the chosen weapon as a D55 effect. */
+type Effect = (lo: Loadout) => GainEffect;
+
+const pick = (w: WeaponChoice, delta: number, effect?: GainEffect): WeaponPick => ({
+  weaponId: w.weapon.id,
+  perks: [...w.choice],
+  delta: round1(delta),
+  ...(effect ? { effect } : {}),
+  ...(w.ammo ? { ammo: w.ammo.id } : {}),
+});
 
 function weaponResult(p: Prepared, main: State): WeaponResult | undefined {
   const chosen = p.weapon;
   if (!chosen || !p.spec) return undefined;
-  const score = weaponScorer(p, main);
-  const base = score(choiceLoadout(chosen));
+  const val = weaponValuer(p, main);
+  const score = (lo: Loadout) => p.blend(val(lo));
+  const baseP = val(choiceLoadout(chosen));
+  const base = p.blend(baseP);
+  const effect: Effect = (lo) => effectOf(p.v, sub(val(lo), baseP));
   const others = rankWeapons(ownedChoices(p.input, p.spec.preset).filter((c) => c.owned !== chosen.owned), score, p.v.level);
   const best = pick(chosen, 0);
   return {
     best,
-    ranking: [best, ...others.map((w) => pick(w, w.score - base))],
-    reshapes: reshapes(p, chosen, score, base),
-    ...(p.input.suggestWeapons ? { suggestions: suggestions(p, score, base) } : {}),
+    ranking: [best, ...others.map((w) => pick(w, w.score - base, effect(choiceLoadout(w))))],
+    reshapes: reshapes(p, chosen, score, base, effect),
+    ...(p.input.suggestWeapons ? { suggestions: suggestions(p, score, base, effect) } : {}),
   };
 }
 
 /** Best dust reshapes of the chosen weapon: one shaping option (rank 10) taken at a level without a reshape; best level per option. */
-function reshapes(p: Prepared, w: WeaponChoice, score: (lo: Loadout) => number, base: number): WeaponReshape[] {
+function reshapes(p: Prepared, w: WeaponChoice, score: (lo: Loadout) => number, base: number, effect: Effect): WeaponReshape[] {
   const shaped = w.owned.shaped ?? [];
   if (shaped.length >= MAX_SHAPED || w.owned.level < RESHAPE_MIN_LEVEL) return [];
   const out: WeaponReshape[] = [];
@@ -1815,8 +1841,9 @@ function reshapes(p: Prepared, w: WeaponChoice, score: (lo: Loadout) => number, 
     const choice = w.choice.map((c, i) => (i === L ? 0 : c));
     for (const o of opts) {
       const options = w.options.map((x, i) => (i === L ? [shapedPerk(o)] : x));
-      const gain = score(loadoutOf(w.weapon, options, choice, w.ammo)) - base;
-      if (gain > MIN_WEAPON_GAIN) out.push({ level: L + 1, replaces, option: shapingId(o), gain: round1(gain) });
+      const lo = loadoutOf(w.weapon, options, choice, w.ammo);
+      const gain = score(lo) - base;
+      if (gain > MIN_WEAPON_GAIN) out.push({ level: L + 1, replaces, option: shapingId(o), gain: round1(gain), effect: effect(lo) });
     }
   });
   out.sort((a, b) => b.gain - a.gain || a.level - b.level);
@@ -1824,7 +1851,7 @@ function reshapes(p: Prepared, w: WeaponChoice, score: (lo: Loadout) => number, 
 }
 
 /** Unowned weapons for the character's level (all proficiency levels), better than the chosen one. */
-function suggestions(p: Prepared, score: (lo: Loadout) => number, base: number): WeaponPick[] {
+function suggestions(p: Prepared, score: (lo: Loadout) => number, base: number, effect: Effect): WeaponPick[] {
   const owned = new Set((p.input.weapons ?? []).map((w) => w.weaponId));
   const cands = weaponsFor(p.input.vocation, p.v.level)
     .filter((w) => !owned.has(w.id) && !NOT_SUGGESTED.has(w.id) && skillFits(p.input, w) && fitsPlan(w, p.spec?.preset))
@@ -1837,5 +1864,5 @@ function suggestions(p: Prepared, score: (lo: Loadout) => number, base: number):
   return rankWeapons(screened, score, p.v.level)
     .filter((w) => w.score > base + MIN_WEAPON_GAIN)
     .slice(0, 3)
-    .map((w) => pick(w, w.score - base));
+    .map((w) => pick(w, w.score - base, effect(choiceLoadout(w))));
 }
