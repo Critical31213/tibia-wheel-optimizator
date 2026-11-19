@@ -64,7 +64,7 @@ RUNTIME (static SPA)
 ├── ARCHITECTURE.md         # this file
 ├── README.md               # user-facing quick start
 ├── assets/icon.svg         # project icon (README)
-├── docs/modules/           # data, wheel-data, planner-code, damage-model, character-formulas, proficiency, engine, ui, integration
+├── docs/modules/           # data, wheel-data, planner-code, damage-model, character-formulas, proficiency, engine, ui, gem-import, integration
 ├── scripts/
 │   ├── scrape-monsters.ts  # offline tibiopedia.pl scraper → src/data/monsters.json
 │   ├── extract-wheel.mjs   # planner WASM → src/data/wheel/wheel-data.json
@@ -207,6 +207,7 @@ Iteration 3: character panel (level → points, scroll points, manual override, 
 Iteration 4: hunt styles removed; `RotationPanel` (auto / preset, the viewed build's rotation with shares and ★ revelation spells,
 forced spell augments; per-vocation localStorage + URL `r` / `fs`).
 Details: [docs/modules/ui.md](docs/modules/ui.md).
+Gem import from Gem Atelier screenshots (D63, browser only): [docs/modules/gem-import.md](docs/modules/gem-import.md).
 
 ## 8. Quality gates (S4 Integration)
 

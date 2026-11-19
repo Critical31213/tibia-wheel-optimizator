@@ -13,8 +13,11 @@ The wheel data is extracted offline from the official planner (test.tibia.com; t
 the planner version); no CipSoft code is committed or shipped, only the derived facts needed to compute builds.
 
 The only CipSoft graphics shipped are the weapon proficiency perk icons in `public/proficiency/` (© CipSoft GmbH),
-taken unmodified from the copies in the TibiaPal repository (see below), which mirror TibiaWiki. They are used
-only to identify the in-game perks, are credited in the app ("Icons © CipSoft GmbH") and are not covered by
+taken unmodified from the copies in the TibiaPal repository (see below), which mirror TibiaWiki, and the gem mod
+icon sheets in `public/gem-mods/` (© CipSoft GmbH), unmodified copies of the official Wheel of Destiny planner's
+sheets (test server). The mod icons are used only as reference images to recognise gems in screenshots the user
+imports (locally, in the browser); the cropped Gem Atelier screenshots in `src/lib/fixtures/` (© CipSoft GmbH game
+graphics) serve only as test inputs. All are credited in the app ("Icons © CipSoft GmbH") and are not covered by
 TibiaPal's MIT license or by CC BY-SA. On request of CipSoft they will be removed.
 
 ## TibiaPal — MIT License

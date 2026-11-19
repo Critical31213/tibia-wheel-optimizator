@@ -5,6 +5,7 @@ import { createGem, GEM_QUALITIES, MOD_GRADES, modsForSlot, normalizeGem, slotKi
 import type { GemSlot } from '../lib/gems';
 import { cx, gemName, ROMAN } from '../lib/labels';
 import { GemIcon } from './GemIcon';
+import { GemImport } from './GemImport';
 import { Panel } from './Panel';
 import { SegmentedControl } from './SegmentedControl';
 
@@ -62,16 +63,19 @@ interface GemCardProps {
   index: number;
   vocation: Vocation;
   mods: ModDefinition[];
+  /** Imported with ambiguous icons: worth a check. */
+  flagged: boolean;
   onChange: (gem: OwnedGem) => void;
   onRemove: () => void;
 }
 
-function GemCard({ gem, index, vocation, mods, onChange, onRemove }: GemCardProps) {
+function GemCard({ gem, index, vocation, mods, flagged, onChange, onRemove }: GemCardProps) {
   const t = useT();
   const id = useId();
   const n = index + 1;
   return (
-    <li className="rounded-xl border border-ink-600 bg-ink-950/50 p-3">
+    <li className={cx('rounded-xl border bg-ink-950/50 p-3', flagged ? 'border-amber-500/80' : 'border-ink-600')}>
+      {flagged && <p className="mb-1.5 text-xs text-amber-300">{t('gems.checkImported')}</p>}
       <div className="mb-2 flex items-center gap-2">
         <GemIcon quality={gem.quality} />
         <label htmlFor={id} className="sr-only">
@@ -138,6 +142,8 @@ export function GemsPanel({ vocation, gems, mods, emptyVessels, onChange }: Gems
       if (!n.delete(q)) n.add(q);
       return n;
     });
+  const [flagged, setFlagged] = useState<ReadonlySet<string>>(new Set());
+  const unflag = (id: string) => setFlagged((s) => (s.has(id) ? new Set([...s].filter((x) => x !== id)) : s));
   const totalEmpty = emptyVessels ? GEM_QUALITIES.reduce((n, q) => n + emptyVessels[q], 0) : 0;
 
   return (
@@ -160,6 +166,7 @@ export function GemsPanel({ vocation, gems, mods, emptyVessels, onChange }: Gems
       }
     >
       <div id={bodyId} hidden={!open}>
+        <GemImport gems={gems} mods={mods} active={open} onChange={onChange} onFlag={(ids) => setFlagged(new Set(ids))} />
         {mods.length === 0 && <p className="mb-2 text-xs text-parchment-400">{t('gems.noModData')}</p>}
         {gems.length === 0 && <p className="mb-3 text-sm text-parchment-300">{t('gems.empty')}</p>}
         <div className="flex flex-col gap-3">
@@ -216,8 +223,15 @@ export function GemsPanel({ vocation, gems, mods, emptyVessels, onChange }: Gems
                         index={index}
                         vocation={vocation}
                         mods={mods}
-                        onChange={(next) => onChange((all) => updateGem(all, next))}
-                        onRemove={() => onChange((all) => all.filter((g) => g.id !== gem.id))}
+                        flagged={flagged.has(gem.id)}
+                        onChange={(next) => {
+                          unflag(gem.id);
+                          onChange((all) => updateGem(all, next));
+                        }}
+                        onRemove={() => {
+                          unflag(gem.id);
+                          onChange((all) => all.filter((g) => g.id !== gem.id));
+                        }}
                       />
                     ))}
                   </ul>
