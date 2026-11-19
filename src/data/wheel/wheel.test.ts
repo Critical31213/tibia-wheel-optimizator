@@ -94,15 +94,14 @@ describe('wheel data', () => {
 });
 
 describe('D73: announced wheel and supreme mod changes', () => {
-  it.each(VOCATIONS)('%s: Revelation Mastery in ring 2, leech in ring 3, an augment in the central ring 3 slot', (v) => {
+  it.each(VOCATIONS)('%s: Revelation Mastery in ring 2, the leech in its old central ring 3 slot', (v) => {
     const tiles = getWheelData(v).tiles;
     for (const q of ['TL', 'TR', 'BL', 'BR']) {
       const inQ = tiles.filter((t) => t.quarter === q);
       expect(inQ.filter((t) => t.conviction.category === 'revelationMastery').map((t) => t.ring)).toEqual([2]);
       expect(inQ.filter((t) => t.conviction.category === 'leech').map((t) => t.ring).sort()).toEqual([3, 4]);
-      const ring3 = inQ.filter((t) => t.ring === 3).map((t) => t.conviction.category);
-      expect(ring3.filter((c) => c === 'leech')).toHaveLength(1);
-      expect(ring3).toContain('augmentation');
+      const central = { TL: 7, TR: 10, BL: 25, BR: 28 }[q]!;
+      expect(inQ.find((t) => t.gridId === central)!.conviction.category).toBe('leech');
     }
   });
 

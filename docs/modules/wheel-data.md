@@ -17,7 +17,7 @@ rules, plus spell metadata used by the engine to value augments in a fight conte
 | `src/data/wheel/wheel-data.d.json.ts` | Types the JSON import as `WheelDataFile`. |
 | `src/data/wheel/types.ts` | Internal types (`WheelTile`, `WheelRevelation`, `WheelBasicMod`, `WheelSupremeMod`, `SpellMeta`, …). |
 | `src/data/wheel/spells.ts` | Hand-curated spell metadata table (`SPELLS`). |
-| `src/data/wheel/update.ts` | D73: announced changes applied on top of the extracted JSON (`applyWheelUpdate`): Revelation Mastery ↔ leech ↔ spell augment slot rotation per quarter, new supreme grade values, chain augments. Remove or adjust once the extraction reflects the update. |
+| `src/data/wheel/update.ts` | D73: announced changes applied on top of the extracted JSON (`applyWheelUpdate`): Revelation Mastery ↔ ring 2 leech slot swap per quarter, new supreme grade values, chain augments. Remove or adjust once the extraction reflects the update. |
 | `src/data/wheel/index.ts` | Public API: `WHEEL_DATA`, `getWheelData(vocation)`, `SPELLS`, `getSpell(name)`, `getWheelSpellNames(vocation)`. |
 | `src/data/wheel/wheel.test.ts` | Vitest checks. |
 
@@ -112,7 +112,7 @@ templates). Wheel facts: official Tibia Wheel of Destiny planner (CipSoft). The 
 - Values come from the **test server** and may change before release; re-run the extraction after updates.
 - The planner uses grade IV for all mods; lower grades come from the strings file only.
 - community builds predate the new layout (`legacyCode`).
-- D73 quadrant layout: the ring 3 augment that moves to the central slot is the one next to the ring 2 leech (TL tile 2, BR tile 33); unambiguous in TR/BL. Chain range (+0/1/2/2, capped at double the base) is not modelled; chain targets add to hunt targets, total capped at 12. Lightning is single-target in the spell data, so its chain mod is valued 0 until its chain behaviour is known.
+- D73 quadrant layout: Revelation Mastery takes the ring 2 leech slot, the leech takes the central ring 3 slot; spell augments stay. Chain range (+0/1/2/2, capped at double the base) is not modelled; chain targets add to hunt targets, total capped at 12. Lightning is single-target in the spell data, so its chain mod is valued 0 until its chain behaviour is known.
 - The planner export keeps the slice ids; on the live planner the perks of moved slots differ until the update ships.
 
 ## Planner export code

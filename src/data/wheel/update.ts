@@ -2,19 +2,19 @@
  * D73: announced Wheel of Destiny / gem changes, applied on top of the extracted planner data
  * (which still describes the previous version).
  *
- * - Quadrants: Revelation Mastery moves to the ring 2 leech slot, the leech moves to the adjacent ring 3 spell
- *   augment slot, and that augment moves to the central ring 3 slot (where Revelation Mastery was).
+ * - Quadrants: Revelation Mastery moves to the ring 2 leech slot and the leech to the central ring 3 slot
+ *   (where Revelation Mastery was); spell augments stay.
  * - Supreme mods: new grade IV values (lower grades keep the I:II:III:IV = 2/3 : 0.733 : 0.8 : 1 ratio).
  * - New chain augments (+1/1/1/2 chain targets, +0/1/2/2 range) replace three supreme mods.
  */
 import type { Quarter, VocationWheelData, WheelDataFile, WheelSupremeMod } from './types';
 
-/** Ring 3 central slot, ring 2 leech slot and the ring 3 augment next to it, per quarter (grid ids). */
-const QUARTER_SLOTS: Record<Quarter, { central: number; leech: number; augment: number }> = {
-  TL: { central: 7, leech: 8, augment: 2 },
-  TR: { central: 10, leech: 16, augment: 17 },
-  BL: { central: 25, leech: 19, augment: 18 },
-  BR: { central: 28, leech: 27, augment: 33 },
+/** Ring 3 central slot (Revelation Mastery) and ring 2 leech slot, per quarter (grid ids). */
+const QUARTER_SLOTS: Record<Quarter, { central: number; leech: number }> = {
+  TL: { central: 7, leech: 8 },
+  TR: { central: 10, leech: 16 },
+  BL: { central: 25, leech: 19 },
+  BR: { central: 28, leech: 27 },
 };
 
 /** New grade IV values: [mod id, kind, value %]. */
@@ -102,8 +102,7 @@ function updateTiles(w: VocationWheelData): VocationWheelData['tiles'] {
   const moved = new Map<number, VocationWheelData['tiles'][number]['conviction']>();
   for (const s of Object.values(QUARTER_SLOTS)) {
     moved.set(s.leech, conv.get(s.central)!);
-    moved.set(s.augment, conv.get(s.leech)!);
-    moved.set(s.central, conv.get(s.augment)!);
+    moved.set(s.central, conv.get(s.leech)!);
   }
   return w.tiles.map((t) => (moved.has(t.gridId) ? { ...t, conviction: moved.get(t.gridId)! } : t));
 }

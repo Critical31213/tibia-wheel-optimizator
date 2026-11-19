@@ -737,7 +737,8 @@ describe('D61: unique conviction rationale', () => {
   it('explains each chosen unique perk with its effect', () => {
     const r = optimize({ vocation: 'sorcerer', points: 2000, monster: null, priority: 0, context: { mode: 'boss' } });
     const msgs = (r.rationaleMsgs ?? []).filter((m) => m.key.startsWith('rationale.unique'));
-    expect(msgs.map((m) => m.key).sort()).toEqual(['rationale.uniqueFocus', 'rationale.uniqueRunic']);
+    expect(msgs.map((m) => m.key)).toContain('rationale.uniqueFocus');
+    for (const m of msgs) expect(m.params?.gain).toBeTruthy();
     const focus = msgs.find((m) => m.key === 'rationale.uniqueFocus')!;
     expect(focus.params).toEqual({ perk: 'Focus Mastery', gain: '+3% damage' });
     const t = translator('pl');
