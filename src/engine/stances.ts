@@ -123,15 +123,28 @@ export function stanceBuilder(
   stances: readonly StanceDef[],
   preset: RotationPreset | null,
   loadout?: Loadout,
+  /** D69: cooldown cuts (s) applied to the base spells (a plan's rotation augments). */
+  preCd?: ReadonlyMap<string, number>,
 ) {
-  if (!loadout) return (c: Required<CharacterStats>) => applyStanceSpells(buildSpellModel(vocation, context, monsters, c, stanceElementMl(c, stances)), stances, preset);
+  const cut = (m: SpellModel) => (preCd?.size ? withCooldownCuts(m, preCd) : m);
+  if (!loadout) return (c: Required<CharacterStats>) => cut(applyStanceSpells(buildSpellModel(vocation, context, monsters, c, stanceElementMl(c, stances)), stances, preset));
   const { healing: _healing, ...weaponMl } = loadoutElementMl(loadout);
   const attack = loadoutAttack(vocation, loadout);
   return (c: Required<CharacterStats>) => {
     const ml: ElementMagicLevel = { ...stanceElementMl(c, stances) };
     for (const [e, x] of Object.entries(weaponMl) as [keyof ElementMagicLevel, number][]) ml[e] = (ml[e] ?? 0) + x;
-    return applyLoadout(applyStanceSpells(buildSpellModel(vocation, context, monsters, c, ml, attack), stances, preset), loadout);
+    return cut(applyLoadout(applyStanceSpells(buildSpellModel(vocation, context, monsters, c, ml, attack), stances, preset), loadout));
   };
+}
+
+/** Model with extra cooldown cuts (s) on some spells. */
+function withCooldownCuts(m: SpellModel, preCd: ReadonlyMap<string, number>): SpellModel {
+  const spells = new Map(m.spells);
+  for (const [n, x] of preCd) {
+    const s = spells.get(n);
+    if (s) spells.set(n, { ...s, cd: (s.cd ?? 0) + x });
+  }
+  return { ...m, spells };
 }
 
 /** Defense of the stances in % EHP (before threat): damage taken, dodge, healing. Shielding goes through mitigation. */

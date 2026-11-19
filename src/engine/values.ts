@@ -96,6 +96,8 @@ export interface ValuationContext {
   mitigationRef: number;
   /** D21: forced spells (utility augments keep their value). */
   forced: ReadonlySet<string>;
+  /** D69: cooldown cuts (s) already in the model (the plan's rotation augments): their augments' cooldown effect counts 0. */
+  preCd?: ReadonlyMap<string, number>;
   /** Exactly evaluated unique convictions (Positional Tactics, Ballistic Mastery). */
   unique: Partial<Record<string, Parts>>;
   /** Share of incoming damage per element (weighted over the spot). */
@@ -421,8 +423,9 @@ export function augmentParts(v: ValuationContext, t: WheelTile): [Parts, Parts] 
   let one = ZERO;
   let both = ZERO;
   for (const spell of a.spells) {
-    one = add(one, spellBundleParts(v, spell, e1));
-    both = add(both, spellBundleParts(v, spell, [...e1, ...e2]));
+    const own = (e: SpellEffect[]) => (v.preCd?.has(spell) ? e.filter((x) => x.kind !== 'cd') : e);
+    one = add(one, spellBundleParts(v, spell, own(e1)));
+    both = add(both, spellBundleParts(v, spell, own([...e1, ...e2])));
   }
   return [one, sub(both, one)];
 }
@@ -442,7 +445,7 @@ export function augmentMods(v: ValuationContext, tiles: WheelTile[]): Map<string
     const effects = [...parseEffects(a.stage1), ...(n > 1 ? parseEffects(a.stage2) : [])];
     for (const spell of a.spells) {
       const prev = out.get(spell);
-      const m = toMods(effects, v.context.mode === 'hunt');
+      const m = toMods(v.preCd?.has(spell) ? effects.filter((x) => x.kind !== 'cd') : effects, v.context.mode === 'hunt');
       out.set(spell, prev ? { pct: prev.pct + m.pct, critChance: prev.critChance + m.critChance, critExtra: prev.critExtra + m.critExtra, cd: prev.cd + m.cd, extraTargets: prev.extraTargets + m.extraTargets } : m);
     }
   }

@@ -988,13 +988,14 @@ export function valuationFor(
   reference?: number,
   stances: readonly StanceDef[] = [],
   loadout?: Loadout,
+  preCd?: ReadonlyMap<string, number>,
 ): ValuationContext {
   const mi0 = modelInputs(input);
   const { context, level, monsters } = mi0;
-  const build = stanceBuilder(input.vocation, context, monsters, stances, preset, loadout);
+  const build = stanceBuilder(input.vocation, context, monsters, stances, preset, loadout, preCd);
   const armed = loadout ? loadoutCharacter(mi0.character, input.vocation, loadout) : mi0.character;
   const character = stancedCharacter(armed, stances);
-  const mi = stances.length || loadout ? { ...mi0, character, model: build(character) } : mi0;
+  const mi = stances.length || loadout || preCd ? { ...mi0, character, model: build(character) } : mi0;
   const model = withPlan(mi.model, preset, reference);
   const t0 = planTotal(mi.model, preset);
   const mage = input.vocation === 'sorcerer' || input.vocation === 'druid';
@@ -1019,6 +1020,7 @@ export function valuationFor(
     incoming: incomingShares(monsters),
     skillOff: Math.max(0, skillOff),
     forced: new Set(input.forcedSpells ?? []),
+    ...(preCd ? { preCd } : {}),
     unique: input.vocation === 'paladin' ? paladinUniques(mi, model, preset, threat, build) : {},
   };
   if (loadout) v.weapon = loadoutParts(v, loadout);
@@ -1035,37 +1037,41 @@ interface ForcedInfo {
   impossible: string[];
   noAugment: string[];
   /** D65: augments the preset's ratio needs (shorter cooldown): taken, out of budget, or none reaches it. */
-  rotation?: { taken: string[]; missing: string[]; tooLong: string[]; stage2: string[] };
+  rotation?: { taken: string[]; missing: string[]; tooLong: string[]; stage2: string[]; cut: ReadonlyMap<string, number> };
 }
 
 /**
  * D65: cooldown augments a preset needs. A spell with ratio r in a preset of ratio sum R is cast every R/r
  * turns, so its cooldown (on the 2 s grid, after proficiency) must fit; else the cheapest augment stage that fits.
  */
-export function presetCooldownNeeds(wheel: EngineWheel, model: SpellModel, entries: readonly { name: string; ratio: number }[]) {
+export function presetCooldownNeeds(wheel: EngineWheel, model: SpellModel, entries: readonly { name: string; ratio: number }[], preCd?: ReadonlyMap<string, number>) {
   const sum = entries.reduce((a, e) => a + e.ratio, 0);
-  const out = { stage1: [] as string[], stage2: [] as string[], tooLong: [] as string[] };
+  const out = { stage1: [] as string[], stage2: [] as string[], tooLong: [] as string[], cut: new Map<string, number>() };
   for (const e of entries) {
     if (e.ratio <= 0 || REVELATION_SPELLS[e.name]) continue;
     const base = spellCooldown(e.name);
-    const own = model.spells.get(e.name)?.cd ?? 0;
+    const own = (model.spells.get(e.name)?.cd ?? 0) - (preCd?.get(e.name) ?? 0);
     const fits = (red: number) => cooldownTurns(reducedCooldown(base, own + red)) <= sum / e.ratio + 1e-9;
     if (fits(0)) continue;
     const tile = wheel.slices.find((sl) => sl.kind === 'augment' && sl.tile.conviction.augment?.spells.includes(e.name))?.tile.conviction.augment;
     const cd = (t: string) => parseEffects(t).reduce((a, x) => a + (x.kind === 'cd' ? x.amount : 0), 0);
     const one = tile ? cd(tile.stage1) : 0;
-    if (tile && one > 0 && fits(one)) out.stage1.push(e.name);
-    else if (tile && fits(one + cd(tile.stage2))) out.stage2.push(e.name);
-    else out.tooLong.push(e.name);
+    if (tile && one > 0 && fits(one)) {
+      out.stage1.push(e.name);
+      out.cut.set(e.name, one);
+    } else if (tile && fits(one + cd(tile.stage2))) {
+      out.stage2.push(e.name);
+      out.cut.set(e.name, one + cd(tile.stage2));
+    } else out.tooLong.push(e.name);
   }
   return out;
 }
 
 /** D65: forced augments of a plan: the user's plus those its preset's cooldowns need. */
-function planForced(wheel: EngineWheel, input: OptimizerInput, budget: number, model?: SpellModel): ForcedInfo {
+function planForced(wheel: EngineWheel, input: OptimizerInput, budget: number, model?: SpellModel, preCd?: ReadonlyMap<string, number>): ForcedInfo {
   const user = input.forcedSpells ?? [];
   const userStage2 = input.forcedStage2 ?? [];
-  const needs = model?.plan.preset ? presetCooldownNeeds(wheel, model, model.plan.entries) : null;
+  const needs = model?.plan.preset ? presetCooldownNeeds(wheel, model, model.plan.entries, preCd) : null;
   if (!needs) return forcedSeed(wheel, user, budget, userStage2);
   const extra = [...needs.stage1, ...needs.stage2];
   const stage2 = [...new Set([...userStage2, ...needs.stage2])];
@@ -1075,9 +1081,19 @@ function planForced(wheel: EngineWheel, input: OptimizerInput, budget: number, m
     ...f,
     taken: f.taken.filter((x) => !mine(x)),
     impossible: f.impossible.filter((x) => !mine(x)),
-    rotation: { taken: f.taken.filter(mine), missing: f.impossible.filter(mine), tooLong: needs.tooLong, stage2: needs.stage2 },
+    rotation: { taken: f.taken.filter(mine), missing: f.impossible.filter(mine), tooLong: needs.tooLong, stage2: needs.stage2, cut: needs.cut },
   };
 }
+
+/** D69: cooldown cuts of the rotation augments a plan always takes; its valuation starts from them. */
+function preCdOf(f: ForcedInfo): Map<string, number> | undefined {
+  const r = f.rotation;
+  if (!r?.taken.length) return undefined;
+  return new Map(r.taken.map((x) => [x, r.cut.get(x) ?? 0]));
+}
+
+const sameCd = (a?: ReadonlyMap<string, number>, b?: ReadonlyMap<string, number>) =>
+  (a?.size ?? 0) === (b?.size ?? 0) && [...(a ?? [])].every(([k, x]) => b?.get(k) === x);
 
 /** Cheapest unlock path (Dijkstra over slice capacities, filled slices free) to one of `targets`; new slices only. */
 function cheapestPath(wheel: EngineWheel, full: ReadonlySet<number>, targets: readonly number[]): { cost: number; path: number[] } | null {
@@ -1324,13 +1340,15 @@ interface PlanSpec {
   reference: number;
   auto: boolean;
   forced: ForcedInfo;
+  /** D69: cooldown cuts (s) of the plan's rotation augments, already in its valuation. */
+  preCd?: ReadonlyMap<string, number>;
   /** D45: weapon and perks of this plan. */
   weapon?: WeaponChoice;
 }
 
 function prepare(input: OptimizerInput, priority = input.priority, base?: Prepared, spec?: PlanSpec): Prepared {
   const wheel = getEngineWheel(input.vocation);
-  const v = base?.v ?? spec?.v ?? valuationFor(input, spec?.preset ?? null, spec?.reference, spec?.stances, spec?.weapon && choiceLoadout(spec.weapon));
+  const v = base?.v ?? spec?.v ?? valuationFor(input, spec?.preset ?? null, spec?.reference, spec?.stances, spec?.weapon && choiceLoadout(spec.weapon), spec?.preCd);
   const budget = Math.min(wheel.definition.totalCapacity, pointsOf(input));
   const gems = input.gems ?? [];
   const blend = blendWith(weightsFor(priority, v.leech));
@@ -1666,9 +1684,11 @@ export function planSpecs(input: OptimizerInput): PlanSpec[] {
   const blend = blendWith(weightsFor(input.priority, leechEhp(base, threatOf(spotMonster(mi.monsters)))));
   const owned = ownedChoices(input);
   const specs = presets.map((preset): PlanSpec | null => {
-    const plain = pickStances(input, preset, reference, blend);
-    const forced = planForced(wheel, input, budget, plain.v?.model);
-    const spec: PlanSpec = { preset, stances: plain.stances, v: plain.v, reference, auto: !chosen, forced };
+    const plain0 = pickStances(input, preset, reference, blend);
+    const forced = planForced(wheel, input, budget, plain0.v?.model);
+    const preCd = preCdOf(forced);
+    const plain = preCd ? pickStances(input, preset, reference, blend, undefined, preCd) : plain0;
+    const spec: PlanSpec = { preset, stances: plain.stances, v: plain.v, reference, auto: !chosen, forced, ...(preCd ? { preCd } : {}) };
     const fit = owned.filter((w) => fitsPlan(w.weapon, preset));
     // A shield plan without a one-handed weapon: dropped in auto mode, weaponless when chosen by the user.
     if (owned.length && !fit.length) return chosen ? spec : null;
@@ -1677,9 +1697,15 @@ export function planSpecs(input: OptimizerInput): PlanSpec[] {
     const ranked = rankWeapons(fit, loadoutScorer(input, spec, blend, plain.v), mi.level).slice(0, WEAPON_FINALISTS);
     let best = { spec, score: -Infinity };
     for (const weapon of ranked) {
-      const { stances, v } = pickStances(input, preset, reference, blend, choiceLoadout(weapon));
+      const lo = choiceLoadout(weapon);
+      let pick = pickStances(input, preset, reference, blend, lo, preCd);
+      // The weapon's own cooldown perks may change which rotation augments are needed.
+      const wf = planForced(wheel, input, budget, pick.v?.model, preCd);
+      const wcd = preCdOf(wf);
+      if (!sameCd(wcd, preCd)) pick = pickStances(input, preset, reference, blend, lo, wcd);
+      const { stances, v } = pick;
       const score = v ? blend(baseParts(v)) : -Infinity;
-      if (score > best.score + 1e-9) best = { spec: { ...spec, stances, v, weapon, forced: planForced(wheel, input, budget, v?.model) }, score };
+      if (score > best.score + 1e-9) best = { spec: { ...spec, stances, v, weapon, forced: wf, preCd: wcd }, score };
     }
     return best.spec;
   });
@@ -1690,13 +1716,13 @@ export function planSpecs(input: OptimizerInput): PlanSpec[] {
  * D24: stances per plan, picked by their build-independent value (damage vs the reference, EHP) at the
  * user's priority; a preset may name its stance (monk virtues).
  */
-export function pickStances(input: OptimizerInput, preset: RotationPreset | null, reference: number, blend: (p: Parts) => number, loadout?: Loadout) {
+export function pickStances(input: OptimizerInput, preset: RotationPreset | null, reference: number, blend: (p: Parts) => number, loadout?: Loadout, preCd?: ReadonlyMap<string, number>) {
   const fixed = preset?.stance ? getStance(preset.stance) : undefined;
   const manual = input.stances?.map(getStance).filter((s): s is StanceDef => !!s);
   const combos = manual ? [manual] : fixed ? [[fixed]] : stanceCombos(input.vocation);
   let best = { stances: [] as StanceDef[], v: null as ValuationContext | null, score: -Infinity };
   for (const stances of combos) {
-    const v = valuationFor(input, preset, reference, stances, loadout);
+    const v = valuationFor(input, preset, reference, stances, loadout, preCd);
     const score = blend(baseParts(v));
     if (score > best.score + 1e-9) best = { stances, v, score };
   }
@@ -1890,19 +1916,19 @@ function ownedChoices(input: OptimizerInput, preset?: RotationPreset | null): Om
  * build's stages and augments), shielding mitigation and weapon sustain. Differences between loadouts match
  * `baseParts` up to the plan-constant terms.
  */
-function loadoutScorer(input: OptimizerInput, spec: Pick<PlanSpec, 'preset' | 'reference' | 'stances'>, blend: (p: Parts) => number, v0: ValuationContext, ri: RotationInput = NO_BONUS) {
+function loadoutScorer(input: OptimizerInput, spec: Pick<PlanSpec, 'preset' | 'reference' | 'stances' | 'preCd'>, blend: (p: Parts) => number, v0: ValuationContext, ri: RotationInput = NO_BONUS) {
   const val = loadoutValuer(input, spec, v0, ri);
   return (lo: Loadout): number => blend(val(lo));
 }
 
 /** Unblended `loadoutScorer`. */
-function loadoutValuer(input: OptimizerInput, spec: Pick<PlanSpec, 'preset' | 'reference' | 'stances'>, v0: ValuationContext, ri: RotationInput = NO_BONUS) {
+function loadoutValuer(input: OptimizerInput, spec: Pick<PlanSpec, 'preset' | 'reference' | 'stances' | 'preCd'>, v0: ValuationContext, ri: RotationInput = NO_BONUS) {
   const mi = modelInputs(input);
   const offhand = v0.model.plan.shield ? 'shield' : undefined;
-  const { preset, reference, stances } = spec;
+  const { preset, reference, stances, preCd } = spec;
   return (lo: Loadout): Parts => {
     const c = stancedCharacter(loadoutCharacter(mi.character, input.vocation, lo), stances);
-    const m0 = stanceBuilder(input.vocation, mi.context, mi.monsters, stances, preset, lo)(c);
+    const m0 = stanceBuilder(input.vocation, mi.context, mi.monsters, stances, preset, lo, preCd)(c);
     const model: SpellModel = { ...m0, plan: planFor(m0, preset), total: reference };
     const off = (100 * (rotationTotal(model, ri) - reference)) / reference;
     const mitigation = characterFacts(input.vocation, mi.level, c.shielding, offhand).mitigation;

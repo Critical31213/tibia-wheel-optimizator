@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { optimize } from '.';
 import { cooldownTurns } from './spells';
+import { getRotationPresets } from '../data/damage/rotations';
 
 const HUNT = { monster: null, priority: 0, context: { mode: 'hunt' as const }, alternatives: 0 };
 const augs = (r: ReturnType<typeof optimize>, name: string) => r.convictions.filter((c) => c.name.startsWith(`Augmented ${name}`)).length;
@@ -36,5 +37,13 @@ describe('D65: preset cooldowns on the 2 s turn grid', () => {
     const r = optimize({ vocation: 'knight', points: 200, ...HUNT });
     expect(r.rotation!.presetId).not.toBe('ek-mas');
     expect(keys(r)).not.toContain('rationale.rotationCooldownMissing');
+  });
+});
+
+describe('D69: a plan valued from its rotation augments (no double count of freed turns)', () => {
+  it.each([['druid', 300], ['druid', 900], ['knight', 600], ['monk', 900]] as const)('%s %i: auto pick is within 2 % of the best preset by 30 s damage', (vocation, points) => {
+    const win = (rotationId?: string) => optimize({ vocation, points, ...HUNT, ...(rotationId ? { rotationId } : {}) }).rotation!.window!.total;
+    const best = Math.max(...getRotationPresets(vocation).map((p) => win(p.id)));
+    expect(win()).toBeGreaterThanOrEqual(0.98 * best);
   });
 });
