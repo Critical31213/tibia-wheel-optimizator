@@ -1,0 +1,244 @@
+# UI module (S3 UI)
+
+## Purpose
+
+Single-page React UI: the user picks a vocation, character level / promotion points / skills, a hunting spot (several
+weighted monsters) and a DPS ↔ survivability priority; the optimized wheel build (plus up to 2 alternatives) is
+recomputed live (no "Calculate" button) and shown as an SVG wheel plus a text
+breakdown. Polish / English UI (switch top-right), dark "Tibian" theme, works from 360 px wide; on `lg`
+screens it is two columns (controls left, results right).
+
+## Files owned
+
+| File | Role |
+|------|------|
+| `src/App.tsx` | Layout, state wiring, memoized `optimize` call. |
+| `src/components/Panel.tsx` | Bordered section card with numbered heading. |
+| `src/components/VocationPicker.tsx` | 5 toggle cards, `radiogroup`. |
+| `src/components/VocationIcon.tsx` | Stroke icon per vocation. |
+| `src/components/CharacterPanel.tsx` | Level (→ points via `pointsForLevel`), scroll points, manual points override, per-vocation skills (empty = "auto"). |
+| `src/components/MonsterSearch.tsx` | Hunting spot: debounced ARIA combobox adding monsters (max 10), weight per monster, remove; `MonsterCard` for one, weighted combined chips for several. |
+| `src/components/BuildSwitcher.tsx` | "Best build · Alt 1 · Alt 2" toggle + alternative label, trade-off, relative score. |
+| `src/components/ExportPanel.tsx` | Planner code of the viewed build: read-only field, Copy code / Copy planner link / Open planner. |
+| `src/lib/monsters.ts` | `resolveMonsters`, `combinedModifiers` (weighted average, missing = 100), `combinedDamageTypes` (tested). |
+| `src/lib/planner.ts` | Re-exports `PLANNER_URL`/`plannerUrl(code)` from `src/data/wheel/plannerCode` (single source); `copyText` (Clipboard API → `execCommand` fallback) (tested). |
+| `src/components/MonsterCard.tsx` | Name, HP/exp, element chips, damage types. |
+| `src/components/PrioritySlider.tsx` | 0–100 range slider. |
+| `src/components/WheelChart.tsx` | SVG wheel, tooltip, active revelation perks per domain (no fill-order badges). |
+| `src/components/ResultsPanel.tsx` | Scores, revelations, convictions, stats, rationale, fill order. |
+| `src/components/SegmentedControl.tsx` | Generic compact `radiogroup` (roving tabindex, arrows/Home/End, `disabled`). |
+| `src/components/FightContextPanel.tsx` | Hunt / Boss toggle (hunt style removed, D20); Avatar / single-target hints. |
+| `src/components/RotationPanel.tsx` | Rotation select (Auto + vocation presets, note / requirements), used rotation of the viewed build (share %, ★ = revelation spell, auto-picked), stances of the viewed build (D24), forced spell augments (select + removable chips). |
+| `src/hooks/usePersistentSpellPrefs.ts` | `rotationId` + `forcedSpells` per vocation (localStorage) mirrored to URL `r` / `fs`. |
+| `src/lib/spellPrefs.ts` | Spell-prefs sanitising + URL / JSON codec (tested). |
+| `src/components/GemsPanel.tsx` | Collapsible "My gems" editor in Lesser / Regular / Greater subsections (mods per slot, grade I–IV), empty-vessel highlight. |
+| `src/components/GemIcon.tsx` | Diamond icon tinted by gem/vessel quality. |
+| `src/components/VesselsPanel.tsx` | Vessels, recommended gems per quality, best upgrades, collapsible spell usage. |
+| `src/lib/vessels.ts` | `emptyUnlockedByQuality`, `recommendationsByQuality`, `activeRevelationsByDomain` (tested). |
+| `src/components/LanguageSwitch.tsx` | PL / EN segmented toggle. |
+| `src/hooks/usePersistentGems.ts` | Owned gems per vocation in localStorage (not in the URL). |
+| `src/lib/gems.ts` | Gem slot rules, mod filtering, gem (de)serialisation, shared mod grades (D27) (tested). |
+| `src/i18n/engine.ts` | `engineText(t, msg, fallback)`: renders engine messages (`engine.<key>`) and translates id params. |
+| `src/i18n/` | `en.ts` / `pl.ts` dictionaries, `lang.ts` (pure helpers), `context.ts` (`useT`, `useI18n`), `I18nProvider.tsx` (tested). |
+| `src/hooks/useDebouncedValue.ts` | Generic debounce hook. |
+| `src/hooks/usePersistentInputs.ts` | Inputs state persisted to localStorage + URL. |
+| `src/lib/api.ts` | UI facade over `src/engine` + lazily loaded `src/data` (`loadMonsterData`, `useMonsterData`). |
+| `src/lib/geometry.ts` | Pure SVG geometry helpers (tested). |
+| `src/lib/inputState.ts` | Input (de)serialisation + validation, monster-list codec, `characterOf` (tested). |
+| `src/lib/labels.ts` | Labels, colours, `clamp`, `cx`, `modifierKind`, `priorityLabel` (tested). |
+| `src/index.css`, `index.html`, `public/favicon.svg` | Theme, fonts, icon. |
+
+## Component tree
+
+```
+App
+├─ VocationPicker      value, onChange(vocation)
+├─ CharacterPanel      vocation, value (points, level, scrolls, skills), max (= wheel.totalCapacity), onChange(patch)
+├─ MonsterSearch       value: WeightedMonster[], ready (dataset loaded), onChange(MonsterEntry[])
+│  └─ MonsterCard      monster
+├─ FightContextPanel   value: FightContext, onChange(patch)
+├─ PrioritySlider      value, onChange(priority)
+├─ GemsPanel           vocation, gems, mods, emptyVessels (viewed build, per quality), onChange(updater)
+├─ Panel › BuildSwitcher alternatives, value (0 = best), onChange   (only when the engine returns alternatives)
+├─ Panel › RotationPanel presets, spells (forceable), value: SpellPrefs, onChange(patch), usage = viewed build `rotation`
+├─ Panel › WheelChart  wheel, result | null   (the *viewed* build: best or alternative)
+├─ Panel › ResultsPanel wheel, result   (empty-state text when points = 0)
+├─ Panel › ExportPanel  code = viewed build `plannerCode` (empty state when undefined)
+└─ Panel › VesselsPanel vocation, result, mods   (only when result != null)
+```
+
+`main.tsx` wraps `App` in `I18nProvider`; `LanguageSwitch` sits in the header (top-right).
+
+Components never import `src/engine` / `src/data` directly — only `src/lib/api.ts`.
+
+## State flow
+
+1. `usePersistentInputs()` holds `{ vocation, points, level, scrolls, mainSkill, shielding, magicLevel, monsters, priority, mode }`.
+   Initial value = defaults ← localStorage (`wheel-optimizer:inputs:v1`) ← URL query
+   (`?v=druid&p=420&lv=470&ml=110&m=demon_dragon-lord*2&prio=75&f=hunt`; the removed hunt-style key `h` is ignored and dropped; URL wins; a link with `v` treats
+   absent optional keys as empty). Every change is written back to
+   localStorage (try/catch) and to the URL with `history.replaceState`.
+   All values are sanitised (`sanitize`) — unknown vocation dropped, points clamped to 0–`MAX_POINTS` (4000 = wheel
+   capacity), priority to 0–100. Once the monster dataset is loaded, unknown monster ids are dropped
+   (`withKnownMonsters`). A legacy `monsterId` / single `m=id` becomes a one-monster list.
+2. `App` derives `wheel = getWheel(vocation)` (memo) and clamps points to `wheel.totalCapacity`.
+3. `useDeferredValue(inputs)` keeps the slider/typing responsive; `optimize()` runs in a
+   `useMemo` keyed on the deferred vocation/points/spot/priority/context/gems/character with `monster: null`,
+   `monsters = resolveMonsters(entries, getMonsterById)`, `character = characterOf(inputs)` (only the vocation's skill
+   fields; level falls back to `points + 50`; `undefined` when nothing entered) and `alternatives: 2`; `context = contextOf(inputs)` (`{ mode }` only),
+   `rotationId` / `forcedSpells` from `usePersistentSpellPrefs(vocation)` (deferred; auto / none → `undefined`),
+   `gems` from `usePersistentGems(vocation)` (also deferred). `points = 0` → `result = null` → empty state.
+4. A local `view` index (0 = best, i = `result.alternatives[i-1]`) picks the *viewed* build (`BuildResult` =
+   `Omit<OptimizerResult, 'alternatives'>`) shown by the wheel, summary, export and vessels panels; it falls back
+   to 0 when the alternative disappears.
+
+### Persistence keys
+
+| Key | Where | Content |
+|-----|-------|---------|
+| `wheel-optimizer:inputs:v1` | localStorage | the whole `InputState` (legacy `monsterId` migrated) |
+| `?v= &p= &lv= &sc= &sk= &sh= &ml= &m= &prio= &f=` | URL query | same inputs (`lv` level, `sc` scrolls, `sk` main skill, `sh` shielding, `ml` magic level; `m` = `id[*weight]` joined by `_`, weight 1 omitted; `f` = hunt/boss; legacy `h` ignored); empty optional keys omitted |
+| `wheel-optimizer:spells:v1:<vocation>` | localStorage | `{ rotationId, forcedSpells }` JSON, validated against the vocation's presets / forceable spells (max 8) |
+| `?r= &fs=` | URL query | rotation preset id (absent = auto), forced spells joined by `,`; a link with `v` but no `r`/`fs` = auto / none |
+| `wheel-optimizer:gems:v1:<vocation>` | localStorage | `OwnedGem[]` JSON, validated by `sanitizeGems` |
+| `wheel-optimizer:lang:v1` | localStorage | `pl` / `en` |
+
+Gems are deliberately **not** in the URL (too long); a shared link carries every other input.
+
+## Character, hunting spot, alternatives, export (iteration 3)
+
+- **Character**: typing a level sets `points = pointsForLevel(level, scrolls)` (clamped to capacity); editing points
+  afterwards is a manual override (help text says "points set manually"). Skill fields per vocation (D13): knight
+  melee + shielding · paladin distance + shielding + magic level · sorcerer/druid magic level · monk fist + magic
+  level; empty = "auto" (engine estimates from level).
+- **Hunting spot**: up to 10 monsters, weight 0.1–100 (default 1, one decimal). One monster → `MonsterCard`;
+  several → weighted-average element chips (`combinedModifiers`) and damage types ordered by weight. Hunt mode shows
+  "Single-target spells are ignored in hunt mode" (D16).
+- **Alternatives**: `BuildSwitcher` (SegmentedControl) appears only when `result.alternatives` is non-empty;
+  label / trade-off rendered with `engineText(labelMsg | tradeoffMsg, fallback)`, score as "% of best".
+- **Export**: `plannerUrl(code)` = `https://www.test.tibia.com/community/?subtopic=wheelofdestinyplanner&code=<encoded>`;
+  copy result announced in a `role="status"` line; empty state when `plannerCode` is undefined.
+
+## Gem editor
+
+- Quality → slots (`slotsForQuality`): lesser = basic 1; regular = basic 1 + 2; greater = basic 1 + 2 + supreme.
+  Changing quality calls `normalizeGem`, which clears slots the quality no longer has.
+- Mod options per slot come from `wheel.mods` via `modsForSlot` (basic mods filtered by `slots`, absent = both;
+  supreme slot = `kind: 'supreme'`); the mod already chosen in the other basic slot is hidden.
+  An unknown stored `modId` is kept and shown as `#id`.
+- Grade I–IV is an inline `SegmentedControl` next to each mod select (disabled until a mod is chosen); the
+  grade's `gradeValues` entry is shown next to the slot label.
+- "Add gem" uses a quality select labelled with the vocation-specific gem name (`gemName`, read from the planner's
+  `VesselInfos.GemNames` in the wheel data, e.g. "Greater Sage Gem" for sorcerers and "Greater Mystic Gem" for druids); each gem card has a quality select and a Remove button. The panel is collapsible
+  (`aria-expanded` / `aria-controls`); it starts open when the vocation already has gems.
+
+## Results: vessels & gems
+
+`VesselsPanel` renders (each with an empty state while the engine returns `[]`):
+vessels (`GemIcon` by quality, locked/unlocked, assigned gem + mod chips with roman grades, badge
+owned / recommended), recommended gems (quality, mods, gain, reason), best upgrades (mod, slot, grade from → to,
+gain) and "Spells in this context" (✓/✗ with screen-reader text, expected targets, reason) collapsed by default.
+Mod names are looked up in `wheel.mods` by `kind` + `modId`.
+
+## i18n
+
+- No library. `src/i18n/en.ts` is the source of truth (`as const`); `MessageKey = keyof typeof en`;
+  `pl.ts` is typed `Record<MessageKey, string>`, so a missing key fails `tsc`. A test also checks identical
+  keys and identical `{placeholder}` sets per key.
+- `useT()` returns `t(key, vars?)` (`{name}` interpolation, EN fallback). `useI18n()` adds `lang` / `setLang`.
+- Default language: localStorage, else `navigator.language` starting with `pl` → `pl`, else `en`.
+  `I18nProvider` sets `<html lang>` and persists the choice.
+- Translated: all UI chrome, aria labels, element / domain / category / priority labels, vocation blurbs.
+  Not translated: game terms from data (perk, spell, mod names, vocation names, gem item names) and
+  engine-generated text (`rationale`, `reason`, stat labels) — those come from the engine in English.
+- `labels.ts` keeps the English constants (`priorityLabel` = `en[priorityKey(v)]`) for non-React callers.
+
+## Theme tokens (`src/index.css`, Tailwind v4 `@theme`)
+
+- `ink-950…500` warm near-black backgrounds; `parchment-50…400` text; `gold-300…700` accent.
+- Semantic: `weak` (green), `resist` (red), `immune` (grey), `offense`, `defense`, `utility`.
+- `font-display` = Cinzel (Google Fonts) for headings.
+- Component classes: `.panel`, `.section-title`, `.field`, `.priority-range`.
+- Domain colours (`DOMAIN_COLORS` in `labels.ts`): topLeft green, topRight red,
+  bottomLeft purple, bottomRight blue — each with `base` (filled), `dim` (empty), `text`.
+
+## Accessibility
+
+- Vocation: `role="radiogroup"` / `role="radio"` + `aria-checked`, roving tabindex, arrows/Home/End.
+- Monster search: ARIA 1.2 combobox (`aria-expanded`, `aria-controls`, `aria-activedescendant`,
+  `role="listbox"`/`option`); ↑/↓ move, Enter selects, Esc closes (second Esc clears text);
+  "Clear all" empties the spot ("No monster (generic build)"). Each row has a labelled weight input ("Weight of X") and
+  "Remove X" button; the list is in an `aria-live` region.
+- Fight context, grade and language toggles are `SegmentedControl` radiogroups (arrow keys).
+  Gem selects have `<label>`s (visually hidden where the context is obvious); Remove has "Remove gem N".
+- Slider has `aria-valuetext` ("Balanced (50 of 100)"); the "Balanced" label resets to 50.
+- Score bars use `role="meter"`; revelation pips have an `aria-label` ("Stage 2 of 3").
+- Wheel slices are focusable (`tabIndex=0`, `role="img"`, descriptive `aria-label`); hover and
+  focus show the same tooltip. Gold `:focus-visible` outline globally; reduced-motion respected.
+
+## Wheel geometry
+
+Angles are degrees clockwise from 12 o'clock, matching `Slice.indexInRing`:
+
+- Slice angles: `[i·360/n, (i+1)·360/n]` with `n = slicesInRing`. Domains therefore land at
+  topRight 0–90° (12→3 o'clock), bottomRight 90–180°, bottomLeft 180–270°, topLeft 270–360°.
+- Point at angle `a`, radius `r`: `(cx + r·sin a, cy − r·cos a)` (SVG y points down).
+- Rings are laid out evenly between hub radius 34 and outer radius 192 (viewBox 400):
+  `inner = hub + (ring−1)·w`, `outer = hub + ring·w`, `w = (outer−hub)/ringCount`.
+- Partial fill is **area-proportional**: `r_fill = √(inner² + f·(outer² − inner²))`, `f = points/capacity`.
+- Each sector is `M outerStart A outer … L innerEnd A inner … Z`, large-arc flag when span > 180°;
+  a full 360° span is clamped to 359.9° (an SVG arc can't start and end on the same point).
+- Fill-order badges sit at the sector centroid (mid angle, mid radius) and show the 1-based
+  index of the slice in `result.path`.
+
+## Monster data loading
+
+The monster dataset (~950 kB JSON) is code-split. `main.tsx` calls `loadMonsterData()` before the first
+render so the `data` chunk downloads in parallel; `useMonsterData()` (a `useSyncExternalStore` hook) flips
+to `true` when it resolves. Until then `searchMonsters` returns `[]` (the listbox says "Loading monster
+data…") and `getMonsterById` returns `undefined`, so the first build is generic and is recomputed once
+the selected monster resolves. The engine is bundled eagerly (it is small).
+
+## Work log
+
+- 2026-11-18 — Theme tokens, fonts, favicon; `lib/` helpers (geometry, input state, labels) with tests;
+  persistence hooks; fixture fallback facade.
+- 2026-11-18 — All components (`VocationPicker`, `PointsInput`, `MonsterSearch`, `MonsterCard`,
+  `PrioritySlider`, `WheelChart`, `ResultsPanel`) and `App` layout; fixed `-0` / full-circle arc
+  rounding in `geometry.ts`. `tsc -b`, `vitest run src/lib` (16 tests) and `npm run build` pass.
+- 2026-11-18 — (S4) Fixture fallback removed; monster data lazy-loaded; scroll points field; `MAX_POINTS` = 4000.
+- 2026-11-18 — (iteration 2) Fight context, My gems editor, Vessels & gems results, PL/EN i18n (`src/i18n/`),
+  `SegmentedControl`; gems per vocation in localStorage, context in URL. 126 tests pass, lint/build clean.
+- 2026-11-18 — (S4, iteration 2) Removed the dev mod fixture (the UI uses `wheel.mods`).
+  - Engine messages are rendered in PL/EN (`engineText`), with the English string as fallback.
+  - Spell share (`% dmg`) and upgrade `gainToMax` (gain to grade IV) are shown.
+  - Gem names come from the data, and vessels are labelled `vesselId + 1`.
+- 2026-11-18 — (iteration 3) Character panel (level/scrolls/points override/skills → `character`), multi-monster
+  hunting spot with weights (→ `monsters`), alternatives switcher, planner export; hunt-mode single-target note.
+
+## Rotation & forced spells (iteration 4, D20/D21)
+
+- `RotationPanel` (right column, above the build summary): `<select>` "Auto (best)" + `getRotationPresets(vocation)`;
+  the chosen preset's `note` and `requires` ("needs Beam Mastery", "needs a shield") below it. `optimize` gets
+  `rotationId` (undefined = auto). Switching vocation loads that vocation's stored prefs; an id not belonging to the
+  vocation is sanitised to auto.
+- Used rotation = viewed build's `result.rotation`: preset name, "picked automatically" when `auto`, each spell with
+  rounded `share` % and ★ when `fromRevelation`.
+- Forced spells: `getForceableSpells(vocation)` (augment slices + supreme-mod spells from the wheel data, sorted) in an
+  "Add spell…" select; chips with × remove; max 8; passed as `forcedSpells` (undefined when empty).
+
+## Iteration 5 (D23: vessels hold only owned gems)
+
+- **Wheel**: the domain-caption legend under the wheel is replaced by the viewed build's active revelation perks
+  (`activeRevelationsByDomain`, stage ≥ 1), in a 2×2 grid matching the quadrants: "Beam Mastery II · 520 pts".
+  A domain without an active revelation leaves its cell empty; no active revelation → no list.
+- **My gems**: three subsections (vocation gem names via `gemName`), each with its own list and "+ Add gem" for that
+  quality. `App` passes `emptyVessels = emptyUnlockedByQuality(shown.vessels)` (unlocked vessels whose `source` is not
+  `owned`; legacy `recommended` counts as empty). A quality with empty vessels gets an amber border + "N unlocked
+  vessels for X gems are empty — add your gems"; the collapsed panel header shows "N empty vessels".
+- **Vessels**: only owned gems are shown inside a vessel; any other unlocked vessel reads "Empty — add a gem".
+- **Owned gems**: a quality section with 2+ gems collapses (header toggle); a collapsed section also hides its add button.
+- **Recommended gems**: grouped by quality (`recommendationsByQuality`; each quality section collapses, D30; a replacement shows a note), each with mods, gain, reason and
+  near-equal substitutes, or "—". "Add to my gems" appends it (`gemFromRecommendation`, mods at the character's grades).
+- **Best upgrades**: one row per mod ("gems: N"); "Upgrade" raises that mod in every gem (`setModGrade`). Editing a
+  grade in the gems editor also applies to every gem with the mod (`updateGem`, D27).

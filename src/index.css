@@ -1,0 +1,96 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+ * Theme tokens — dark Tibian look (stone / leather / parchment / gold).
+ * Utilities: bg-ink-900, text-parchment-200, border-gold-600, font-display …
+ * ------------------------------------------------------------------------- */
+@theme {
+  --font-display: "Cinzel", ui-serif, Georgia, "Times New Roman", serif;
+
+  /* Backgrounds: near-black warm stone */
+  --color-ink-950: #0d0a07;
+  --color-ink-900: #15110c;
+  --color-ink-850: #1a1510;
+  --color-ink-800: #211a13;
+  --color-ink-700: #2d241a;
+  --color-ink-600: #3e3225;
+  --color-ink-500: #5a4a37;
+
+  /* Text: parchment */
+  --color-parchment-50: #fbf5e6;
+  --color-parchment-100: #f1e4c3;
+  --color-parchment-200: #e2d1a8;
+  --color-parchment-300: #c9b68d;
+  --color-parchment-400: #a8946c;
+
+  /* Accent: old gold */
+  --color-gold-300: #f3d27c;
+  --color-gold-400: #e4b552;
+  --color-gold-500: #c9962f;
+  --color-gold-600: #9c7222;
+  --color-gold-700: #6b4f19;
+
+  /* Semantic */
+  --color-weak: #6cc77a;
+  --color-resist: #ec7b70;
+  --color-immune: #9a9083;
+  --color-offense: #e0754f;
+  --color-defense: #5f9fe0;
+  --color-utility: #b892e8;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-ink-950 text-parchment-100 antialiased;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgb(201 150 47 / 0.12), transparent 70%),
+      radial-gradient(ellipse 60% 40% at 100% 100%, rgb(90 74 55 / 0.18), transparent 70%);
+    background-attachment: fixed;
+    min-height: 100vh;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-gold-400);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: rgb(201 150 47 / 0.4);
+  }
+}
+
+@layer components {
+  .panel {
+    @apply rounded-2xl border border-ink-600/70 bg-ink-900/85 p-4 shadow-lg shadow-black/40 sm:p-5;
+    background-image: linear-gradient(180deg, rgb(255 255 255 / 0.025), transparent 40%);
+  }
+  .section-title {
+    @apply font-display text-sm font-semibold tracking-wider text-gold-300 uppercase;
+  }
+  .field {
+    @apply w-full rounded-lg border border-ink-600 bg-ink-950/70 px-3 py-2 text-parchment-50 placeholder:text-parchment-400/70;
+    @apply focus:border-gold-500 focus:outline-none focus-visible:outline-none focus:ring-2 focus:ring-gold-500/40;
+  }
+  .sr-only-focusable:not(:focus) {
+    @apply sr-only;
+  }
+}
+
+/* Range input: gold accent; thicker track */
+input[type="range"].priority-range {
+  accent-color: var(--color-gold-500);
+  height: 1.75rem;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
