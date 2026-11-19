@@ -122,7 +122,7 @@ Gems are deliberately **not** in the URL (too long); a shared link carries every
 - Quality → slots (`slotsForQuality`): lesser = basic 1; regular = basic 1 + 2; greater = basic 1 + 2 + supreme.
   Changing quality calls `normalizeGem`, which clears slots the quality no longer has.
 - Mod options per slot come from `wheel.mods` via `modsForSlot` (basic mods filtered by `slots`, absent = both;
-  supreme slot = `kind: 'supreme'`); the mod already chosen in the other basic slot is hidden.
+  supreme slot = `kind: 'supreme'`); the mod already chosen in the other basic slot is hidden. Supreme options are ordered by `sortSupremeMods` (D41): effects, Revelation Mastery, augments by spell.
   An unknown stored `modId` is kept and shown as `#id`.
 - Grade I–IV is an inline `SegmentedControl` next to each mod select (disabled until a mod is chosen); the
   grade's `gradeValues` entry is shown next to the slot label.
@@ -222,7 +222,7 @@ the selected monster resolves. The engine is bundled eagerly (it is small).
   vocation is sanitised to auto.
 - Used rotation = viewed build's `result.rotation`: preset name, "picked automatically" when `auto`, each spell with
   rounded `share` % and ★ when `fromRevelation`.
-- Forced spells: `getForceableSpells(vocation)` (augment slices + supreme-mod spells from the wheel data, sorted) in an
+- Forced spells: `getForceableSpells(vocation)` (spells of wheel augment slices only, not gem-only supreme mods; sorted) in an
   "Add spell…" select; chips with × remove; max 8; passed as `forcedSpells` (undefined when empty).
 
 ## Iteration 5 (D23: vessels hold only owned gems)

@@ -6,6 +6,9 @@ import { inflateSync } from 'fflate';
 import type { GemQuality, Vocation } from '../../types';
 import { getWheelData, WHEEL_DATA } from './index';
 
+/** Official planner on tibia.com; still the old wheel (Vessel Resonance), so codes target the test server for now (D38). */
+export const LIVE_PLANNER_URL = 'https://www.tibia.com/community/?subtopic=wheelofdestinyplanner';
+/** Planner that reads our codes. Switch to LIVE_PLANNER_URL when `npm run check:planner` reports the new wheel. */
 export const PLANNER_URL = 'https://www.test.tibia.com/community/?subtopic=wheelofdestinyplanner';
 export const PLANNER_CODE_VERSION = 1;
 export const GRID_SIZE = 36;

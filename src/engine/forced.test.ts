@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { optimize, revelationOptions } from '.';
 import { getWheel } from '.';
+import { VOCATIONS } from '../types';
 
 const BOSS = { vocation: 'paladin' as const, points: 800, monster: null, priority: 0, context: { mode: 'boss' as const }, alternatives: 0 };
 const caldera = (r: ReturnType<typeof optimize>) => r.convictions.filter((c) => c.name.startsWith('Augmented Divine Caldera')).length;
@@ -23,6 +24,24 @@ describe('D35: forced augment stage and revelation stage', () => {
     expect(at(600)).toBe('impossible');
     expect(at(800)).toBe('gem');
     expect(at(900)).toBe('ok');
+  });
+
+  it('D38: an RM gem only helps once its greater vessel is unlocked (300 points: no stage II from a gem)', () => {
+    expect(revelationOptions({ vocation: 'paladin', points: 300, gems: [] })[0].stages[1].status).toBe('impossible');
+  });
+
+  it.each(VOCATIONS)('D38: %s: every revelation at stage III, at the fewest points reach calls ok (with and without an RM gem IV), is met', (vocation) => {
+    const mods = getWheel(vocation).mods.filter((m) => m.kind === 'supreme' && m.name.startsWith('Revelation Mastery '));
+    for (const rev of getWheel(vocation).revelations) {
+      const mod = mods.find((m) => m.name === `Revelation Mastery ${rev.name}`);
+      for (const gems of [[], mod ? [{ id: 'g', quality: 'greater' as const, basic1: null, basic2: null, supreme: { modId: mod.id, grade: 4 as const } }] : []]) {
+        const ok = (points: number) => revelationOptions({ vocation, points, gems }).find((x) => x.name === rev.name)!.stages[2].status === 'ok';
+        let points = 500;
+        while (!ok(points)) points += 25;
+        const r = optimize({ ...BOSS, vocation, points, gems, forcedRevelations: [{ name: rev.name, stage: 3 }] });
+        expect(r.revelations.find((x) => x.perk.name === rev.name)!.stage, `${rev.name} @${points} gems=${gems.length}`).toBe(3);
+      }
+    }
   });
 
   it('duplicate supreme mod names carry their effect', () => {

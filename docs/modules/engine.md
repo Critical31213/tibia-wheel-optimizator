@@ -7,7 +7,7 @@ Owner: **S2 Engine** (iteration 3). Every number comes from the official test-se
 
 | Export | Purpose |
 |---|---|
-| `optimize(input): OptimizerResult` | The best allocation, path, revelations, convictions, stats, vessels, gem and upgrade recommendations, and spells. Also `plannerCode` and `alternatives`. Deterministic; < 75 ms worst case including alternatives and RM re-optimization. |
+| `optimize(input): OptimizerResult` | The best allocation, path, revelations, convictions, stats, vessels, gem and upgrade recommendations, and spells. Also `plannerCode` and `alternatives`. Deterministic; ~65 ms worst case (2500 points), test budget 100 ms, including RM re-optimization and D34 pair tries. |
 | `getWheel(vocation): WheelDefinition` | Contract view: 36 slices, 4 revelations, 8 `vessels`, and `mods` (basic and supreme). |
 | `pointsForLevel`, `MIN_LEVEL_FOR_POINTS`, `MAX_SCROLL_POINTS` | Unchanged. |
 | `ENGINE_MESSAGES`, `renderMessage`, `EngineMessageKey` | i18n templates for `rationaleMsgs`, `reasonMsg` and `labelMsg`. |
@@ -47,7 +47,7 @@ src/engine/
 - **Vessels.** There are 8 vessels, numbered with a **0-based** `vesselId` in planner order (lesser, regular, greater, lesser, greater, regular, greater, greater). Vessel *n* (0-based) unlocks when *n + 1* Gem Vessel slices are full, in any domain.
 - **Gems and slots.** A lesser gem has `basic1`. A regular gem has `basic1` and `basic2`. A greater gem has both basics and `supreme`.
   - D28: a gem fits only a vessel of its own quality (lesser → lesser, regular → regular, greater → greater); then all its slots are active (`fits`, `activeSlots`). Placement gives mismatched pairs weight 0.
-  - D35: `input.forcedStage2` (both slices, `forcedSeed` → `pairPath`), `input.forcedRevelations` (`forcedStages`, `forceTables`, `planValid`), `revelationOptions` (reach per stage via `domainCost`). Duplicate supreme mod names get an effect suffix (`distinctNames` in wheel/build.ts).
+  - D35: `input.forcedStage2` (both slices, `forcedSeed` → `pairPath`), `input.forcedRevelations` (`forcedStages`, `forceTables`, `planValid`), `revelationOptions` (reach per stage via `domainCost`; D38: plus the vessel fill an RM gem needs, `vesselFills`). D38: `forceTables` penalty is graded per missing stage. Duplicate supreme mod names get an effect suffix (`distinctNames` in wheel/build.ts).
   - D34: `searchPlan` adds seeded searches (`pairTries`, `pairSeed`, `cheapestPath`) for the top 2 augment pairs with stage II > stage I that the plain search did not fill.
   - D31: life leech (nodes, augments, supreme mods) per +1 pp = `leech / threat × 100 / LIFE_LEECH_IMBUE[vocation]` (`leechPoint`).
   - D32: `input.stances` (names, `[]` = none) replaces the automatic stance pick in `pickStances`.

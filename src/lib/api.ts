@@ -33,8 +33,8 @@ export function getStanceOptions(vocation: Vocation): string[] {
 export function getForceableSpells(vocation: Vocation): string[] {
   const w = getWheelData(vocation);
   const names = new Set<string>();
+  // Wheel (conviction) augments only; gem-only spell mods cannot be forced on the wheel.
   for (const t of w.tiles) for (const s of t.conviction.augment?.spells ?? []) names.add(s);
-  for (const m of w.mods.supreme) if (m.spell) names.add(m.spell);
   return [...names].sort((a, b) => a.localeCompare(b));
 }
 

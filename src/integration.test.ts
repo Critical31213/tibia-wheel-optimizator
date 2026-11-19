@@ -636,6 +636,11 @@ describe('integration: iteration 4 — EHP gems, rotations, forced spells', () =
         }
   });
 
+  it.each(VOCATIONS)('%s: every forceable spell has a wheel augment slice (not gem-only)', (vocation) => {
+    const wheelSpells = new Set(getEngineWheel(vocation).slices.flatMap((sl) => sl.tile.conviction.augment?.spells ?? []));
+    expect(getForceableSpells(vocation).filter((s) => !wheelSpells.has(s))).toEqual([]);
+  });
+
   it.each([
     ['paladin', 'Divine Dazzle'],
     ['monk', 'Mystic Repulse'],

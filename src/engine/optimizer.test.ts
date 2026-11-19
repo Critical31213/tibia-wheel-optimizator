@@ -142,7 +142,7 @@ describe('behaviour', () => {
     for (const s of res.stats) expect(s.labelMsg?.key).toMatch(/^stat\./);
   });
 
-  it('runs well under 75 ms (warm, incl. RM gem re-optimization)', () => {
+  it('runs under 100 ms (warm, incl. RM gem re-optimization and D34 pair tries)', () => {
     const inputs = VOCATIONS.flatMap((vocation) =>
       [100, 1000, 2500, 4000].map((points) => ({ vocation, points, monster: null, priority: 50, context: CONTEXTS[0] })),
     );
@@ -159,7 +159,8 @@ describe('behaviour', () => {
       worst = Math.max(worst, ms);
     }
     // Shared CI runners are several times slower than a desktop.
-    expect(worst).toBeLessThan(import.meta.env.CI ? 400 : 75);
+    // ~65 ms worst locally (2500 points, D34 pair tries); 100 keeps headroom for parallel workers.
+    expect(worst).toBeLessThan(import.meta.env.CI ? 400 : 100);
   });
 
   it('roughly agrees with the planner reference builds', () => {

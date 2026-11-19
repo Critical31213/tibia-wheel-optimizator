@@ -19,9 +19,24 @@ export function slotsForQuality(quality: GemQuality): GemSlot[] {
 
 export const slotKind = (slot: GemSlot): ModKind => (slot === 'supreme' ? 'supreme' : 'basic');
 
+const AUG_ORDER = ['Base Damage', 'Critical Damage', 'Cooldown', 'Healing'];
+const supremeGroup = (m: ModDefinition) => (m.name.startsWith('Revelation Mastery') ? 1 : m.name.startsWith('Augmented') ? 2 : 0);
+const augOrder = (m: ModDefinition) => AUG_ORDER.findIndex((s) => m.name.endsWith(`(${s})`));
+
+/** Supreme mods for display: general effects, then all Revelation Mastery mods, then augments by spell (damage, crit, cooldown, healing). */
+export function sortSupremeMods(mods: readonly ModDefinition[]): ModDefinition[] {
+  return [...mods].sort(
+    (a, b) =>
+      supremeGroup(a) - supremeGroup(b) ||
+      (a.target ?? a.name).localeCompare(b.target ?? b.name) ||
+      augOrder(a) - augOrder(b) ||
+      a.name.localeCompare(b.name),
+  );
+}
+
 /** Mods that may go into `slot` (basic mods without `slots` fit both basic slots). */
 export function modsForSlot(mods: readonly ModDefinition[], slot: GemSlot): ModDefinition[] {
-  if (slot === 'supreme') return mods.filter((m) => m.kind === 'supreme');
+  if (slot === 'supreme') return sortSupremeMods(mods.filter((m) => m.kind === 'supreme'));
   const n = slot === 'basic1' ? 1 : 2;
   return mods.filter((m) => m.kind === 'basic' && (!m.slots || m.slots.includes(n)));
 }

@@ -1014,11 +1014,13 @@ function pairSeed(wheel: EngineWheel, base: readonly number[], pair: readonly [n
 /**
  * D35: fewest wheel points that bring domain `d` to `need` revelation points (domain slices from the centre,
  * RM slices add their bonus; a partial last slice counts). Greedy by revelation points per wheel point.
+ * `base`: slices already filled (free); their domain points count.
  */
-function domainCost(wheel: EngineWheel, d: number, need: number): number {
-  if (need <= 0) return 0;
-  const alloc = new Int32Array(wheel.slices.length);
+function domainCost(wheel: EngineWheel, d: number, need: number, base?: Int32Array): number {
+  const alloc = base ? Int32Array.from(base) : new Int32Array(wheel.slices.length);
   let have = 0;
+  for (const s of wheel.slices) if (s.domainIdx === d && isFull(wheel, alloc, s.idx)) have += s.capacity + (s.kind === 'rm' ? RM_SLICE_POINTS : 0);
+  if (have >= need) return 0;
   let cost = 0;
   for (;;) {
     let best = -1;
@@ -1043,23 +1045,53 @@ function domainCost(wheel: EngineWheel, d: number, need: number): number {
   }
 }
 
+/**
+ * D38: cheapest fills that unlock 0..8 vessels (index = vessel count), greedy nearest vessel node; one variant
+ * prefers nodes of domain `d` (they also add revelation points there). An RM gem counts only in an unlocked
+ * greater vessel, so its reach must pay for those nodes.
+ */
+function vesselFills(wheel: EngineWheel, d: number): { alloc: Int32Array; cost: number }[][] {
+  return [false, true].map((prefer) => {
+    const full = new Set<number>();
+    let cost = 0;
+    const out = [{ alloc: new Int32Array(wheel.slices.length), cost: 0 }];
+    for (let c = 1; c <= wheel.vesselTiles.length; c++) {
+      const left = wheel.vesselTiles.filter((i) => !full.has(i));
+      const own = left.filter((i) => wheel.slices[i].domainIdx === d);
+      const p = left.length ? cheapestPath(wheel, full, prefer && own.length ? own : left) : null;
+      if (!p) break;
+      p.path.forEach((i) => full.add(i));
+      cost += p.cost;
+      const alloc = new Int32Array(wheel.slices.length);
+      full.forEach((i) => (alloc[i] = wheel.slices[i].capacity));
+      out.push({ alloc, cost });
+    }
+    return out;
+  });
+}
+
 /** D35: reach of every revelation stage for the input's budget and owned gems. */
 export function revelationOptions(input: Pick<OptimizerInput, 'vocation' | 'points' | 'gems' | 'character'>): RevelationOption[] {
   const wheel = getEngineWheel(input.vocation);
   const budget = Math.min(wheel.definition.totalCapacity, pointsOf(input as OptimizerInput));
-  const offsets = ownedRmOffsets(wheel, input.gems ?? []);
-  const owned = offsets[offsets.length - 1];
+  const owned = input.gems ?? [];
   return wheel.revelations.map((r) => {
     const d = r.domainIdx;
     const mod = wheel.supremeMods.find((m) => m.category === 'revelationMastery' && m.revelation === r.data.name);
-    const gem = (input.gems ?? []).find((g) => g.quality === 'greater' && g.supreme?.modId === mod?.id);
-    const fits = (offset: number, t: number) => domainCost(wheel, d, t - offset) <= budget;
+    const gem = owned.find((g) => g.quality === 'greater' && g.supreme?.modId === mod?.id);
+    const fills = vesselFills(wheel, d);
+    // Reachable when some vessel count c (RM gems placed by ownedRmOffsets) plus the domain points fit the budget.
+    const fits = (gems: OwnedGem[], t: number) => {
+      const offsets = ownedRmOffsets(wheel, gems);
+      return fills.some((f) => f.some((x, c) => x.cost + domainCost(wheel, d, t - offsets[Math.min(c, offsets.length - 1)][d], x.alloc) <= budget));
+    };
+    const others = owned.filter((g) => g !== gem);
+    const withGrade = (g: number): OwnedGem[] => [...others, { id: 'reach-probe', quality: 'greater', basic1: null, basic2: null, supreme: { modId: mod!.id, grade: g as ModGrade } }];
     const stages = REVELATION_THRESHOLDS.map((t): RevelationReach => {
-      if (fits(owned[d], t)) return { status: 'ok' };
+      if (fits(owned, t)) return { status: 'ok' };
       if (mod) {
-        const base = owned[d] - (gem ? (mod.values[gem.supreme!.grade - 1] ?? 0) : 0);
         for (let g = gem ? gem.supreme!.grade + 1 : 1; g <= 4; g++) {
-          if (fits(base + (mod.values[g - 1] ?? 0), t)) return { status: gem ? 'upgrade' : 'gem', grade: g as 1 | 2 | 3 | 4 };
+          if (fits(withGrade(g), t)) return { status: gem ? 'upgrade' : 'gem', grade: g as 1 | 2 | 3 | 4 };
         }
       }
       return { status: 'impossible' };
@@ -1088,10 +1120,10 @@ const ROMAN_STAGE = ['', 'I', 'II', 'III'];
 /** D35: revelation value below a forced stage. */
 const FORCED_PENALTY = 1e4;
 
-/** D35: tables with a penalty on revelation stages below the forced ones. */
+/** D35: tables with a penalty on revelation stages below the forced ones, graded per missing stage (D38) so the search sees progress. */
 function forceTables(t: Tables, min: readonly number[]): Tables {
   if (min.every((x) => x === 0)) return t;
-  return { ...t, rev: t.rev.map((r, d) => Float64Array.from(r, (x, k) => (k < min[d] ? x - FORCED_PENALTY : x))) };
+  return { ...t, rev: t.rev.map((r, d) => Float64Array.from(r, (x, k) => (k < min[d] ? x - FORCED_PENALTY * (min[d] - k) : x))) };
 }
 
 interface Prepared {

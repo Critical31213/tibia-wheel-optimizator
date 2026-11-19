@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ModDefinition, OwnedGem } from '../types';
+import { type ModDefinition, type OwnedGem, VOCATIONS } from '../types';
+import { getWheel } from './api';
 import { createGem, gemsStorageKey, modsForSlot, normalizeGem, parseGems, serializeGems, slotsForQuality } from './gems';
 
 const MODS: ModDefinition[] = [
@@ -61,5 +62,15 @@ describe('gem persistence', () => {
 
   it('uses a per-vocation storage key', () => {
     expect(gemsStorageKey('druid')).not.toBe(gemsStorageKey('knight'));
+  });
+});
+
+describe('D41: supreme mod order', () => {
+  it.each(VOCATIONS)('%s: effects, then all Revelation Mastery, then augments grouped by spell', (vocation) => {
+    const names = modsForSlot(getWheel(vocation).mods, 'supreme').map((m) => m.name);
+    const group = (n: string) => (n.startsWith('Revelation Mastery') ? 1 : n.startsWith('Augmented') ? 2 : 0);
+    expect(names.map(group)).toEqual([...names.map(group)].sort());
+    const augs = names.filter((n) => group(n) === 2).map((n) => n.replace(/ \(.*\)$/, ''));
+    expect(augs.filter((n, i) => i > 0 && augs[i - 1] !== n && augs.indexOf(n) < i)).toEqual([]);
   });
 });

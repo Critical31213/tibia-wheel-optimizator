@@ -20,7 +20,7 @@ The iteration 3 count (200) dropped when hunt styles were removed (S3 reduced th
 | Area | Cases |
 |------|-------|
 | EHP gems (D18) | 5 vocations × levels 200 / 600 / 1500 × hunt / boss × priority 0 / 50 / 100, main build and alternatives: no gem mod contains Capacity or Mana (Mana Drain resistance allowed). |
-| Forced spells (D21) | Paladin Divine Dazzle, monk Mystic Repulse, druid Heal Friend (level 600): the spell is in `getForceableSpells`, a slice with its augment is filled, `rationale.forced` is present and the build is valid. |
+| Forced spells (D21) | Paladin Divine Dazzle, monk Mystic Repulse, druid Heal Friend (level 600): the spell is in `getForceableSpells`, a slice with its augment is filled, `rationale.forced` is present and the build is valid. Every forceable spell of every vocation has a wheel augment slice. |
 | Manual rotation (D20) | Every preset of every vocation (level 1000): main build and alternative report `presetId` with `auto: false`, and `rationale.rotationManual` names the preset. Without `rotationId`, `auto: true` and a valid preset id. |
 | Revelation spells | 5 vocations × levels 300 / 800 / 1500 × priority 0 / 50 × hunt / boss, main + alternative: `fromRevelation` ⇔ `revelationSpell(name)`, and the revelation is at stage ≥ 1. |
 | Avatar | 5 vocations × levels 300 / 1000 / 2000 × hunt / boss (priority 30): the Avatar is in the rotation exactly when in boss mode with its revelation reached (seen at least once per vocation). |

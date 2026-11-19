@@ -156,6 +156,11 @@ src/integration.test.ts      end-to-end tests
 - Armor is not modelled; base mitigation assumes default equipment per vocation.
 - Hunt target counts are community averages; the shield defense (50) and quiver factor used for paladin
   mitigation come from a few in-game data points.
-- Near a full wheel there may be no alternatives (not enough room for a distinct build).
 - Some legacy monsters have incomplete damage or resistance data on the source site.
 - The UI is functional, not polished; polishing is postponed until the functionality is accepted.
+
+## License
+
+The source code and documentation are licensed under the [MIT License](LICENSE). Third-party material is not:
+Tibia names, texts and game data remain © CipSoft GmbH, and every other source keeps its own terms
+([THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)).
