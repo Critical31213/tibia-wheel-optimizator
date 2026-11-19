@@ -1,10 +1,16 @@
 import { useId } from 'react';
 import type { OwnedWeapon, WeaponPick, WeaponResult } from '../types';
+import type { TFunction } from '../i18n';
 import { useT } from '../i18n';
 import { getShapingOption, getWeapon, levelOptions } from '../lib/api';
 import { formatNumber } from '../lib/labels';
 import { perkLabel, shapingLabel } from '../lib/weapons';
+import { PerkIcon } from './PerkIcon';
 import { WeaponMeta } from './WeaponsPanel';
+
+/** Alpha strike only pays off when the player hits a fresh target first, i.e. playing solo. */
+const SoloNote = ({ kind, t }: { kind?: string; t: TFunction }) =>
+  kind === 'alphaStrike' ? <span className="text-weak"> ({t('weaponResult.solo')})</span> : null;
 
 const signed = (n: number) => `${n > 0 ? '+' : n < 0 ? '−' : '±'}${formatNumber(Math.abs(Math.round(n * 10) / 10))}`;
 
@@ -29,9 +35,13 @@ function PickPerks({ pick, owned }: { pick: WeaponPick; owned?: OwnedWeapon }) {
         if (!p) return null;
         const manual = owned?.perks?.[i] != null;
         return (
-          <li key={i} className="flex gap-2">
-            <span className="w-6 shrink-0 text-right tabular-nums text-parchment-400">{i + 1}.</span>
-            <span className="min-w-0 flex-1 text-parchment-100">{perkLabel(t, p)}</span>
+          <li key={i} className="flex items-center gap-2">
+            <span className="w-5 shrink-0 text-right tabular-nums text-parchment-400">{i + 1}.</span>
+            <PerkIcon perk={p} size={16} />
+            <span className="min-w-0 flex-1 text-parchment-100">
+              {perkLabel(t, p)}
+              <SoloNote kind={p.kind} t={t} />
+            </span>
             {options[i].length > 1 && (
               <span className="shrink-0 text-parchment-400">{manual ? t('weaponResult.yours') : t('weaponResult.picked')}</span>
             )}
@@ -88,9 +98,11 @@ export function WeaponResultPanel({ result, owned, suggest, busy, onSuggestChang
               const o = getShapingOption(r.option);
               const replaced = bestOptions[r.level - 1]?.[r.replaces];
               return (
-                <li key={`${r.level}-${r.option}`} className="flex items-start justify-between gap-2 text-sm">
-                  <span className="min-w-0 text-parchment-100">
+                <li key={`${r.level}-${r.option}`} className="flex items-start gap-2 text-sm">
+                  {o && <PerkIcon perk={o} size={16} />}
+                  <span className="min-w-0 flex-1 text-parchment-100">
                     {t('weaponResult.reshape', { level: r.level, option: o ? shapingLabel(t, o, 10) : r.option })}
+                    <SoloNote kind={o?.kind} t={t} />
                     {replaced && (
                       <span className="block text-xs text-parchment-400">{t('weaponResult.replaces', { perk: perkLabel(t, replaced) })}</span>
                     )}

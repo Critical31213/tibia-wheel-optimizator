@@ -32,8 +32,9 @@ screens it is two columns (controls left, results right).
 | `src/hooks/usePersistentSpellPrefs.ts` | `rotationId` + `forcedSpells` per vocation (localStorage) mirrored to URL `r` / `fs`. |
 | `src/lib/spellPrefs.ts` | Spell-prefs sanitising + URL / JSON codec (tested). |
 | `src/components/GemsPanel.tsx` | Collapsible "My gems" editor in Lesser / Regular / Greater subsections (mods per slot, grade I–IV), empty-vessel highlight. |
-| `src/components/WeaponsPanel.tsx` | D47: collapsible "My weapons": weapon search (combobox, vocation's weapons with a known tree), per weapon proficiency level 0–n, perk per level (Auto / option; ✦ = reshaped slot) and dust reshapes (shaping option at rank 10 + replaced option, at most 2). |
-| `src/components/WeaponResultPanel.tsx` | D47: best weapon with its perks (picked / your choice), other owned weapons (difference), worthwhile reshapes, collapsible "better weapons you do not own" (opening it sets `suggestWeapons`). |
+| `src/components/WeaponsPanel.tsx` | D47: collapsible "My weapons": weapon search (combobox, vocation's weapons with a known tree), per weapon proficiency level 0–n, compact tree (D50: one column of official perk icons per level, click = manual pick with a gold frame, again = Auto; locked levels dimmed; ✦ = reshaped slot; icon legend below) and dust reshapes (shaping option at rank 10 + replaced option, at most 2). |
+| `src/components/PerkIcon.tsx` | D50: perk icon from `public/proficiency/` (sprite strip frame; augment mark in the corner), decorative. |
+| `src/components/WeaponResultPanel.tsx` | D47: best weapon with its perks (picked / your choice, small icons; alpha strike marked "solo play only"), other owned weapons (difference), worthwhile reshapes, collapsible "better weapons you do not own" (opening it sets `suggestWeapons`). |
 | `src/hooks/usePersistentWeapons.ts` | D47: owned weapons + suggest flag per vocation in localStorage (not in the URL). |
 | `src/lib/weapons.ts` | D47: weapon prefs sanitising / codec, `setPerk`, `setShaped`, `perkLabel`, `shapingLabel` (tested). |
 | `src/components/GemIcon.tsx` | Diamond icon tinted by gem/vessel quality. |

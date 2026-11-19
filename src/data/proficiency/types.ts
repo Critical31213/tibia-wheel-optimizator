@@ -86,4 +86,6 @@ export interface ProficiencyFile {
   meta: { sources: string[]; weapons: number; withoutTree: string[]; issues: string[] };
   weapons: Weapon[];
   shaping: ShapingOption[];
+  /** Perk icon key (see `iconKeys`) → file in public/proficiency/, with `#frame/frames` for sprite sheets. */
+  icons: Record<string, string>;
 }

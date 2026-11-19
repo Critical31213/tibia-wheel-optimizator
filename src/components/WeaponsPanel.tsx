@@ -2,11 +2,12 @@ import { useId, useMemo, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { OwnedWeapon, Vocation } from '../types';
 import { useT } from '../i18n';
-import { getShapingOption, getWeapon, levelOptions, searchWeapons, shapingId, shapingOptions, type Weapon } from '../lib/api';
+import { getShapingOption, getWeapon, iconKeys, levelOptions, searchWeapons, shapingId, shapingOptions, type Weapon, type WeaponPerk } from '../lib/api';
 import { cx } from '../lib/labels';
 import { MAX_SHAPED, ownWeapon, perkLabel, setPerk, setShaped, shapingLabel, type WeaponPrefs } from '../lib/weapons';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { Panel } from './Panel';
+import { PerkIcon } from './PerkIcon';
 
 interface WeaponSearchProps {
   vocation: Vocation;
@@ -128,6 +129,88 @@ export function WeaponMeta({ weapon }: { weapon: Weapon }) {
 /** Two-handedness only matters for weapons a shield could go with (knights). */
 const vocationUsesShield = (w: Weapon) => w.vocations.includes('knight');
 
+interface PerkGridProps {
+  owned: OwnedWeapon;
+  weapon: Weapon;
+  onChange: (o: OwnedWeapon) => void;
+}
+
+/**
+ * D50: compact proficiency tree — one column of perk icons per level; a click picks a perk by hand (gold frame),
+ * a second click returns the level to Auto. Locked levels are dimmed. The legend below names every icon.
+ */
+function PerkGrid({ owned, weapon, onChange }: PerkGridProps) {
+  const t = useT();
+  const all = levelOptions({ ...owned, level: weapon.levels.length }, weapon);
+  const shaped = owned.shaped ?? [];
+  const legend = new Map<string, { perk: WeaponPerk; labels: string[] }>();
+  all.forEach((level, i) =>
+    level.forEach((p) => {
+      const key = iconKeys(p).join('|');
+      const entry = legend.get(key) ?? { perk: p, labels: [] };
+      entry.labels.push(`${i + 1}: ${perkLabel(t, p)}`);
+      legend.set(key, entry);
+    }),
+  );
+  return (
+    <div>
+      <ol className="flex gap-1 overflow-x-auto pb-1" aria-label={t('weapons.tree')}>
+        {all.map((level, i) => {
+          const locked = i >= owned.level;
+          const choice = owned.perks?.[i];
+          const shape = shaped.find((x) => x.level === i + 1);
+          return (
+            <li key={i} className={cx('flex shrink-0 flex-col items-center gap-1', locked && 'opacity-35')}>
+              <span className="text-[10px] tabular-nums text-parchment-400">{i + 1}</span>
+              {level.map((p, k) => {
+                const label = `${t('weapons.levelN', { n: i + 1 })}: ${perkLabel(t, p)}`;
+                const picked = choice === k;
+                const mark = shape?.replaces === k && (
+                  <span aria-hidden="true" className="absolute -left-1 -top-1 text-[10px] leading-none text-gold-300">✦</span>
+                );
+                if (level.length === 1 || locked)
+                  return (
+                    <span key={k} title={label} className="relative rounded-md border border-ink-600 p-0.5">
+                      <span className="sr-only">{label}</span>
+                      <PerkIcon perk={p} />
+                      {mark}
+                    </span>
+                  );
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    title={label}
+                    aria-label={label}
+                    aria-pressed={picked}
+                    onClick={() => onChange(setPerk(owned, i, picked ? null : k))}
+                    className={cx(
+                      'relative rounded-md border p-0.5',
+                      picked ? 'border-gold-400 bg-gold-700/30' : 'border-ink-600 hover:border-gold-600',
+                    )}
+                  >
+                    <PerkIcon perk={p} />
+                    {mark}
+                  </button>
+                );
+              })}
+            </li>
+          );
+        })}
+      </ol>
+      <p className="mt-1 text-[11px] text-parchment-400">{t('weapons.gridHint')}</p>
+      <ul className="mt-1.5 grid gap-1" aria-label={t('weapons.legend')}>
+        {[...legend].map(([key, { perk, labels }]) => (
+          <li key={key} className="flex items-center gap-2 text-[11px] text-parchment-200">
+            <PerkIcon perk={perk} size={16} />
+            <span className="min-w-0">{labels.join(' · ')}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 interface WeaponCardProps {
   owned: OwnedWeapon;
   vocation: Vocation;
@@ -177,35 +260,7 @@ function WeaponCard({ owned, vocation, onChange, onRemove }: WeaponCardProps) {
           ))}
         </select>
       </div>
-      {options.length > 0 && (
-        <ol className="flex flex-col gap-1.5">
-          {options.map((level, i) => {
-            const shape = shaped.find((s) => s.level === i + 1);
-            const value = owned.perks?.[i];
-            return (
-              <li key={i} className="grid gap-1">
-                <label htmlFor={`${id}-perk-${i}`} className="text-[11px] text-parchment-400">
-                  {t('weapons.levelN', { n: i + 1 })}
-                </label>
-                <select
-                  id={`${id}-perk-${i}`}
-                  value={value == null ? '' : String(value)}
-                  onChange={(e) => onChange(setPerk(owned, i, e.target.value === '' ? null : Number(e.target.value)))}
-                  className="field min-w-0 py-1 text-sm"
-                >
-                  {level.length > 1 && <option value="">{t('weapons.auto')}</option>}
-                  {level.map((p, k) => (
-                    <option key={k} value={k}>
-                      {shape?.replaces === k ? '✦ ' : ''}
-                      {perkLabel(t, p)}
-                    </option>
-                  ))}
-                </select>
-              </li>
-            );
-          })}
-        </ol>
-      )}
+      <PerkGrid owned={owned} weapon={weapon} onChange={onChange} />
       {options.length > 0 && (
         <details className="mt-2">
           <summary className="cursor-pointer text-xs text-gold-400 hover:underline">
@@ -315,7 +370,7 @@ export function WeaponsPanel({ vocation, prefs, onChange }: WeaponsPanelProps) {
           </ul>
         )}
         <p className="text-[11px] text-parchment-400">
-          {t('weapons.skillsNote')} {t('weapons.storedLocally')}
+          {t('weapons.skillsNote')} {t('weapons.storedLocally')} {t('weapons.iconsCredit')}
         </p>
       </div>
     </Panel>

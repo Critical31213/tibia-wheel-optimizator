@@ -11,9 +11,13 @@
  * client. The English descriptions were scraped from wikis earlier and are partly stale (rebalanced lines) or belong
  * to other weapons; they are only cross-checked and disagreements are listed in `meta.issues`.
  *
+ * Perk icons (CipSoft graphics, as mirrored in the TibiaPal repository) are downloaded, deduplicated by content and
+ * written to public/proficiency/; `icons` in the JSON maps a perk icon key (see `iconKeys`) to a file.
+ *
  * Output: src/data/proficiency/proficiency.json. Problems are printed and listed in `meta.issues`.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -21,6 +25,8 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CACHE = join(ROOT, 'scripts', '.cache', 'proficiency');
 const OUT = join(ROOT, 'src', 'data', 'proficiency', 'proficiency.json');
 const PAL = 'https://raw.githubusercontent.com/PawelKusnierek/TibiaPal/HEAD/_site/data/proficiency/';
+const ICONS = join(ROOT, 'public', 'proficiency');
+const PAL_REPO = 'https://raw.githubusercontent.com/PawelKusnierek/TibiaPal/HEAD/';
 const WEAPONS_URL = 'https://tibiopedia.pl/items/weapons';
 const UA = 'wheel-optimizer-research';
 const refresh = process.argv.includes('--refresh');
@@ -34,6 +40,29 @@ async function cached(name, url, headers = {}) {
   mkdirSync(CACHE, { recursive: true });
   writeFileSync(file, text);
   return text;
+}
+
+async function cachedBinary(path) {
+  const file = join(CACHE, 'img', path.replace(/\//g, '__'));
+  if (!existsSync(file)) {
+    const res = await fetch(PAL_REPO + path, { headers: { 'User-Agent': UA } });
+    if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, Buffer.from(await res.arrayBuffer()));
+  }
+  return readFileSync(file);
+}
+
+/** Icon keys of a perk: [base] or, for spell augments, [spell, augment overlay]. Mirrors src/data/proficiency. */
+const iconKeys = (p) =>
+  p.kind === 'augment' ? [`spell:${p.spell}`, `aug:${p.augment}`] : [[p.kind, p.skill, p.element, p.bestiary].filter(Boolean).join(':')];
+
+/** key → { "path#frame/frames": votes }; the most common image wins (the wiki crops are a little noisy). */
+const iconVotes = new Map();
+function voteIcon(key, ref) {
+  if (!iconVotes.has(key)) iconVotes.set(key, new Map());
+  const v = iconVotes.get(key);
+  v.set(ref, (v.get(ref) ?? 0) + 1);
 }
 
 const issues = [];
@@ -154,6 +183,7 @@ const SHAPING_AUGMENTS = {
   'Base Damage': 'baseDamage', 'Critical Extra Damage': 'critDamage', 'Critical Hit Chance': 'critChance',
   'Life Leech': 'lifeLeech', 'Mana Leech': 'manaLeech',
 };
+const SHAPING_ICON = new WeakMap();
 const GROUPS = { 'Todas as Vocações': 'all', Knight: 'knight', Paladin: 'paladin', Monk: 'monk', Sorcerer: 'sorcerer', Druid: 'druid' };
 const num = (s) => Number(/[\d.,]+/.exec(s)[0].replace(',', '.'));
 
@@ -169,6 +199,7 @@ function shaping(file) {
       else if (best) out.push({ kind: 'bestiary', bestiary: best[1], ...r });
       else if (SHAPING_KINDS[o.name]) out.push({ kind: SHAPING_KINDS[o.name], ...r });
       else issue(`shaping: unknown option "${o.name}"`);
+      if (o.icon && out.length) SHAPING_ICON.set(out[out.length - 1], o.icon);
       if (!r.group) issue(`shaping: unknown group "${group}"`);
     }
   }
@@ -290,7 +321,17 @@ for (const pw of palWeapons) {
     continue;
   }
   const levels = pw.levels.map((l) =>
-    l.proficiencies.map((p) => toPerk(p, spells, `${st.name} L${l.level}`)).filter((p) => p !== null),
+    l.proficiencies
+      .map((p) => {
+        const perk = toPerk(p, spells, `${st.name} L${l.level}`);
+        if (perk) {
+          const [base, overlay] = iconKeys(perk);
+          voteIcon(base, `${p.sprite.file}#${p.sprite.frame}/${p.sprite.frames}`);
+          if (overlay && p.iconImage) voteIcon(overlay, `${p.iconImage}#0/1`);
+        }
+        return perk;
+      })
+      .filter((p) => p !== null),
   );
   const tree = JSON.stringify(levels);
   // Identical duplicates (e.g. Ferumbras' staff variants) are kept once.
@@ -303,6 +344,27 @@ for (const pw of palWeapons) {
 weapons.sort((a, b) => a.vocations[0].localeCompare(b.vocations[0]) || a.minLevel - b.minLevel || a.name.localeCompare(b.name));
 for (const u of unmatched) issue(`not on tibiopedia: ${u}`);
 
+const shapingList = shaping(shapingFile);
+// Shaping-only options (e.g. life gain on kill) take the shaping page's icon.
+for (const o of shapingList) {
+  const [key] = iconKeys(o);
+  if (!iconVotes.has(key) && SHAPING_ICON.has(o)) voteIcon(key, `images/proficiency/shaping/${SHAPING_ICON.get(o).split('/').pop()}#0/1`);
+}
+
+rmSync(ICONS, { recursive: true, force: true });
+mkdirSync(ICONS, { recursive: true });
+const icons = {};
+for (const [key, votes] of [...iconVotes].sort(([a], [b]) => a.localeCompare(b))) {
+  const [ref] = [...votes].sort((a, b) => b[1] - a[1])[0];
+  const [path, frame] = ref.split('#');
+  const bytes = await cachedBinary(path);
+  // Some mirrored .gif files are really WebP: the extension follows the content.
+  const ext = bytes.subarray(0, 4).toString('latin1') === 'RIFF' ? '.webp' : bytes.subarray(0, 3).toString('latin1') === 'GIF' ? '.gif' : '.png';
+  const name = createHash('sha1').update(bytes).digest('hex').slice(0, 10) + ext;
+  writeFileSync(join(ICONS, name), bytes);
+  icons[key] = frame === '0/1' ? name : `${name}#${frame}`;
+}
+
 const out = {
   meta: {
     sources: ['TibiaPal weapon-proficiencies.json + perk-shaping-options.json (MIT)', WEAPONS_URL],
@@ -311,9 +373,10 @@ const out = {
     issues,
   },
   weapons,
-  shaping: shaping(shapingFile),
+  shaping: shapingList,
+  icons,
 };
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, JSON.stringify(out) + '\n');
-console.log(`Wrote ${weapons.length} weapons, ${out.shaping.length} shaping options, ${out.meta.withoutTree.length} weapons without a tree.`);
+console.log(`Wrote ${weapons.length} weapons, ${out.shaping.length} shaping options, ${Object.keys(icons).length} icons (${readdirSync(ICONS).length} files), ${out.meta.withoutTree.length} weapons without a tree.`);
 if (issues.length) console.log(`Issues (${issues.length}):\n  ${issues.join('\n  ')}`);

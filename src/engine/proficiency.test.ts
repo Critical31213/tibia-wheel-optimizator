@@ -3,7 +3,7 @@ import { MONSTERS } from '../data';
 import { getWeapon, type Perk } from '../data/proficiency';
 import type { OptimizerInput } from '../types';
 import { runOptimizer } from './optimizer';
-import { applyLoadout, choosePerks, levelOptions, loadoutCharacter, type Loadout } from './proficiency';
+import { applyLoadout, choosePerks, levelOptions, loadoutCharacter, loadoutParts, type Loadout } from './proficiency';
 import { buildSpellModel, castDamage, NO_BONUS, rotationTotal } from './spells';
 
 const dragonLord = MONSTERS.find((m) => m.id === 'dragon-lord')!;
@@ -51,6 +51,21 @@ describe('weapon proficiency model (D45)', () => {
     };
     // Powerful Strike: 10 % × 50 % extra → ×1.05.
     expect(dmg(plain) / dmg(rending)).toBeCloseTo(1.05, 3);
+  });
+
+  it('drops the leech imbuement of Siphoning (life) and Draining (mana) weapons', () => {
+    const v = { model: knight('boss'), vocation: 'knight', threat: 1, leech: 1 } as unknown as Parameters<typeof loadoutParts>[0];
+    const diff = (id: string) => {
+      const w = getWeapon(id)!;
+      const a = loadoutParts(v, lo([], w));
+      const b = loadoutParts(v, lo([], { ...w, id: 'plain' }));
+      return { off: a.off - b.off, def: a.def - b.def };
+    };
+    // Life: one of two Powerful Vampirism items (25 pp) × leechPoint 2 (leech 1, threat 1, 50 pp assumed).
+    expect(diff('siphoning-inferniarch-blade')).toEqual({ off: 0, def: -50 });
+    const d = diff('draining-inferniarch-blade');
+    expect(d.off).toBeCloseTo(-0.8);
+    expect(d.def).toBeCloseTo(-0.4);
   });
 
   it('raises the rotation with flat spell damage and auto-attack perks', () => {

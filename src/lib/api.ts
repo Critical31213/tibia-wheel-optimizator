@@ -83,6 +83,6 @@ export function getMonsterById(id: string): Monster | undefined {
 }
 
 // D47: weapon proficiency (weapon data is small and bundled).
-export { getShapingOption, getWeapon, searchWeapons, shapingId, shapingOptions } from '../data/proficiency';
-export type { Perk as WeaponPerk, ShapingOption, Weapon } from '../data/proficiency';
+export { getShapingOption, getWeapon, iconKeys, perkIcon, searchWeapons, shapingId, shapingOptions } from '../data/proficiency';
+export type { Perk as WeaponPerk, PerkIcon, ShapingOption, Weapon } from '../data/proficiency';
 export { levelOptions } from '../engine/proficiency';

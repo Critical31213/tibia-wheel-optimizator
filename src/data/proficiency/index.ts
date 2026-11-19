@@ -46,6 +46,31 @@ export function shapedPerk(o: ShapingOption, rank = SHAPED_RANK): Perk {
 export const shapingValue = (o: ShapingOption, rank: number): number =>
   o.rank0 + ((o.rank10 - o.rank0) * Math.max(0, Math.min(10, rank))) / 10;
 
+/** One icon image; sprite sheets are horizontal strips of `frames` equal frames. */
+export interface PerkIcon {
+  file: string;
+  frame: number;
+  frames: number;
+}
+
+/** Icon keys of a perk: [base] or, for spell augments, [spell, augment overlay] (mirrors the import script). */
+export const iconKeys = (p: Omit<Perk, 'value'>): string[] =>
+  p.kind === 'augment' ? [`spell:${p.spell}`, `aug:${p.augment}`] : [[p.kind, p.skill, p.element, p.bestiary].filter(Boolean).join(':')];
+
+function icon(key: string): PerkIcon | null {
+  const ref = data.icons[key];
+  if (!ref) return null;
+  const [file, sprite] = ref.split('#');
+  const [frame, frames] = sprite ? sprite.split('/').map(Number) : [0, 1];
+  return { file, frame, frames };
+}
+
+/** Official perk icon (CipSoft graphics): base and, for spell augments, the augment overlay. */
+export const perkIcon = (p: Omit<Perk, 'value'>): { base: PerkIcon | null; overlay: PerkIcon | null } => {
+  const [base, overlay] = iconKeys(p);
+  return { base: icon(base), overlay: overlay ? icon(overlay) : null };
+};
+
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 
 /** Case-insensitive weapon search for a vocation: prefix matches first, then substring; ties by level. */

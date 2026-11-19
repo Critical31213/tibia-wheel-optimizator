@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { BESTIARY_CLASSES, VOCATIONS } from '../../types';
 import { MONSTERS } from '..';
 import formulas from '../damage/spell-formulas.json';
-import { SHAPING_OPTIONS, WEAPONS, getWeapon, searchWeapons, shapingOptions, shapingValue, weaponsFor } from '.';
+import { SHAPING_OPTIONS, WEAPONS, getWeapon, perkIcon, searchWeapons, shapingOptions, shapingValue, weaponsFor } from '.';
 
 /** Augmented spells without a damage/healing formula (low level, avatars, support): their augments are worth 0. */
 const UNMODELLED = new Set([
@@ -11,7 +11,19 @@ const UNMODELLED = new Set([
   'Lesser Ethereal Spear', 'Lesser Front Sweep', 'Light Healing', 'Scorch', 'Wound Cleansing',
 ]);
 
+/** Icon files shipped in public/proficiency/ (keys only, nothing is loaded). */
+const ICON_FILES = new Set(Object.keys(import.meta.glob('../../../public/proficiency/*')).map((p) => p.split('/').pop()));
+
 describe('proficiency data', () => {
+  it('has an icon file for every perk and shaping option', () => {
+    for (const p of [...WEAPONS.flatMap((w) => w.levels.flat()), ...SHAPING_OPTIONS]) {
+      const { base, overlay } = perkIcon(p);
+      expect(base, JSON.stringify(p)).not.toBeNull();
+      if (p.kind === 'augment') expect(overlay, JSON.stringify(p)).not.toBeNull();
+      for (const i of [base, overlay]) if (i) expect(ICON_FILES.has(i.file), i.file).toBe(true);
+    }
+  });
+
   it('has unique ids and complete trees', () => {
     expect(WEAPONS.length).toBeGreaterThan(400);
     expect(new Set(WEAPONS.map((w) => w.id)).size).toBe(WEAPONS.length);

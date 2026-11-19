@@ -33,10 +33,15 @@ export const PROF = {
   BOLT_ATTACK: 78,
   /** Offensive spell casts per turn (homing missile trigger). */
   CASTS_PER_TURN: 1,
+  /** Mana leech of the Powerful Void imbuement (%). */
+  VOID_MANA_LEECH: 8,
 } as const;
 
 /** Rending Inferniarch weapons cannot take the critical hit (Strike) imbuement. */
 export const noCritImbue = (w: Weapon) => w.id.startsWith('rending-inferniarch-');
+/** D49: Siphoning Inferniarch weapons cannot take the life leech imbuement, Draining ones not the mana leech one. */
+export const noLifeLeechImbue = (w: Weapon) => w.id.startsWith('siphoning-inferniarch-');
+export const noManaLeechImbue = (w: Weapon) => w.id.startsWith('draining-inferniarch-');
 
 export interface Loadout {
   weapon: Weapon;
@@ -223,6 +228,9 @@ export function loadoutParts(v: ValuationContext, lo: Loadout): Parts {
   const m = v.model;
   let life = 100 * (sum(perks, (p) => p.kind === 'lifeLeech') + (w.specials?.lifeLeech ?? 0));
   let mana = 100 * (sum(perks, (p) => p.kind === 'manaLeech') + (w.specials?.manaLeech ?? 0));
+  // The weapon's share of the assumed imbuements (life leech: half of K.LIFE_LEECH_IMBUE, i.e. one of two items).
+  if (noLifeLeechImbue(w)) life -= K.LIFE_LEECH_IMBUE[m.vocation] / 2;
+  if (noManaLeechImbue(w)) mana -= PROF.VOID_MANA_LEECH;
   let heal = 0;
   const c = m.character;
   const flatHeal = perks.reduce((a, p) => a + (p.kind === 'healSkillScaling' ? p.value * scalingSkill(c, p) : 0), 0);

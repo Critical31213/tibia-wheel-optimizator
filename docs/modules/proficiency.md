@@ -13,11 +13,19 @@ gitignored `scripts/.cache/proficiency/` and writes `src/data/proficiency/profic
 | TibiaPal `weapon-proficiencies.json` (MIT) | proficiency tree of each weapon (levels × 1–3 perks) |
 | TibiaPal `perk-shaping-options.json` (MIT, compiled from TibiaWiki BR) | dust shaping options, rank 0 and rank 10 values |
 | tibiopedia.pl `/items/weapons` | attack + element, defence, class, imbuement slots, specials, level, vocation |
+| TibiaPal `images/proficiency/…` (CipSoft graphics, D50) | perk icons |
 
 Weapons are joined by name (case and apostrophes ignored). Only weapons present in both sources are written
 (432). The ~235 weapons on tibiopedia without a TibiaPal tree (older and common weapons, Carving/Mayhem/Remedy
 variants, replicas) are listed in `meta.withoutTree`; the game gives every weapon a tree, but those trees are not
 in the data.
+
+Perk icons (D50): each perk has an icon key — `kind[:skill][:element][:bestiary]`, or for spell augments
+`spell:<name>` plus the overlay `aug:<augment>` (`iconKeys`, mirrored in the script). The script takes the most
+common TibiaPal sprite per key (its wiki crops are slightly noisy), shaping-only options fall back to the shaping
+page icon, downloads them (cached in `scripts/.cache/proficiency/img/`), names them by content hash (extension from
+the content: some `.gif` mirrors are WebP) into `public/proficiency/` and writes `icons` (key → file, `#frame/frames`
+for sprite strips). `perkIcon(perk)` resolves them; a test checks every perk and shaping option has a shipped file.
 
 ## Perks
 
@@ -77,7 +85,9 @@ weapon can have at most two reshaped slots.
 | life / mana leech | sustain (D29/D31 leech point), mana leech as for convictions |
 
 Rending Inferniarch weapons cannot take the critical hit (Strike) imbuement: their loadout removes the default
-Powerful Strike crit (10 % chance, +50 % extra damage) from spells and auto-attack (user, D48).
+Powerful Strike crit (10 % chance, +50 % extra damage) from spells and auto-attack (user, D48). Siphoning
+Inferniarch weapons cannot take the life leech imbuement (−half of `K.LIFE_LEECH_IMBUE`, the weapon's item) and
+Draining ones not the mana leech one (−8 pp, Powerful Void) (user, D49).
 
 Not valued: defence, armor penetration, hit chance, on-hit / on-kill, rune crit, mage auto-attack (skipped). Skills
 are entered without weapon bonuses; the main skill is assumed for every weapon type of the vocation.
