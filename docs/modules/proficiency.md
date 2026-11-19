@@ -79,7 +79,7 @@ weapon can have at most two reshaped slots.
 | bestiary | hunting only (assumed not to work on bosses): spot-weighted damage multiplier of the class |
 | boss | boss mode only |
 | alpha / omega strike | × (1 + share × value); shares hunt 0.1 / boss 0.005 and 0.15 (assumptions, halved in D54) |
-| spell / auto / heal skill scaling | flat damage or healing = value × skill (no skill = the highest one; fishing = 0) |
+| spell / auto / heal skill scaling | flat damage or healing = value × skill (no skill = the highest one; fishing = 0); spell variant confirmed in-game as flat per hit (7.5 % × 118 fist ≈ +9) |
 | rangeDamage, perfect shot | auto-attack flat × 0.25 (share of shots from range; D54) |
 | homing missile | chance × level multiplier × level per offensive cast (1 per turn) |
 | life / mana leech | sustain (D29/D31 leech point), mana leech as for convictions |
