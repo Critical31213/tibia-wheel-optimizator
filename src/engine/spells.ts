@@ -3,7 +3,7 @@
  *
  * damage per turn T = auto-attack + Σ rate(S) × perCast(S)
  * perCast(S)        = hit(S, level, skills, stage) × targets(S, context) × element(S, monsters) × crit EV
- * rate(S)           = greedy fill of the single attack-spell slot per 2 s turn by perCast, capped at 1/cooldown
+ * rate(S)           = greedy fill of the single attack-spell slot per 2 s turn by perCast, capped at 1 / cooldown turns (rounded up: 2 s grid)
  *
  * D16: in hunt mode single-target spells never enter the rotation (zero value for their augments/gems).
  * Perk values are ΔT / T0 (T0 = rotation without wheel bonuses, no revelation).
@@ -425,6 +425,9 @@ export function reducedCooldown(base: number, reduction: number): number {
   return Math.max(base * COOLDOWN_FLOOR, base - Math.max(0, reduction));
 }
 
+/** D65: turns between casts of a spell with cooldown `cd` (s); attack spells are cast on the 2 s turn grid. */
+export const cooldownTurns = (cd: number) => Math.max(1, Math.ceil(cd / TURN_SECONDS - 1e-9));
+
 /** Cast-rate gain (fraction) from a total cooldown reduction, respecting the 50 % floor. */
 export function cooldownGain(base: number, reduction: number): number {
   if (base <= 0 || reduction <= 0) return 0;
@@ -496,7 +499,7 @@ function candidate(model: SpellModel, s: SpellEval, r: RotationInput): Cand | nu
   const perCast = castDamage(model, s, r, m);
   if (perCast <= 0 && s.revelation >= 0) return null;
   const cd = reducedCooldown(spellCooldown(s.name, stage), m.cd + (s.cd ?? 0));
-  return { s, perCast, cap: 1 / Math.max(1, cd / TURN_SECONDS) };
+  return { s, perCast, cap: 1 / cooldownTurns(cd) };
 }
 
 function dropSharedCooldowns(cands: Cand[]) {
@@ -558,7 +561,7 @@ export function rotation(model: SpellModel, r: RotationInput): RotationResult {
     const perCast = castDamage(model, s, r, m);
     if (perCast <= 0) continue;
     const cd = reducedCooldown(spellCooldown(s.name, stage), m.cd + (s.cd ?? 0));
-    cands.push({ s, perCast, cap: 1 / Math.max(1, cd / TURN_SECONDS) });
+    cands.push({ s, perCast, cap: 1 / cooldownTurns(cd) });
   }
   dropSharedCooldowns(cands);
   cands.sort((a, b) => b.perCast - a.perCast || a.s.name.localeCompare(b.s.name));

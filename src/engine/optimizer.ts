@@ -66,8 +66,12 @@ import {
   normaliseMonsters,
   planFor,
   planTotal,
+  cooldownTurns,
+  reducedCooldown,
+  REVELATION_SPELLS,
   rotation,
   rotationTotal,
+  spellCooldown,
   type RotationInput,
   type SpellModel,
   TEAM_HEALS,
@@ -780,6 +784,10 @@ function rationale(p: Prepared, best: State, stages: number[], revPoints: number
   const f = p.forced;
   if (f.taken.length) out.push(text('rationale.forced', { spells: f.taken.join(', ') }));
   if (f.impossible.length) out.push(text('rationale.forcedImpossible', { spells: f.impossible.join(', ') }));
+  const r = f.rotation;
+  if (r?.taken.length) out.push(text('rationale.rotationCooldown', { spells: r.taken.map((x) => (r.stage2.includes(x) ? `${x} II` : x)).join(', ') }));
+  if (r?.missing.length) out.push(text('rationale.rotationCooldownMissing', { spells: r.missing.join(', ') }));
+  if (r?.tooLong.length) out.push(text('rationale.rotationCooldownTooLong', { spells: r.tooLong.join(', ') }));
   const extra = f.taken.filter((s) => !p.input.forcedStage2?.includes(s) && wheel.slices.some((sl) => sl.kind === 'augment' && sl.twin > sl.idx && sl.tile.conviction.augment?.spells.includes(s) && isFull(wheel, best.alloc, sl.idx) && isFull(wheel, best.alloc, sl.twin)));
   if (extra.length) out.push(text('rationale.forcedExtra', { spells: extra.join(', ') }));
   if (p.revBlocked.length) out.push(text('rationale.revelationBlocked', { revelations: p.revBlocked.join(', ') }));
@@ -1015,6 +1023,49 @@ interface ForcedInfo {
   taken: string[];
   impossible: string[];
   noAugment: string[];
+  /** D65: augments the preset's ratio needs (shorter cooldown): taken, out of budget, or none reaches it. */
+  rotation?: { taken: string[]; missing: string[]; tooLong: string[]; stage2: string[] };
+}
+
+/**
+ * D65: cooldown augments a preset needs. A spell with ratio r in a preset of ratio sum R is cast every R/r
+ * turns, so its cooldown (on the 2 s grid, after proficiency) must fit; else the cheapest augment stage that fits.
+ */
+export function presetCooldownNeeds(wheel: EngineWheel, model: SpellModel, entries: readonly { name: string; ratio: number }[]) {
+  const sum = entries.reduce((a, e) => a + e.ratio, 0);
+  const out = { stage1: [] as string[], stage2: [] as string[], tooLong: [] as string[] };
+  for (const e of entries) {
+    if (e.ratio <= 0 || REVELATION_SPELLS[e.name]) continue;
+    const base = spellCooldown(e.name);
+    const own = model.spells.get(e.name)?.cd ?? 0;
+    const fits = (red: number) => cooldownTurns(reducedCooldown(base, own + red)) <= sum / e.ratio + 1e-9;
+    if (fits(0)) continue;
+    const tile = wheel.slices.find((sl) => sl.kind === 'augment' && sl.tile.conviction.augment?.spells.includes(e.name))?.tile.conviction.augment;
+    const cd = (t: string) => parseEffects(t).reduce((a, x) => a + (x.kind === 'cd' ? x.amount : 0), 0);
+    const one = tile ? cd(tile.stage1) : 0;
+    if (tile && one > 0 && fits(one)) out.stage1.push(e.name);
+    else if (tile && fits(one + cd(tile.stage2))) out.stage2.push(e.name);
+    else out.tooLong.push(e.name);
+  }
+  return out;
+}
+
+/** D65: forced augments of a plan: the user's plus those its preset's cooldowns need. */
+function planForced(wheel: EngineWheel, input: OptimizerInput, budget: number, model?: SpellModel): ForcedInfo {
+  const user = input.forcedSpells ?? [];
+  const userStage2 = input.forcedStage2 ?? [];
+  const needs = model?.plan.preset ? presetCooldownNeeds(wheel, model, model.plan.entries) : null;
+  if (!needs) return forcedSeed(wheel, user, budget, userStage2);
+  const extra = [...needs.stage1, ...needs.stage2];
+  const stage2 = [...new Set([...userStage2, ...needs.stage2])];
+  const f = forcedSeed(wheel, [...user, ...extra], budget, stage2);
+  const mine = (x: string) => extra.includes(x) && !user.includes(x);
+  return {
+    ...f,
+    taken: f.taken.filter((x) => !mine(x)),
+    impossible: f.impossible.filter((x) => !mine(x)),
+    rotation: { taken: f.taken.filter(mine), missing: f.impossible.filter(mine), tooLong: needs.tooLong, stage2: needs.stage2 },
+  };
 }
 
 /** Cheapest unlock path (Dijkstra over slice capacities, filled slices free) to one of `targets`; new slices only. */
@@ -1312,6 +1363,9 @@ function planValid(p: Prepared, stages: number[]): boolean {
   return d >= 0 && stages[d] >= 1;
 }
 
+/** D65: 2 = valid, 1 = valid but its cooldown augment is out of budget (auto mode prefers others), 0 = invalid. */
+const planRank = (p: Prepared, st: State) => (!planValid(p, gridStages(p, st)) ? 0 : p.forced.rotation?.missing.length ? 1 : 2);
+
 const runSearch = (p: Prepared, tables = p.tables, opts = FULL_SEARCH) => search(p.wheel, tables, p.budget, p.gemRm, p.forced.seed, opts);
 
 const GATED_BOOST = 10;
@@ -1470,11 +1524,12 @@ const signed = (x: number) => (x > 0 ? `+${x}` : `${x}`);
 
 /** Best valid rotation plan for a state (auto mode: every prepared plan; manual: the chosen one). */
 function bestPlan(plans: Prepared[], st: State): { p: Prepared; obj: number } {
-  let best: { p: Prepared; obj: number } | null = null;
+  let best: { p: Prepared; obj: number; rank: number } | null = null;
   for (const q of plans) {
-    if (plans.length > 1 && !planValid(q, gridStages(q, st))) continue;
+    const rank = plans.length > 1 ? planRank(q, st) : 2;
+    if (!rank) continue;
     const obj = objective(q, st);
-    if (!best || obj > best.obj + 1e-9) best = { p: q, obj };
+    if (!best || rank > best.rank || (rank === best.rank && obj > best.obj + 1e-9)) best = { p: q, obj, rank };
   }
   return best ?? { p: plans[0], obj: objective(plans[0], st) };
 }
@@ -1596,11 +1651,12 @@ export function planSpecs(input: OptimizerInput): PlanSpec[] {
   // Same reference in manual and auto mode, so offense values stay comparable.
   const reference = Math.max(1, ...autoPlans.filter((x) => !x?.requires?.revelation).map((x) => planTotal(base, x)));
   const wheel = getEngineWheel(input.vocation);
-  const forced = forcedSeed(wheel, input.forcedSpells ?? [], Math.min(wheel.definition.totalCapacity, pointsOf(input)), input.forcedStage2);
+  const budget = Math.min(wheel.definition.totalCapacity, pointsOf(input));
   const blend = blendWith(weightsFor(input.priority, leechEhp(base, threatOf(spotMonster(mi.monsters)))));
   const owned = ownedChoices(input);
   const specs = presets.map((preset): PlanSpec | null => {
     const plain = pickStances(input, preset, reference, blend);
+    const forced = planForced(wheel, input, budget, plain.v?.model);
     const spec: PlanSpec = { preset, stances: plain.stances, v: plain.v, reference, auto: !chosen, forced };
     const fit = owned.filter((w) => fitsPlan(w.weapon, preset));
     // A shield plan without a one-handed weapon: dropped in auto mode, weaponless when chosen by the user.
@@ -1612,7 +1668,7 @@ export function planSpecs(input: OptimizerInput): PlanSpec[] {
     for (const weapon of ranked) {
       const { stances, v } = pickStances(input, preset, reference, blend, choiceLoadout(weapon));
       const score = v ? blend(baseParts(v)) : -Infinity;
-      if (score > best.score + 1e-9) best = { spec: { ...spec, stances, v, weapon }, score };
+      if (score > best.score + 1e-9) best = { spec: { ...spec, stances, v, weapon, forced: planForced(wheel, input, budget, v?.model) }, score };
     }
     return best.spec;
   });
@@ -1744,13 +1800,16 @@ function bestBuild(input: OptimizerInput): { p: Prepared; plans: Prepared[]; mai
   let p = plans[0];
   let best: State | null = null;
   let bestObj = -Infinity;
+  let bestRank = 0;
   const consider = (q: Prepared, st: State) => {
-    if (plans.length > 1 && !planValid(q, gridStages(q, st))) return;
+    const rank = plans.length > 1 ? planRank(q, st) : 2;
+    if (!rank) return;
     const obj = objective(q, st);
-    if (obj > bestObj + 1e-9) {
+    if (rank > bestRank || (rank === bestRank && obj > bestObj + 1e-9)) {
       p = q;
       best = st;
       bestObj = obj;
+      bestRank = rank;
     }
   };
   let finalists = plans;
@@ -1758,10 +1817,12 @@ function bestBuild(input: OptimizerInput): { p: Prepared; plans: Prepared[]; mai
     const screened = plans.map((q) => {
       const st = searchPlan(q, SCREEN_SEARCH);
       consider(q, st);
-      return { q, obj: planValid(q, gridStages(q, st)) ? objective(q, st) : -Infinity };
+      const rank = planRank(q, st);
+      return { q, rank, obj: rank ? objective(q, st) : -Infinity };
     });
-    screened.sort((a, b) => b.obj - a.obj);
-    finalists = screened.filter((x, i) => i === 0 || (i === 1 && x.obj >= screened[0].obj - 0.02 * Math.abs(screened[0].obj))).map((x) => x.q);
+    screened.sort((a, b) => b.rank - a.rank || b.obj - a.obj);
+    const top = screened[0];
+    finalists = screened.filter((x, i) => i === 0 || (i === 1 && x.rank === top.rank && x.obj >= top.obj - 0.02 * Math.abs(top.obj))).map((x) => x.q);
   }
   for (const q of finalists) consider(q, searchPlan(q));
   let main = refine(p, best ?? runSearch(p));
