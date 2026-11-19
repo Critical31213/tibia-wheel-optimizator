@@ -303,14 +303,6 @@ function toMods(effects: SpellEffect[], hunt: boolean): SpellMods {
   return m;
 }
 
-/** Stages vector with the domain of `spell` set to `stage` (if any). */
-export function stagesFor(model: SpellModel, spell: string, stage: number): number[] {
-  const s = model.spells.get(spell);
-  const out = [...NO_STAGES];
-  if (s && s.stageDomain >= 0) out[s.stageDomain] = stage;
-  return out;
-}
-
 /**
  * Value of a set of effects applied to one spell against the rotation at `stages`. Cooldowns are summed
  * first so the 50 % floor applies. Damage spells: Δ rotation damage (D16: single-target spells in hunt = 0).

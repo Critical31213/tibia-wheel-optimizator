@@ -1,5 +1,5 @@
 /** Display labels and colours shared by UI components (no React here). */
-import type { Domain, Element, GemQuality, ModGrade, PerkCategory, Vocation } from '../types';
+import type { Domain, Element, GemQuality, ModGrade, Vocation } from '../types';
 import { WHEEL_DATA } from '../data/wheel';
 import { en } from '../i18n/en';
 import type { MessageKey } from '../i18n/en';
@@ -12,44 +12,12 @@ export const VOCATION_LABELS: Record<Vocation, string> = {
   monk: 'Monk',
 };
 
-export const VOCATION_BLURBS: Record<Vocation, string> = {
-  knight: 'Melee tank',
-  paladin: 'Ranged hybrid',
-  sorcerer: 'Elemental mage',
-  druid: 'Healer mage',
-  monk: 'Martial artist',
-};
-
-/** Ordered clockwise starting at 12 o'clock, like the in-game wheel. */
-export const DOMAINS: readonly Domain[] = ['topRight', 'bottomRight', 'bottomLeft', 'topLeft'];
-
-export const DOMAIN_LABELS: Record<Domain, string> = {
-  topLeft: 'Top-left',
-  topRight: 'Top-right',
-  bottomLeft: 'Bottom-left',
-  bottomRight: 'Bottom-right',
-};
-
 /** Tibia-like domain tints. `base` fills allocated points, `dim` is the empty slot. */
 export const DOMAIN_COLORS: Record<Domain, { base: string; dim: string; text: string }> = {
   topLeft: { base: '#4fa65a', dim: '#1f3322', text: '#8fd89a' },
   topRight: { base: '#c2483d', dim: '#3a1d1a', text: '#f2958c' },
   bottomLeft: { base: '#8e5bc4', dim: '#2b2038', text: '#c9a6ef' },
   bottomRight: { base: '#3f7fc8', dim: '#1a2738', text: '#94bff0' },
-};
-
-export const ELEMENT_LABELS: Record<Element, string> = {
-  physical: 'Physical',
-  fire: 'Fire',
-  earth: 'Earth',
-  energy: 'Energy',
-  ice: 'Ice',
-  holy: 'Holy',
-  death: 'Death',
-  lifeDrain: 'Life drain',
-  manaDrain: 'Mana drain',
-  drown: 'Drown',
-  healing: 'Healing',
 };
 
 /** Swatch colour per element (used as a small dot next to the label). */
@@ -65,12 +33,6 @@ export const ELEMENT_COLORS: Record<Element, string> = {
   manaDrain: '#5a8ae0',
   drown: '#3fb5a6',
   healing: '#b7e070',
-};
-
-export const CATEGORY_LABELS: Record<PerkCategory, string> = {
-  offense: 'Offense',
-  defense: 'Defense',
-  utility: 'Utility',
 };
 
 export type ModifierKind = 'weakness' | 'resistance' | 'immune' | 'neutral';

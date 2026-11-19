@@ -11,8 +11,6 @@ export * from './ammo';
 
 export const WEAPONS: readonly Weapon[] = data.weapons;
 export const SHAPING_OPTIONS: readonly ShapingOption[] = data.shaping;
-/** Weapons in the stats source without a known proficiency tree (not selectable yet). */
-export const WEAPONS_WITHOUT_TREE: readonly string[] = data.meta.withoutTree;
 
 const BY_ID = new Map(WEAPONS.map((w) => [w.id, w]));
 

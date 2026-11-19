@@ -180,11 +180,12 @@ interface State {
   used: number;
   domainPts: number[];
   rmFull: number[];
+  /** Revelation points from slices per domain: domainPts + full RM slices. */
+  slicesRev: number[];
   vessels: number;
   score: number;
   path: number[];
   key: number;
-  rank: number;
 }
 
 interface Search {
@@ -196,22 +197,23 @@ interface Search {
   gemRm: number[][];
   /** Augment slice pairs (same conviction): stage II needs both copies. */
   pairs: [number, number][];
+  /** complete() results by the full-slice states its greedy chain passed (beam states repeat that chain). */
+  completed: Map<number, { from: State; done: State }>;
 }
 
 const isFull = (w: EngineWheel, alloc: ArrayLike<number>, i: number) => alloc[i] >= w.slices[i].capacity;
-const revPts = (s: Search, st: State, d: number, vessels = st.vessels) =>
-  st.domainPts[d] + RM_SLICE_POINTS * st.rmFull[d] + s.gemRm[vessels][d];
+const revPts = (s: Search, st: State, d: number, vessels: number) => st.slicesRev[d] + s.gemRm[vessels][d];
 
-/** Rank of st after adding `pts` to slice i (i < 0: st itself) without allocating the new state. */
-function rankOf(s: Search, st: State, i = -1, pts = 0, delta = 0): number {
-  const sl = i >= 0 ? s.wheel.slices[i] : null;
-  const fills = !!sl && st.alloc[i] + pts >= sl.capacity;
-  const vessels = fills && sl!.kind === 'vessel' ? Math.min(st.vessels + 1, s.gemRm.length - 1) : st.vessels;
+/** Beam rank of st after adding `pts` to slice i, without allocating the new state. */
+function rankOf(s: Search, st: State, i: number, pts: number, delta: number): number {
+  const sl = s.wheel.slices[i];
+  const fills = st.alloc[i] + pts >= sl.capacity;
+  const vessels = fills && sl.kind === 'vessel' ? Math.min(st.vessels + 1, s.gemRm.length - 1) : st.vessels;
   const remaining = s.budget - st.used - pts;
   let shaping = 0;
   for (let d = 0; d < 4; d++) {
     let dp = revPts(s, st, d, vessels);
-    if (sl && d === sl.domainIdx) dp += pts + (fills && sl.kind === 'rm' ? RM_SLICE_POINTS : 0);
+    if (d === sl.domainIdx) dp += pts + (fills && sl.kind === 'rm' ? RM_SLICE_POINTS : 0);
     const stage = stageFor(dp);
     if (stage >= REVELATION_THRESHOLDS.length) continue;
     const target = REVELATION_THRESHOLDS[stage];
@@ -255,7 +257,7 @@ function gainOf(s: Search, st: State, i: number, pts: number): number {
   let rev = 0;
   for (let d = 0; d < 4; d++) {
     if (d !== sl.domainIdx && nextVessels === st.vessels) continue;
-    const before = revPts(s, st, d);
+    const before = revPts(s, st, d, st.vessels);
     let after = revPts(s, st, d, nextVessels);
     if (d === sl.domainIdx) after += pts + (fills && sl.kind === 'rm' ? RM_SLICE_POINTS : 0);
     rev += s.t.rev[d][stageFor(after)] - s.t.rev[d][stageFor(before)];
@@ -270,28 +272,44 @@ function extend(s: Search, st: State, i: number, pts: number, delta = gainOf(s, 
   alloc[i] += pts;
   const domainPts = st.domainPts.slice();
   domainPts[sl.domainIdx] += pts;
-  const rmFull = fills && sl.kind === 'rm' ? st.rmFull.map((x, d) => (d === sl.domainIdx ? x + 1 : x)) : st.rmFull;
+  const rmFill = fills && sl.kind === 'rm';
+  const rmFull = rmFill ? st.rmFull.map((x, d) => (d === sl.domainIdx ? x + 1 : x)) : st.rmFull;
+  const slicesRev = st.slicesRev.slice();
+  slicesRev[sl.domainIdx] += pts + (rmFill ? RM_SLICE_POINTS : 0);
   const next: State = {
     alloc,
     used: st.used + pts,
     domainPts,
     rmFull,
+    slicesRev,
     vessels: fills && sl.kind === 'vessel' ? Math.min(st.vessels + 1, s.gemRm.length - 1) : st.vessels,
     score: 0,
     path: st.path.includes(i) ? st.path : [...st.path, i],
     key: fills ? st.key + 2 ** i : st.key,
-    rank: 0,
   };
   next.score = st.score + delta;
-  next.rank = rankOf(s, next);
   return next;
 }
 
 /** Greedily spends leftover points; only the last touched slice may be partial. */
 function complete(s: Search, start: State): State {
+  const hit = s.completed.get(start.key);
+  if (hit && sameState(hit.from, start)) return hit.done;
+  const chain: State[] = [];
+  const done = greedyFill(s, start, chain);
+  for (const st of chain) s.completed.set(st.key, { from: st, done });
+  return done;
+}
+
+/** Exactly equal (score bits and fill order), so a remembered completion is the one complete() would compute. */
+const sameState = (a: State, b: State) =>
+  a === b || (a.score === b.score && a.path.length === b.path.length && a.path.every((x, k) => x === b.path[k]));
+
+function greedyFill(s: Search, start: State, chain: State[]): State {
   let st = start;
   const n = s.wheel.slices.length;
   for (;;) {
+    chain.push(st);
     const left = s.budget - st.used;
     if (left <= 0) return st;
     let best = -1;
@@ -363,17 +381,17 @@ function search(wheel: EngineWheel, t: Tables, budget: number, gemRm: number[][]
   });
   density /= n;
   const pairs = wheel.slices.filter((sl) => sl.kind === 'augment' && sl.twin > sl.idx).map((sl): [number, number] => [sl.idx, sl.twin]);
-  const s: Search = { wheel, t, budget, density, gemRm, pairs };
+  const s: Search = { wheel, t, budget, density, gemRm, pairs, completed: new Map() };
   let empty: State = {
     alloc: new Int32Array(n),
     used: 0,
     domainPts: [0, 0, 0, 0],
     rmFull: [0, 0, 0, 0],
+    slicesRev: [0, 0, 0, 0],
     vessels: 0,
     score: 0,
     path: [],
     key: 0,
-    rank: 0,
   };
   // D21: forced augment paths are filled first.
   for (const i of seed) empty = extend(s, empty, i, wheel.slices[i].capacity);

@@ -5,7 +5,7 @@
 import type { CharacterStats, Vocation } from '../../types';
 import { resolveCharacterStats } from '../character';
 import formulasJson from './spell-formulas.json';
-import type { Coefficients, DamageArea, DamageSpell, DamageVariant, HealingSpell, RotationPreset, SpellFormulasFile, WeaponBracket } from './types';
+import type { Coefficients, DamageSpell, DamageVariant, HealingSpell, RotationPreset, SpellFormulasFile, WeaponBracket } from './types';
 
 export type * from './types';
 
@@ -242,10 +242,6 @@ export function spellCooldownTurns(spellName: string, reductionSeconds = 0): num
 
 export function spellElement(spellName: string) {
   return getDamageSpell(spellName)?.element ?? (getHealingSpell(spellName) ? 'healing' : null);
-}
-
-export function spellArea(spellName: string): DamageArea | null {
-  return getDamageSpell(spellName)?.area ?? getHealingSpell(spellName)?.area ?? null;
 }
 
 /** D16: single-target spells are never valued in hunt mode. Unknown spells → false. */

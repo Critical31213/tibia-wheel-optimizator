@@ -8,8 +8,6 @@ export type GemSlot = 'basic1' | 'basic2' | 'supreme';
 
 export const GEM_QUALITIES: readonly GemQuality[] = ['lesser', 'regular', 'greater'];
 export const MOD_GRADES: readonly ModGrade[] = [1, 2, 3, 4];
-export const GEM_SLOTS: readonly GemSlot[] = ['basic1', 'basic2', 'supreme'];
-
 /** Lesser = 1 basic, regular = 2 basic, greater = 2 basic + 1 supreme. */
 export function slotsForQuality(quality: GemQuality): GemSlot[] {
   if (quality === 'lesser') return ['basic1'];
