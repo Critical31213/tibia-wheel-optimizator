@@ -162,6 +162,7 @@ function PerkGrid({ owned, weapon, onChange }: PerkGridProps) {
           return (
             <li key={i} className={cx('flex shrink-0 flex-col items-center gap-1', locked && 'opacity-35')}>
               <span className="text-[10px] tabular-nums text-parchment-400">{i + 1}</span>
+              <div className="flex flex-1 flex-col justify-center gap-1">
               {level.map((p, k) => {
                 const label = `${t('weapons.levelN', { n: i + 1 })}: ${perkLabel(t, p)}${shape?.replaces === k ? ' ✦' : ''}`;
                 const picked = choice === k;
@@ -190,6 +191,7 @@ function PerkGrid({ owned, weapon, onChange }: PerkGridProps) {
                   </Tip>
                 );
               })}
+              </div>
             </li>
           );
         })}
