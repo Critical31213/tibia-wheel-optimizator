@@ -145,6 +145,7 @@ export default function App() {
                 suggest={weaponPrefs.suggest}
                 busy={optimized.busy}
                 onSuggestChange={(suggest) => setWeaponPrefs((p) => ({ ...p, suggest }))}
+                onApplyPerks={(id, perks) => setWeaponPrefs((p) => ({ ...p, weapons: p.weapons.map((w) => (w.weaponId === id ? { ...w, perks } : w)) }))}
               />
             </Panel>
           )}

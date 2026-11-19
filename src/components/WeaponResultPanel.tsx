@@ -26,6 +26,8 @@ interface WeaponResultPanelProps {
   suggest: boolean;
   busy: boolean;
   onSuggestChange: (on: boolean) => void;
+  /** D56: replace the manual perks of a weapon. */
+  onApplyPerks?: (weaponId: string, perks: (number | null)[]) => void;
 }
 
 /** D52: the picked perk per level as icons; the effect in a tooltip, manual choices framed in gold. */
@@ -59,8 +61,55 @@ function PickPerks({ pick, owned }: { pick: WeaponPick; owned?: OwnedWeapon }) {
   );
 }
 
+/** D56: the engine's perks for the chosen weapon when they beat the manual picks; only the changed levels are shown. */
+function BetterPerks({ better, chosen, owned, onApply }: { better: WeaponPick; chosen: WeaponPick; owned: OwnedWeapon; onApply?: (perks: (number | null)[]) => void }) {
+  const t = useT();
+  const weapon = getWeapon(better.weaponId);
+  if (!weapon) return null;
+  const options = levelOptions(owned, weapon);
+  const changed = better.perks.flatMap((k, i) => (k !== chosen.perks[i] ? [i] : []));
+  if (!changed.length) return null;
+  const icon = (i: number, k: number, align: 'start' | 'center' | 'end') => {
+    const p = options[i]?.[k];
+    return p ? (
+      <Tip text={`${t('weapons.levelN', { n: i + 1 })}: ${perkLabel(t, p)}`} align={align}>
+        <span tabIndex={0} aria-label={perkLabel(t, p)} className="block rounded-md border border-ink-600 p-0.5">
+          <PerkIcon perk={p} size={20} />
+        </span>
+      </Tip>
+    ) : null;
+  };
+  return (
+    <div role="note" className="mt-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-medium text-amber-200">{t('weaponResult.better')}</span>
+        <Gain effect={better.effect} score={better.delta} />
+      </div>
+      <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1.5">
+        {changed.map((i) => (
+          <li key={i} className="flex items-center gap-1 text-xs text-parchment-300">
+            <span className="tabular-nums text-parchment-400">{i + 1}:</span>
+            <span className="opacity-50">{icon(i, chosen.perks[i], 'start')}</span>
+            <span aria-hidden="true">→</span>
+            {icon(i, better.perks[i], 'start')}
+          </li>
+        ))}
+      </ul>
+      {onApply && (
+        <button
+          type="button"
+          onClick={() => onApply(owned.perks?.map((x, i) => (x == null ? x : better.perks[i])) ?? [])}
+          className="mt-2 rounded-md border border-gold-600 bg-gold-700/30 px-2 py-0.5 text-xs font-medium text-gold-300 hover:bg-gold-700/50"
+        >
+          {t('weaponResult.applyBetter')}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** D47: chosen weapon with its perks, the other owned weapons, dust reshapes and (optional) unowned suggestions. */
-export function WeaponResultPanel({ result, owned, suggest, busy, onSuggestChange }: WeaponResultPanelProps) {
+export function WeaponResultPanel({ result, owned, suggest, busy, onSuggestChange, onApplyPerks }: WeaponResultPanelProps) {
   const t = useT();
   const suggestId = useId();
   const ownedOf = (id: string) => owned.find((w) => w.weaponId === id);
@@ -81,6 +130,14 @@ export function WeaponResultPanel({ result, owned, suggest, busy, onSuggestChang
           <div className="mt-1">
             <PickPerks pick={result.best} owned={bestOwned} />
           </div>
+          {result.better && bestOwned && (
+            <BetterPerks
+              better={result.better}
+              chosen={result.best}
+              owned={bestOwned}
+              onApply={onApplyPerks && ((perks) => onApplyPerks(result.best.weaponId, perks))}
+            />
+          )}
         </section>
       )}
 

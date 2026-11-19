@@ -217,6 +217,8 @@ export const pl: Dictionary = {
   'weaponResult.best': "Najlepsza broń",
   'weaponResult.picked': "wybrany",
   'weaponResult.yours': "Twój wybór",
+  'weaponResult.better': "Lepsze perki dla tej broni",
+  'weaponResult.applyBetter': "Zastosuj",
   'weaponResult.ranking': "Pozostałe Twoje bronie",
   'weaponResult.reshapes': "Warte przekształcenia pyłem",
   'weaponResult.reshape': "Poziom {level}: {option}",

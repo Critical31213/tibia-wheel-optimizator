@@ -115,3 +115,8 @@ the level that beat the chosen one (all levels unlocked; Ice Rapier excluded, it
 ## Monsters
 
 `Monster.bestiaryClass` (21 classes) is parsed from the tibiopedia "Klasa" link, see `docs/modules/data.md`.
+
+## Better perks (D56)
+
+When the chosen weapon has manual perks, `weaponResult` also ranks it with every perk free (same scorer, ammunition
+re-chosen) and returns `WeaponResult.better` if that beats the manual loadout by more than `MIN_WEAPON_GAIN`.

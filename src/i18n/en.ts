@@ -223,6 +223,8 @@ export const en = {
   'weaponResult.best': "Best weapon",
   'weaponResult.picked': "picked",
   'weaponResult.yours': "your choice",
+  'weaponResult.better': "Better perks for this weapon",
+  'weaponResult.applyBetter': "Apply",
   'weaponResult.ranking': "Your other weapons",
   'weaponResult.reshapes': "Dust reshapes worth doing",
   'weaponResult.reshape': "Level {level}: {option}",

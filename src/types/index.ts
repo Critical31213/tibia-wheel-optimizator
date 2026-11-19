@@ -417,6 +417,8 @@ export interface WeaponReshape {
 export interface WeaponResult {
   /** The chosen weapon (also first in `ranking`). */
   best: WeaponPick;
+  /** D56: the chosen weapon with every perk left to the engine, when that beats the manual picks. */
+  better?: WeaponPick;
   /** All owned weapons, best first. */
   ranking: WeaponPick[];
   /** Most valuable dust reshapes of the chosen weapon (free slots only), best first. */

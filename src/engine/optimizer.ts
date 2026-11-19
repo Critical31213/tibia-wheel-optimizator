@@ -1820,8 +1820,13 @@ function weaponResult(p: Prepared, main: State): WeaponResult | undefined {
   const effect: Effect = (lo) => effectOf(p.v, sub(val(lo), baseP));
   const others = rankWeapons(ownedChoices(p.input, p.spec.preset).filter((c) => c.owned !== chosen.owned), score, p.v.level);
   const best = pick(chosen, 0);
+  // D56: the same weapon with every perk left to the engine.
+  const better = chosen.owned.perks?.some((x) => x != null)
+    ? rankWeapons([{ owned: { ...chosen.owned, perks: undefined }, weapon: chosen.weapon, options: chosen.options }], score, p.v.level)[0]
+    : undefined;
   return {
     best,
+    ...(better && better.score > base + MIN_WEAPON_GAIN ? { better: pick(better, better.score - base, effect(choiceLoadout(better))) } : {}),
     ranking: [best, ...others.map((w) => pick(w, w.score - base, effect(choiceLoadout(w))))],
     reshapes: reshapes(p, chosen, score, base, effect),
     ...(p.input.suggestWeapons ? { suggestions: suggestions(p, score, base, effect) } : {}),

@@ -124,6 +124,17 @@ describe('weapon choice in the optimizer (D45)', () => {
     }
   });
 
+  it('suggests the engine perks when manual picks are worse (D56)', () => {
+    const auto = runOptimizer(input({ weapons: [{ weaponId: 'sanguine-cudgel', level: 7 }] })).weapon!;
+    expect(auto.better).toBeUndefined();
+    const levels = getWeapon('sanguine-cudgel')!.levels;
+    const perks = auto.best.perks.map((k, i) => (levels[i].length > 1 ? (k + 1) % levels[i].length : null));
+    const w = runOptimizer(input({ weapons: [{ weaponId: 'sanguine-cudgel', level: 7, perks }] })).weapon!;
+    expect(w.better).toBeDefined();
+    expect(w.better!.delta).toBeGreaterThan(0);
+    expect(w.better!.perks).not.toEqual(w.best.perks);
+  });
+
   it('splits gains into % damage and % EHP (D55)', () => {
     const r = runOptimizer(input({ weapons: [{ weaponId: 'sanguine-cudgel', level: 7 }], suggestWeapons: true }));
     const all = [...r.gemRecommendations, ...r.upgradeRecommendations, ...r.weapon!.reshapes, ...(r.weapon!.suggestions ?? [])];
