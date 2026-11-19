@@ -46,3 +46,29 @@ describe('D68: five builders before each spender', () => {
     expect(build + spend).toBeCloseTo(30, 0);
   });
 });
+
+describe('D70: custom rotation', () => {
+  const run = (vocation: 'druid' | 'monk', customRotation: { name: string; ratio: number }[]) =>
+    optimize({ vocation, points: 1000, monster: null, priority: 0, context: { mode: 'hunt' }, alternatives: 0, rotationId: 'custom', customRotation });
+
+  it('uses the chosen spells and weights', () => {
+    const r = run('druid', [
+      { name: 'Strong Ice Wave', ratio: 2 },
+      { name: 'Terra Wave', ratio: 1 },
+    ]);
+    expect(r.rotation!.presetId).toBe('custom');
+    const m = rates(r);
+    expect(m.get('Strong Ice Wave')).toBeGreaterThan(m.get('Terra Wave')!);
+    expect(m.has('Ice Wave')).toBe(false);
+  });
+
+  it('monk: Spiritual Outburst goes into the spender slot', () => {
+    const m = rates(run('monk', [{ name: 'Chained Penance', ratio: 5 }, { name: 'Spiritual Outburst', ratio: 1 }]));
+    expect(m.get('Chained Penance')).toBeGreaterThan(0);
+    expect(m.get('Spiritual Outburst')! + (m.get('Sweeping Takedown') ?? 0)).toBeGreaterThan(0);
+  });
+
+  it('no valid spell: the engine picks the rotation', () => {
+    expect(run('druid', [{ name: 'Nope', ratio: 3 }]).rotation!.presetId).not.toBe('custom');
+  });
+});

@@ -31,12 +31,13 @@ import type {
   WeaponReshape,
   WeaponResult,
 } from '../types';
+import { CUSTOM_ROTATION_ID } from '../types';
 import { ammoFor, shapedPerk, shapingId, shapingOptions, weaponsFor, type Ammo, type Perk as ProfPerk, type Weapon } from '../data/proficiency';
 import { choosePerks, loadoutCharacter, loadoutOf, loadoutParts, ownedOptions, type Loadout } from './proficiency';
 import { encodePlannerCode, gridForSliceId, plannerVesselIssues, type PlannerVessel } from '../data/wheel/plannerCode';
 import { resolveCharacterStats } from '../data/character';
 import { BALLISTIC_MASTERY, healingAverage, pierceDamageMod, POSITIONAL_TACTICS, TURN_SECONDS } from '../data/damage';
-import { getRotationPresets } from '../data/damage/rotations';
+import { customPreset, getRotationPresets } from '../data/damage/rotations';
 import { getStance, stanceCombos, type StanceDef } from '../data/damage/stances';
 import { stanceBuilder, stanceDefense, stancedCharacter } from './stances';
 import {
@@ -895,7 +896,7 @@ const pointsOf = (input: Pick<OptimizerInput, 'points'>) =>
   Math.max(0, Math.floor(Number.isFinite(input.points) ? input.points : 0));
 
 type ValuationInput = Pick<OptimizerInput, 'vocation' | 'points' | 'monster' | 'context' | 'character' | 'monsters'> &
-  Partial<Pick<OptimizerInput, 'rotationId' | 'forcedSpells'>>;
+  Partial<Pick<OptimizerInput, 'rotationId' | 'forcedSpells' | 'customRotation'>>;
 
 /** Level used for valuation: `character.level`, else points + 50. */
 export function levelFor(input: Pick<OptimizerInput, 'points' | 'character'>): number {
@@ -904,7 +905,8 @@ export function levelFor(input: Pick<OptimizerInput, 'points' | 'character'>): n
 }
 
 /** Rotation preset of the vocation with this id, else null. */
-export function presetById(vocation: OptimizerInput['vocation'], id: string | undefined): RotationPreset | null {
+export function presetById(vocation: OptimizerInput['vocation'], id: string | undefined, custom?: OptimizerInput['customRotation']): RotationPreset | null {
+  if (id === CUSTOM_ROTATION_ID) return customPreset(vocation, custom);
   return id ? (getRotationPresets(vocation).find((p) => p.id === id) ?? null) : null;
 }
 
@@ -984,7 +986,7 @@ function paladinUniques(
  */
 export function valuationFor(
   input: ValuationInput,
-  preset: RotationPreset | null = presetById(input.vocation, input.rotationId),
+  preset: RotationPreset | null = presetById(input.vocation, input.rotationId, input.customRotation),
   reference?: number,
   stances: readonly StanceDef[] = [],
   loadout?: Loadout,
@@ -1670,7 +1672,7 @@ function refine(p: Prepared, best: State): State {
  * schedule in boss mode. All share one reference T0 (best plan without a revelation requirement).
  */
 export function planSpecs(input: OptimizerInput): PlanSpec[] {
-  const chosen = presetById(input.vocation, input.rotationId);
+  const chosen = presetById(input.vocation, input.rotationId, input.customRotation);
   const boss = input.context?.mode === 'boss';
   const all = getRotationPresets(input.vocation);
   const autoPlans: (RotationPreset | null)[] = [...all, ...(boss || !all.length ? [null] : [])];

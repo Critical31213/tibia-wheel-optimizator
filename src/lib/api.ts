@@ -22,7 +22,7 @@ export { getWheel, MAX_EXTRA_POINTS, optimize, pointsForLevel, revelationOptions
 export function getRevelationNames(vocation: Vocation): string[] {
   return getWheelData(vocation).revelations.map((r) => r.name);
 }
-export { getRotationPresets } from '../data/damage/rotations';
+export { getCustomRotationSpells, getRotationPresets } from '../data/damage/rotations';
 
 /** D32: selectable stance sets of the vocation, as keys ('' = none, names joined by STANCE_SEP). */
 export function getStanceOptions(vocation: Vocation): string[] {

@@ -186,6 +186,9 @@ export interface RotationPreset {
 /** `RotationUsage.presetId` of the engine's greedy boss plan (no preset). */
 export const GREEDY_ROTATION_ID = 'boss';
 
+/** D70: `rotationId` of the user's own rotation (`OptimizerInput.customRotation`). */
+export const CUSTOM_ROTATION_ID = 'custom';
+
 export interface RotationUsage {
   presetId: string;
   /** True when the engine picked it (no manual choice). */
@@ -374,6 +377,8 @@ export interface OptimizerInput {
   alternatives?: number;
   /** Rotation preset id; undefined = engine picks the best. */
   rotationId?: string;
+  /** D70: spells and casts per full cycle of the user's rotation, used when `rotationId` is `custom`. */
+  customRotation?: RotationSpell[];
   /** Spells whose wheel augment must be taken (e.g. utility spells needed at a spot). */
   forcedSpells?: string[];
   /** D35: forced spells whose augment must reach stage II (both slices); a subset of `forcedSpells`. */

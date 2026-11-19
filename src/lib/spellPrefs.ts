@@ -2,7 +2,7 @@
  * Rotation choice, forced spells (stage II subset), forced revelation stages and stance (D20/D21/D32/D35):
  * per-vocation localStorage and URL keys `r` / `fs` / `fs2` / `fr` / `st`. Pure.
  */
-import type { ForcedRevelation, Vocation } from '../types';
+import type { ForcedRevelation, RotationSpell, Vocation } from '../types';
 
 export interface SpellPrefs {
   /** Rotation preset id; null = auto (engine picks the best). */
@@ -14,9 +14,29 @@ export interface SpellPrefs {
   forcedRevelations: ForcedRevelation[];
   /** D32: stance set key ('' = none, names joined by STANCE_SEP); null = auto. */
   stance: string | null;
+  /** D70: the user's own rotation (used when `rotationId` is `custom`). */
+  customRotation: RotationSpell[];
 }
 
-export const EMPTY_SPELL_PREFS: SpellPrefs = { rotationId: null, forcedSpells: [], forcedStage2: [], forcedRevelations: [], stance: null };
+export const EMPTY_SPELL_PREFS: SpellPrefs = { rotationId: null, forcedSpells: [], forcedStage2: [], forcedRevelations: [], stance: null, customRotation: [] };
+export const MAX_CUSTOM_SPELLS = 8;
+export const MAX_CUSTOM_RATIO = 20;
+
+/** D70: known spells only (canonical casing), unique, whole casts 1..MAX_CUSTOM_RATIO, at most MAX_CUSTOM_SPELLS. */
+export function sanitizeCustomSpells(raw: unknown, allowed: readonly string[]): RotationSpell[] {
+  if (!Array.isArray(raw)) return [];
+  const byLower = new Map(allowed.map((s) => [s.toLowerCase(), s]));
+  const out: RotationSpell[] = [];
+  for (const x of raw) {
+    const { name, ratio } = (x ?? {}) as Record<string, unknown>;
+    const n = typeof name === 'string' ? byLower.get(name.trim().toLowerCase()) : undefined;
+    const r = typeof ratio === 'number' && Number.isFinite(ratio) ? Math.round(ratio) : NaN;
+    if (!n || !(r >= 1) || out.some((s) => s.name === n)) continue;
+    out.push({ name: n, ratio: Math.min(MAX_CUSTOM_RATIO, r) });
+    if (out.length >= MAX_CUSTOM_SPELLS) break;
+  }
+  return out;
+}
 export const STANCE_SEP = '+';
 export const stanceNames = (key: string) => (key ? key.split(STANCE_SEP) : []);
 export const MAX_FORCED_SPELLS = 8;
@@ -28,6 +48,7 @@ const FS_KEY = 'fs';
 const ST_KEY = 'st';
 const FS2_KEY = 'fs2';
 const FR_KEY = 'fr';
+const CR_KEY = 'cr';
 const SEP = ',';
 
 /** Keeps only known ids/spells (canonical casing), unique, at most MAX_FORCED_SPELLS. */
@@ -37,9 +58,10 @@ export function sanitizeSpellPrefs(
   spells: readonly string[],
   stances: readonly string[] = [],
   revelations: readonly string[] = [],
+  customSpells: readonly string[] = [],
 ): SpellPrefs {
   if (!raw || typeof raw !== 'object') return EMPTY_SPELL_PREFS;
-  const { rotationId, forcedSpells, forcedStage2, forcedRevelations, stance } = raw as Record<string, unknown>;
+  const { rotationId, forcedSpells, forcedStage2, forcedRevelations, stance, customRotation } = raw as Record<string, unknown>;
   const byLower = new Map(spells.map((s) => [s.toLowerCase(), s]));
   const forced: string[] = [];
   if (Array.isArray(forcedSpells)) {
@@ -63,6 +85,7 @@ export function sanitizeSpellPrefs(
     forcedStage2: stage2,
     forcedRevelations: revs,
     stance: typeof stance === 'string' && stances.includes(stance) ? stance : null,
+    customRotation: sanitizeCustomSpells(customRotation, customSpells),
   };
 }
 
@@ -72,10 +95,11 @@ export function parseSpellPrefs(
   spells: readonly string[],
   stances: readonly string[] = [],
   revelations: readonly string[] = [],
+  customSpells: readonly string[] = [],
 ): SpellPrefs {
   if (!json) return EMPTY_SPELL_PREFS;
   try {
-    return sanitizeSpellPrefs(JSON.parse(json), rotationIds, spells, stances, revelations);
+    return sanitizeSpellPrefs(JSON.parse(json), rotationIds, spells, stances, revelations, customSpells);
   } catch {
     return EMPTY_SPELL_PREFS;
   }
@@ -91,9 +115,16 @@ export function spellPrefsFromQuery(
   spells: readonly string[],
   stances: readonly string[] = [],
   revelations: readonly string[] = [],
+  customSpells: readonly string[] = [],
 ): SpellPrefs | undefined {
   const q = new URLSearchParams(search);
-  if (![R_KEY, FS_KEY, FS2_KEY, FR_KEY, ST_KEY, 'v'].some((k) => q.has(k))) return undefined;
+  if (![R_KEY, FS_KEY, FS2_KEY, FR_KEY, ST_KEY, CR_KEY, 'v'].some((k) => q.has(k))) return undefined;
+  const customRotation = (q.get(CR_KEY) ?? '')
+    .split(SEP)
+    .map((x) => {
+      const i = x.lastIndexOf(':');
+      return { name: x.slice(0, i), ratio: Number(x.slice(i + 1)) };
+    });
   const forcedRevelations = (q.get(FR_KEY) ?? '')
     .split(SEP)
     .map((x) => {
@@ -101,11 +132,12 @@ export function spellPrefsFromQuery(
       return { name: x.slice(0, i), stage: Number(x.slice(i + 1)) };
     });
   return sanitizeSpellPrefs(
-    { rotationId: q.get(R_KEY), forcedSpells: (q.get(FS_KEY) ?? '').split(SEP), forcedStage2: (q.get(FS2_KEY) ?? '').split(SEP), forcedRevelations, stance: q.get(ST_KEY) },
+    { rotationId: q.get(R_KEY), forcedSpells: (q.get(FS_KEY) ?? '').split(SEP), forcedStage2: (q.get(FS2_KEY) ?? '').split(SEP), forcedRevelations, stance: q.get(ST_KEY), customRotation },
     rotationIds,
     spells,
     stances,
     revelations,
+    customSpells,
   );
 }
 
@@ -122,5 +154,7 @@ export function spellPrefsToQuery(prefs: SpellPrefs, search = ''): string {
   else q.delete(FR_KEY);
   if (prefs.stance !== null) q.set(ST_KEY, prefs.stance);
   else q.delete(ST_KEY);
+  if (prefs.customRotation?.length) q.set(CR_KEY, prefs.customRotation.map((s) => `${s.name}:${s.ratio}`).join(SEP));
+  else q.delete(CR_KEY);
   return `?${q.toString()}`;
 }

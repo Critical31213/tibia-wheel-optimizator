@@ -8,7 +8,7 @@ import {
   spellPrefsStorageKey,
   spellPrefsToQuery,
 } from './spellPrefs';
-import { getForceableSpells, getRevelationNames, getRotationPresets, getStanceOptions } from './api';
+import { getForceableSpells, getRevelationNames, getRotationPresets, getCustomRotationSpells, getStanceOptions } from './api';
 
 const IDS = ['ms-gfw-echo', 'ms-gfw-geb'];
 const SPELLS = ["Hell's Core", 'Great Fire Wave', 'Ultimate Healing'];
@@ -21,6 +21,7 @@ describe('spell prefs', () => {
       forcedStage2: [],
       forcedRevelations: [],
       stance: null,
+      customRotation: [],
     });
     const many = Array.from({ length: 20 }, (_, i) => `s${i}`);
     expect(sanitizeSpellPrefs({ forcedSpells: many }, IDS, many).forcedSpells).toHaveLength(MAX_FORCED_SPELLS);
@@ -35,13 +36,20 @@ describe('spell prefs', () => {
       forcedStage2: ["Hell's Core"],
       forcedRevelations: [{ name: 'Beam Mastery', stage: 2 as const }],
       stance: 'Master of Flames+Aura of Exposed Weakness',
+      customRotation: [{ name: 'Great Fire Wave', ratio: 3 }, { name: 'Energy Wave', ratio: 1 }],
     };
     const ST = getStanceOptions('sorcerer');
     const RV = getRevelationNames('sorcerer');
+    const CS = getCustomRotationSpells('sorcerer');
     const search = spellPrefsToQuery(prefs, '?v=sorcerer&p=100');
     expect(new URLSearchParams(search).get('v')).toBe('sorcerer');
-    expect(spellPrefsFromQuery(search, IDS, SPELLS, ST, RV)).toEqual(prefs);
-    expect(parseSpellPrefs(JSON.stringify(prefs), IDS, SPELLS, ST, RV)).toEqual(prefs);
+    expect(spellPrefsFromQuery(search, IDS, SPELLS, ST, RV, CS)).toEqual(prefs);
+    expect(parseSpellPrefs(JSON.stringify(prefs), IDS, SPELLS, ST, RV, CS)).toEqual(prefs);
+    // Custom rotation: unknown / duplicate spells dropped, casts rounded and clamped.
+    expect(spellPrefsFromQuery('?cr=great+fire+wave:2.6,Nope:3,Great+Fire+Wave:1,Energy+Wave:99,Energy+Beam:0', IDS, SPELLS, ST, RV, CS)?.customRotation).toEqual([
+      { name: 'Great Fire Wave', ratio: 3 },
+      { name: 'Energy Wave', ratio: 20 },
+    ]);
     // Stage II only for forced spells; unknown revelations / stages dropped.
     expect(spellPrefsFromQuery('?fs2=Hell%27s+Core&fr=Nope:2,Beam+Mastery:4', IDS, SPELLS, ST, RV)).toMatchObject({ forcedStage2: [], forcedRevelations: [] });
     expect(spellPrefsFromQuery('?st=', IDS, SPELLS, ST)?.stance).toBe('');

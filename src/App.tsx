@@ -22,7 +22,8 @@ import { usePersistentInputs } from './hooks/usePersistentInputs';
 import { usePersistentSpellPrefs } from './hooks/usePersistentSpellPrefs';
 import { usePersistentWeapons } from './hooks/usePersistentWeapons';
 import { useT } from './i18n';
-import { getForceableSpells, getMonsterById, getRotationPresets, getStanceOptions, getWheel, revelationOptions, useMonsterData } from './lib/api';
+import { CUSTOM_ROTATION_ID } from './types';
+import { getCustomRotationSpells, getForceableSpells, getMonsterById, getRotationPresets, getStanceOptions, getWheel, revelationOptions, useMonsterData } from './lib/api';
 import { stanceNames } from './lib/spellPrefs';
 import type { BuildResult } from './lib/api';
 import { characterOf, contextOf } from './lib/inputState';
@@ -40,6 +41,7 @@ export default function App() {
   const deferredWeapons = useDeferredValue(weaponPrefs);
   const presets = useMemo(() => getRotationPresets(inputs.vocation), [inputs.vocation]);
   const forceable = useMemo(() => getForceableSpells(inputs.vocation), [inputs.vocation]);
+  const customSpells = useMemo(() => getCustomRotationSpells(inputs.vocation), [inputs.vocation]);
   const stanceOptions = useMemo(() => getStanceOptions(inputs.vocation), [inputs.vocation]);
   const monstersReady = useMonsterData();
   const deferred = useDeferredValue(inputs);
@@ -60,7 +62,7 @@ export default function App() {
   );
   const character = useMemo(() => characterOf(deferred), [deferred]);
   const { mode } = deferred;
-  const { rotationId, forcedSpells, forcedStage2, forcedRevelations, stance } = deferredPrefs;
+  const { rotationId, forcedSpells, forcedStage2, forcedRevelations, stance, customRotation } = deferredPrefs;
   const revelationReach = useMemo(
     () => revelationOptions({ vocation: deferred.vocation, points, gems: deferredGems, character }),
     [deferred.vocation, points, deferredGems, character],
@@ -80,6 +82,7 @@ export default function App() {
             meleeSkill: deferred.vocation === 'knight' ? (deferred.meleeSkill ?? undefined) : undefined,
             alternatives: 0,
             rotationId: rotationId ?? undefined,
+            customRotation: rotationId === CUSTOM_ROTATION_ID && customRotation.length ? customRotation : undefined,
             forcedSpells: forcedSpells.length ? forcedSpells : undefined,
             forcedStage2: forcedStage2.length ? forcedStage2 : undefined,
             forcedRevelations: forcedRevelations.length ? forcedRevelations : undefined,
@@ -88,7 +91,7 @@ export default function App() {
             suggestWeapons: deferredWeapons.weapons.length && deferredWeapons.suggest ? true : undefined,
           }
         : null,
-    [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, deferred.meleeSkill, rotationId, forcedSpells, forcedStage2, forcedRevelations, stance, deferredWeapons],
+    [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, deferred.meleeSkill, rotationId, customRotation, forcedSpells, forcedStage2, forcedRevelations, stance, deferredWeapons],
   );
   const optimized = useOptimizer(request);
   // The shown build may lag the inputs while the worker computes; everything below follows its own vocation.
@@ -130,6 +133,7 @@ export default function App() {
           <Panel title={t('rotation.title')} headingId="rotation-heading">
             <RotationPanel
               presets={presets}
+              customSpells={customSpells}
               spells={forceable}
               stanceOptions={stanceOptions}
               revelations={revelationReach}

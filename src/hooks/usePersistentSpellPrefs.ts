@@ -1,22 +1,22 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Vocation } from '../types';
-import { getForceableSpells, getRevelationNames, getRotationPresets, getStanceOptions } from '../lib/api';
+import { CUSTOM_ROTATION_ID, type Vocation } from '../types';
+import { getCustomRotationSpells, getForceableSpells, getRevelationNames, getRotationPresets, getStanceOptions } from '../lib/api';
 import { parseSpellPrefs, spellPrefsFromQuery, spellPrefsStorageKey, spellPrefsToQuery } from '../lib/spellPrefs';
 import type { SpellPrefs } from '../lib/spellPrefs';
 
 const optionsOf = (vocation: Vocation) =>
-  [getRotationPresets(vocation).map((r) => r.id), getForceableSpells(vocation), getStanceOptions(vocation), getRevelationNames(vocation)] as const;
+  [[...getRotationPresets(vocation).map((r) => r.id), CUSTOM_ROTATION_ID], getForceableSpells(vocation), getStanceOptions(vocation), getRevelationNames(vocation), getCustomRotationSpells(vocation)] as const;
 
 function readPrefs(vocation: Vocation, fromUrl: boolean): SpellPrefs {
-  const [ids, spells, stances, revs] = optionsOf(vocation);
+  const [ids, spells, stances, revs, custom] = optionsOf(vocation);
   if (fromUrl) {
-    const q = spellPrefsFromQuery(window.location.search, ids, spells, stances, revs);
+    const q = spellPrefsFromQuery(window.location.search, ids, spells, stances, revs, custom);
     if (q) return q;
   }
   try {
-    return parseSpellPrefs(window.localStorage.getItem(spellPrefsStorageKey(vocation)), ids, spells, stances, revs);
+    return parseSpellPrefs(window.localStorage.getItem(spellPrefsStorageKey(vocation)), ids, spells, stances, revs, custom);
   } catch {
-    return parseSpellPrefs(null, ids, spells, stances, revs);
+    return parseSpellPrefs(null, ids, spells, stances, revs, custom);
   }
 }
 

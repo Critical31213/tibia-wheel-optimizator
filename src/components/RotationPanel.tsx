@@ -1,7 +1,7 @@
 import { useId } from 'react';
-import { GREEDY_ROTATION_ID, type RotationPreset, type RotationUsage } from '../types';
+import { CUSTOM_ROTATION_ID, GREEDY_ROTATION_ID, type RotationPreset, type RotationSpell, type RotationUsage } from '../types';
 import { useT } from '../i18n';
-import { MAX_FORCED_SPELLS, stanceNames } from '../lib/spellPrefs';
+import { MAX_CUSTOM_RATIO, MAX_CUSTOM_SPELLS, MAX_FORCED_SPELLS, stanceNames } from '../lib/spellPrefs';
 import { cx, formatNumber, ROMAN } from '../lib/labels';
 import type { RevelationOption, RevelationReach } from '../types';
 
@@ -10,6 +10,8 @@ import type { SpellPrefs } from '../lib/spellPrefs';
 
 interface RotationPanelProps {
   presets: RotationPreset[];
+  /** D70: spells selectable in a custom rotation. */
+  customSpells: string[];
   /** Spells whose augment can be forced. */
   spells: string[];
   /** Selectable stance set keys (D32). */
@@ -28,7 +30,7 @@ interface RotationPanelProps {
 const AUTO = '*';
 
 /** Rotation choice (auto / preset), the rotation the viewed build is based on, and forced spell augments. */
-export function RotationPanel({ presets, spells, stanceOptions, revelations, value, onChange, usage, stances }: RotationPanelProps) {
+export function RotationPanel({ presets, customSpells, spells, stanceOptions, revelations, value, onChange, usage, stances }: RotationPanelProps) {
   const t = useT();
   const id = useId();
   const selected = presets.find((p) => p.id === value.rotationId);
@@ -60,7 +62,9 @@ export function RotationPanel({ presets, spells, stanceOptions, revelations, val
             {p.name}
           </option>
         ))}
+        <option value={CUSTOM_ROTATION_ID}>{t('rotation.custom')}</option>
       </select>
+      {value.rotationId === CUSTOM_ROTATION_ID && <CustomRotationEditor spells={customSpells} value={value.customRotation} onChange={(customRotation) => onChange({ customRotation })} />}
       {selected && (selected.note || selected.requires) && (
         <p className="mt-1 text-xs text-parchment-400">{[selected.note, ...requires(selected)].filter(Boolean).join(' · ')}</p>
       )}
@@ -89,7 +93,7 @@ export function RotationPanel({ presets, spells, stanceOptions, revelations, val
       {usage && (
         <div className="mt-3" aria-live="polite">
           <p className="text-xs text-parchment-300">
-            {t('rotation.used')}: <span className="text-parchment-100">{used?.name ?? (usage.presetId === GREEDY_ROTATION_ID ? t('rotation.boss') : usage.presetId)}</span>
+            {t('rotation.used')}: <span className="text-parchment-100">{used?.name ?? (usage.presetId === GREEDY_ROTATION_ID ? t('rotation.boss') : usage.presetId === CUSTOM_ROTATION_ID ? t('rotation.custom') : usage.presetId)}</span>
             {usage.auto && <span className="text-parchment-400"> ({t('rotation.autoPicked')})</span>}
           </p>
           {stances && (
@@ -270,5 +274,58 @@ function RotationDamage({ usage, window: w }: { usage: RotationUsage; window: No
       </div>
       <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.damageNote')}</p>
     </details>
+  );
+}
+
+/** D70: spells and casts per full cycle of the user's rotation. */
+function CustomRotationEditor({ spells, value, onChange }: { spells: string[]; value: RotationSpell[]; onChange: (v: RotationSpell[]) => void }) {
+  const t = useT();
+  const id = useId();
+  const addable = spells.filter((s) => !value.some((x) => x.name === s));
+  const setRatio = (name: string, ratio: number) =>
+    onChange(value.map((x) => (x.name === name ? { ...x, ratio: Math.max(1, Math.min(MAX_CUSTOM_RATIO, Math.round(ratio) || 1)) } : x)));
+  return (
+    <div className="mt-2 rounded border border-ink-700 p-2">
+      <p className="text-[11px] text-parchment-400">{t('rotation.customHint')}</p>
+      {value.length > 0 && (
+        <ul className="mt-1 space-y-1">
+          {value.map((x) => (
+            <li key={x.name} className="flex items-center gap-2 text-xs">
+              <span className="flex-1 text-parchment-200">{x.name}</span>
+              <label className="sr-only" htmlFor={`${id}-${x.name}`}>
+                {t('rotation.customRatio', { name: x.name })}
+              </label>
+              <input
+                id={`${id}-${x.name}`}
+                type="number"
+                min={1}
+                max={MAX_CUSTOM_RATIO}
+                value={x.ratio}
+                onChange={(e) => setRatio(x.name, Number(e.target.value))}
+                className="field w-14 py-0.5 text-right text-xs tabular-nums"
+              />
+              <button type="button" onClick={() => onChange(value.filter((y) => y.name !== x.name))} className="text-parchment-400 hover:text-parchment-100" aria-label={t('rotation.forcedRemove', { name: x.name })}>
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <select
+        aria-label={t('rotation.customAdd')}
+        value=""
+        disabled={!addable.length || value.length >= MAX_CUSTOM_SPELLS}
+        onChange={(e) => e.target.value && onChange([...value, { name: e.target.value, ratio: 1 }])}
+        className="field mt-2 w-full py-1 text-xs"
+      >
+        <option value="">{t('rotation.customAdd')}</option>
+        {addable.map((s) => (
+          <option key={s} value={s}>
+            {s}
+          </option>
+        ))}
+      </select>
+      {!value.length && <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.customEmpty')}</p>}
+    </div>
   );
 }

@@ -1,4 +1,6 @@
-import type { RotationPreset, Vocation } from '../../types';
+import { CUSTOM_ROTATION_ID, type RotationPreset, type RotationSpell, type Vocation } from '../../types';
+import { sanitizeCustomSpells } from '../../lib/spellPrefs';
+import { getDamageSpells, revelationSpell } from './index';
 
 /**
  * Suggested hunting rotations (user-confirmed + community presets).
@@ -38,4 +40,40 @@ export const ROTATION_PRESETS: readonly RotationPreset[] = [
 
 export function getRotationPresets(vocation: Vocation): RotationPreset[] {
   return ROTATION_PRESETS.filter((r) => r.vocation === vocation);
+}
+
+/** Spender slot of the monk (Spiritual Outburst goes in it, D66). */
+const SPENDER_SLOT = 'Sweeping Takedown';
+const OUTBURST = 'Spiritual Outburst';
+
+/**
+ * D70: spells selectable in a custom rotation: the vocation's attack spells (no runes). Revelation spells are
+ * cast by the engine on cooldown, except Spiritual Outburst (a Harmony spender, cast in the spender slot).
+ */
+export function getCustomRotationSpells(vocation: Vocation): string[] {
+  return getDamageSpells(vocation)
+    .filter((s) => s.spellType === 'spell' && (!revelationSpell(s.name) || s.name === OUTBURST))
+    .map((s) => s.name)
+    .sort((a, b) => a.localeCompare(b));
+}
+
+/** Known custom-rotation spells of the vocation only (see sanitizeCustomSpells). */
+export function sanitizeCustomRotation(vocation: Vocation, raw: unknown): RotationSpell[] {
+  return sanitizeCustomSpells(raw, getCustomRotationSpells(vocation));
+}
+
+/** D70: the user's rotation as a preset; null when it has no valid spell. Spiritual Outburst joins the spender slot. */
+export function customPreset(vocation: Vocation, raw: readonly RotationSpell[] | undefined): RotationPreset | null {
+  const spells = sanitizeCustomRotation(vocation, raw);
+  if (!spells.length) return null;
+  const so = spells.find((s) => s.name === OUTBURST);
+  let entries: RotationSpell[] = spells.filter((s) => s !== so);
+  if (so) {
+    const slot = entries.find((s) => s.name === SPENDER_SLOT);
+    entries = slot
+      ? entries.map((s) => (s === slot ? { ...s, ratio: s.ratio + so.ratio, slot: [OUTBURST] } : s))
+      : [...entries, { name: SPENDER_SLOT, ratio: so.ratio, slot: [OUTBURST] }];
+  }
+  const name = `Custom: ${spells.map((s) => `${s.name} ×${s.ratio}`).join(', ')}`;
+  return { id: CUSTOM_ROTATION_ID, vocation, name, spells: entries };
 }
