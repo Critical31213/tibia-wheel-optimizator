@@ -64,12 +64,13 @@ RUNTIME (static SPA)
 ├── ARCHITECTURE.md         # this file
 ├── README.md               # user-facing quick start
 ├── assets/icon.svg         # project icon (README)
-├── docs/modules/           # data, wheel-data, planner-code, damage-model, character-formulas, engine, ui, integration
+├── docs/modules/           # data, wheel-data, planner-code, damage-model, character-formulas, proficiency, engine, ui, integration
 ├── scripts/
 │   ├── scrape-monsters.ts  # offline tibiopedia.pl scraper → src/data/monsters.json
 │   ├── extract-wheel.mjs   # planner WASM → src/data/wheel/wheel-data.json
 │   ├── datamine-damage.mjs  # damage API → src/data/damage/spell-formulas.json
-│   └── datamine-damage-meta.mjs # curated cooldowns / areas / healing formulas
+│   ├── datamine-damage-meta.mjs # curated cooldowns / areas / healing formulas
+│   └── import-proficiency.mjs # TibiaPal trees + tibiopedia weapon stats → src/data/proficiency/proficiency.json
 ├── public/favicon.svg
 ├── index.html
 ├── vite.config.ts          # React + Tailwind plugins, CSP meta, third-party-licenses.txt (D37), chunk size limit
@@ -148,6 +149,10 @@ path, activated perks, stat summary, rationale, vessels, `plannerCode`) → whee
   formulas offline on the a public damage-calculator API → `src/data/damage/spell-formulas.json`.
   Loader: `spellAverageHit`, `spellCooldownTurns`, `isSingleTarget` (D16), `defaultTargets`, `recommendedRotation`,
   `critMultiplier`, `healingAverage`. Details: [`docs/modules/damage-model.md`](docs/modules/damage-model.md).
+- **Weapon proficiency (D45):** `scripts/import-proficiency.mjs` (`npm run import:proficiency`) →
+  `src/data/proficiency/proficiency.json` (weapons with stats and proficiency trees, dust shaping options).
+  API: `WEAPONS`, `getWeapon`, `weaponsFor`, `searchWeapons`, `shapingOptions`, `shapingValue`.
+  Details: [`docs/modules/proficiency.md`](docs/modules/proficiency.md).
 - **Character formulas:** `src/data/character/`: HP/mana/cap by level, default skills 200–1500, `mitigationPercent`
   (× wheel Mitigation Multiplier). Details: [`docs/modules/character-formulas.md`](docs/modules/character-formulas.md).
 

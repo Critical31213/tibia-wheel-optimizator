@@ -129,6 +129,8 @@ The site only lists resistances for the 7 attack elements, so
   `Życie: 0` as a placeholder for "unknown", so HP 0 is omitted, and the
   experience next to it is omitted too unless it is > 0. Experience 0 with
   real HP (summons, quest creatures) is kept.
+- `bestiaryClass` (D45): from the "Klasa" link slug (`/monsters/dragons` → `Dragon`); the 21 classes of
+  `BESTIARY_CLASSES`. "Pozostałe" (others) has none.
 - `imageUrl`: absolute tibiopedia.pl GIF URL (hot-linked). `sourceUrl`: detail page URL.
 
 ## Re-running the scraper

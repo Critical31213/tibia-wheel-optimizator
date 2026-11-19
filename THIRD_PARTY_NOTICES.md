@@ -17,7 +17,10 @@ are committed or shipped, only the derived facts needed to compute builds.
 
 Spell damage formulas are fitted on the public damage calculator of TibiaPal (tibiapal.com); community
 averages (hits per spell when hunting), rotation presets and related spell data come from TibiaPal
-(https://github.com/PawelKusnierek/TibiaPal). TibiaPal is licensed as follows:
+(https://github.com/PawelKusnierek/TibiaPal). The weapon proficiency trees, the perk shaping options and the
+client spell ids used to read them come from TibiaPal's proficiency data and calculator; the shaping options were
+compiled there from TibiaWiki BR (see below). They are downloaded offline from the repository
+(raw.githubusercontent.com). TibiaPal is licensed as follows:
 
 ```
 MIT License
@@ -45,15 +48,23 @@ SOFTWARE.
 
 ## tibiopedia.pl
 
-Monster facts (element modifiers, damage types, hit points, experience) come from https://tibiopedia.pl.
+Monster facts (element modifiers, damage types, hit points, experience, bestiary class) and weapon facts (attack and
+element, defence, class, imbuement slots, bonuses, required level and vocation) come from https://tibiopedia.pl.
 They are collected offline at a low request rate and shipped as static JSON; the app makes no requests to the
 site and shows no images from it. Each monster keeps a link to its source page. The site publishes no
 license for its data; on request of its owners the data will be removed or replaced.
 
 ## TibiaWiki
 
-Some spell cooldowns and stance values were checked against TibiaWiki (https://tibia.fandom.com). Only
-individual facts (numbers) are used; no wiki text is copied. TibiaWiki text is licensed under CC BY-SA.
+Some spell cooldowns, stance values and a few wand damage values were checked against TibiaWiki
+(https://tibia.fandom.com). Only individual facts (numbers) are used; no wiki text is copied. TibiaWiki text is
+licensed under CC BY-SA.
+
+## TibiaWiki BR
+
+The rank 0 and rank 10 values of weapon proficiency perk shaping options come from TibiaWiki BR
+(https://www.tibiawiki.com.br), through TibiaPal's export. Only the numbers and effect names are used; no wiki
+text is copied. TibiaWiki BR text is licensed under CC BY-SA.
 
 ## Bundled software
 

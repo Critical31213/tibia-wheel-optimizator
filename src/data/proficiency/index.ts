@@ -1,0 +1,46 @@
+/**
+ * D45: weapon proficiency data — weapons with their stats and proficiency trees, plus dust shaping options.
+ * Generated offline by `npm run import:proficiency` (scripts/import-proficiency.mjs).
+ */
+import type { Vocation } from '../../types';
+import data from './proficiency.json';
+import type { ShapingOption, Weapon } from './types';
+
+export type * from './types';
+
+export const WEAPONS: readonly Weapon[] = data.weapons;
+export const SHAPING_OPTIONS: readonly ShapingOption[] = data.shaping;
+/** Weapons in the stats source without a known proficiency tree (not selectable yet). */
+export const WEAPONS_WITHOUT_TREE: readonly string[] = data.meta.withoutTree;
+
+const BY_ID = new Map(WEAPONS.map((w) => [w.id, w]));
+
+export const getWeapon = (id: string): Weapon | undefined => BY_ID.get(id);
+
+/** Weapons a vocation can wield, optionally only those usable at `level`. */
+export function weaponsFor(vocation: Vocation, level = Infinity): Weapon[] {
+  return WEAPONS.filter((w) => w.vocations.includes(vocation) && w.minLevel <= level);
+}
+
+/** Shaping options available to a vocation (general + vocation specific). */
+export function shapingOptions(vocation: Vocation): ShapingOption[] {
+  return SHAPING_OPTIONS.filter((o) => o.group === 'all' || o.group === vocation);
+}
+
+/** Value of a shaping option at rank 0..10 (linear between the known rank 0 and rank 10 values). */
+export const shapingValue = (o: ShapingOption, rank: number): number =>
+  o.rank0 + ((o.rank10 - o.rank0) * Math.max(0, Math.min(10, rank))) / 10;
+
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+/** Case-insensitive weapon search for a vocation: prefix matches first, then substring; ties by level. */
+export function searchWeapons(query: string, vocation: Vocation, limit = 10): Weapon[] {
+  const q = norm(query);
+  if (!q) return [];
+  return weaponsFor(vocation)
+    .map((w) => ({ w, n: norm(w.name) }))
+    .filter(({ n }) => n.includes(q))
+    .sort((a, b) => Number(!a.n.startsWith(q)) - Number(!b.n.startsWith(q)) || b.w.minLevel - a.w.minLevel)
+    .slice(0, limit)
+    .map(({ w }) => w);
+}

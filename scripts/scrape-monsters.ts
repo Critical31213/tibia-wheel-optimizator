@@ -15,7 +15,7 @@ import { load, type CheerioAPI } from 'cheerio';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { Element, Monster } from '../src/types/index.ts';
+import type { BestiaryClass, Element, Monster } from '../src/types/index.ts';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -45,6 +45,14 @@ const INCLUDED_SECTIONS = [
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CACHE_DIR = join(ROOT, 'scripts', '.cache');
 const OUT_FILE = join(ROOT, 'src', 'data', 'monsters.json');
+
+/** "Klasa" link slugs (`/monsters/<slug>`) → bestiary class; "others" has none. */
+const CLASS_SLUGS: Record<string, BestiaryClass> = {
+  amphibians: 'Amphibic', aquatic: 'Aquatic', birds: 'Bird', constructs: 'Construct', demons: 'Demon', dragons: 'Dragon',
+  elementals: 'Elemental', extradimensionals: 'Extra Dimensional', fey: 'Fey', giants: 'Giant', humans: 'Human',
+  humanoids: 'Humanoid', inkborn: 'Inkborn', lycanthropes: 'Lycanthrope', magical: 'Magical', mammals: 'Mammal',
+  plants: 'Plant', reptiles: 'Reptile', slimes: 'Slime', undeads: 'Undead', vermin: 'Vermin',
+};
 
 // ---------------------------------------------------------------------------
 // Element mapping
@@ -267,6 +275,7 @@ export interface DetailParse {
   elementModifiers: Partial<Record<Element, number>>;
   damageTypes: Element[];
   maxDamage?: number;
+  bestiaryClass?: BestiaryClass;
   unknownIcons: string[];
 }
 
@@ -366,6 +375,13 @@ export function parseDetailPage(html: string): DetailParse {
     }
   }
 
+  let bestiaryClass: BestiaryClass | undefined;
+  detail.find('strong').filter((_, s) => $(s).text().trim() === 'Klasa:').first().parent().find('a[href*="/monsters/"]').each((_, a) => {
+    const slug = ($(a).attr('href') ?? '').split('/').pop() ?? '';
+    if (CLASS_SLUGS[slug]) bestiaryClass = CLASS_SLUGS[slug];
+    else if (slug !== 'others') unknownIcons.push(`class:${slug}`);
+  });
+
   const dpsMatch = detail.find('table.monster_dmg_types').text().match(/Max DPS:\s*(\d+)/i);
   const maxDamage = dpsMatch ? Number(dpsMatch[1]) : maxAttack;
 
@@ -386,6 +402,7 @@ export function parseDetailPage(html: string): DetailParse {
     elementModifiers: orderedModifiers,
     damageTypes,
     maxDamage,
+    bestiaryClass,
     unknownIcons,
   };
 }
@@ -441,6 +458,7 @@ async function main() {
           if (exp !== undefined) m.experience = exp;
         } else if (exp !== undefined && exp > 0) m.experience = exp;
         if (d.maxDamage !== undefined) m.maxDamage = d.maxDamage;
+        if (d.bestiaryClass) m.bestiaryClass = d.bestiaryClass;
         const img = d.imageUrl ?? entry.imageUrl;
         if (img) m.imageUrl = img;
         m.sourceUrl = entry.url;

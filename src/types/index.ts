@@ -52,6 +52,13 @@ export const ATTACK_ELEMENTS: readonly Element[] = [
 // Monsters (owned by the Data module: src/data)
 // ---------------------------------------------------------------------------
 
+/** The 21 bestiary classes that weapon proficiency perks can target. */
+export const BESTIARY_CLASSES = [
+  'Amphibic', 'Aquatic', 'Bird', 'Construct', 'Demon', 'Dragon', 'Elemental', 'Extra Dimensional', 'Fey', 'Giant',
+  'Human', 'Humanoid', 'Inkborn', 'Lycanthrope', 'Magical', 'Mammal', 'Plant', 'Reptile', 'Slime', 'Undead', 'Vermin',
+] as const;
+export type BestiaryClass = (typeof BESTIARY_CLASSES)[number];
+
 export interface Monster {
   /** Stable slug, e.g. "dragon-lord". */
   id: string;
@@ -69,6 +76,8 @@ export interface Monster {
   damageTypes: Element[];
   /** Estimated max damage per turn, if known. */
   maxDamage?: number;
+  /** Bestiary class (weapon proficiency "damage against X" perks); missing for bosses and unclassified creatures. */
+  bestiaryClass?: BestiaryClass;
   imageUrl?: string;
   /** Page the data was taken from (tibiopedia.pl). */
   sourceUrl?: string;
