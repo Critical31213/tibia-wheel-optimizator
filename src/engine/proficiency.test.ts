@@ -42,6 +42,17 @@ describe('weapon proficiency model (D45)', () => {
     expect(groundshaker([{ kind: 'boss', value: 0.05 }], 'boss')).toBeCloseTo(groundshaker([], 'boss') * 1.05);
   });
 
+  it('drops the imbuement crit on Rending Inferniarch weapons', () => {
+    const rending = getWeapon('rending-inferniarch-greataxe')!;
+    const plain = { ...rending, id: 'inferniarch-greataxe' };
+    const dmg = (weapon: typeof rending) => {
+      const m = applyLoadout(knight('boss'), lo([], weapon));
+      return castDamage(m, m.spells.get('Groundshaker')!, NO_BONUS);
+    };
+    // Powerful Strike: 10 % × 50 % extra → ×1.05.
+    expect(dmg(plain) / dmg(rending)).toBeCloseTo(1.05, 3);
+  });
+
   it('raises the rotation with flat spell damage and auto-attack perks', () => {
     const t = (perks: Perk[]) => rotationTotal(applyLoadout(knight('boss'), lo(perks)), NO_BONUS);
     expect(t([{ kind: 'spellSkillScaling', value: 0.1, skill: 'sword' }])).toBeGreaterThan(t([]));

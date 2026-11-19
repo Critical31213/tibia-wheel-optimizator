@@ -76,6 +76,9 @@ weapon can have at most two reshaped slots.
 | homing missile | chance × level multiplier × level per offensive cast (1 per turn) |
 | life / mana leech | sustain (D29/D31 leech point), mana leech as for convictions |
 
+Rending Inferniarch weapons cannot take the critical hit (Strike) imbuement: their loadout removes the default
+Powerful Strike crit (10 % chance, +50 % extra damage) from spells and auto-attack (user, D48).
+
 Not valued: defence, armor penetration, hit chance, on-hit / on-kill, rune crit, mage auto-attack (skipped). Skills
 are entered without weapon bonuses; the main skill is assumed for every weapon type of the vocation.
 

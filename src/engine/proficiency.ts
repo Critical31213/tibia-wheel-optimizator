@@ -15,6 +15,7 @@ import {
   healShare,
   NO_STAGES,
   spotElementMultiplier,
+  IMBUE_CRIT,
   type ElementMagicLevel,
   type SpellEval,
   type SpellModel,
@@ -33,6 +34,9 @@ export const PROF = {
   /** Offensive spell casts per turn (homing missile trigger). */
   CASTS_PER_TURN: 1,
 } as const;
+
+/** Rending Inferniarch weapons cannot take the critical hit (Strike) imbuement. */
+export const noCritImbue = (w: Weapon) => w.id.startsWith('rending-inferniarch-');
 
 export interface Loadout {
   weapon: Weapon;
@@ -138,8 +142,9 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
   const mode = model.context.mode;
   const c = model.character;
   const pp = (f: (p: Perk) => boolean) => 100 * sum(perks, f);
-  const critChance = pp((p) => p.kind === 'critChance') + 100 * (w.specials?.critChance ?? 0);
-  const critExtra = pp((p) => p.kind === 'critDamage') + 100 * (w.specials?.critDamage ?? 0);
+  const noImbue = noCritImbue(w);
+  const critChance = pp((p) => p.kind === 'critChance') + 100 * (w.specials?.critChance ?? 0) - (noImbue ? IMBUE_CRIT.chance : 0);
+  const critExtra = pp((p) => p.kind === 'critDamage') + 100 * (w.specials?.critDamage ?? 0) - (noImbue ? IMBUE_CRIT.extra : 0);
   const elemCrit = (e: Element | null) => [pp((p) => p.kind === 'elementCritChance' && p.element === e), pp((p) => p.kind === 'elementCritDamage' && p.element === e)];
   const pierce = (e: Element | null) => pp((p) => p.kind === 'pierce' && p.element === e);
   const mult =

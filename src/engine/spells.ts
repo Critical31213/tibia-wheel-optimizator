@@ -39,6 +39,8 @@ const SOLO_FALLBACK: Record<SpellMeta['area'], number> = { single: 1, area: 5, c
 const MAX_TARGETS_FALLBACK: Record<SpellMeta['area'], number> = { single: 1, area: 20, chain: 6, beam: 7 };
 /** Cooldown can never drop below this fraction of the base cooldown. */
 export const COOLDOWN_FLOOR = 0.5;
+/** Default crit = the Powerful Strike imbuement (chance / extra damage, pp). */
+export const IMBUE_CRIT = { chance: SPELL_FORMULAS.critDefaults.critChance, extra: SPELL_FORMULAS.critDefaults.critDamage };
 const BASE_CRIT_CHANCE = SPELL_FORMULAS.critDefaults.critChance;
 const BASE_CRIT_EXTRA = SPELL_FORMULAS.critDefaults.critDamage;
 
@@ -405,7 +407,7 @@ export const NO_BONUS: RotationInput = { stages: NO_STAGES };
 
 /** Expected crit multiplier on top of the defaults (chance / extra in percentage points). */
 export function critEV(chance: number, extra: number): number {
-  return 1 + (Math.min(100, BASE_CRIT_CHANCE + chance) / 100) * ((BASE_CRIT_EXTRA + extra) / 100);
+  return 1 + (Math.max(0, Math.min(100, BASE_CRIT_CHANCE + chance)) / 100) * (Math.max(0, BASE_CRIT_EXTRA + extra) / 100);
 }
 
 export function spellCooldown(name: string, stage = 3): number {
