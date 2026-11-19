@@ -1,4 +1,4 @@
-# Integration & QA (S4 Integration)
+# Integration & QA
 
 ## Iteration 4 (2026-11-18)
 
@@ -15,7 +15,7 @@ Verified, no change needed: `RotationPanel` receives `shown.rotation`, so altern
 
 ### Test matrix additions (`src/integration.test.ts`, 165 tests total, +25)
 
-The iteration 3 count (200) dropped when hunt styles were removed (S3 reduced the context matrix to hunt / boss).
+The iteration 3 count (200) dropped when hunt styles were removed (the context matrix was reduced to hunt / boss).
 
 | Area | Cases |
 |------|-------|
@@ -47,7 +47,7 @@ Paladin, level 600, URL with the legacy `h=solo`; the page loads and drops `h`.
 
 ### Open issues
 
-- At priority 50, a paladin hunting at levels 500–800 takes Gift of Life instead of the meta Divine Grenade + Divine Empowerment, because 1 % EHP weighs as much as 1 % damage. This waits for the user to decide the offense/defense exchange rate.
+- At priority 50, a paladin hunting at levels 500–800 takes Gift of Life instead of the meta Divine Grenade + Divine Empowerment, because 1 % EHP weighs as much as 1 % damage. The offense/defense exchange rate is still open.
 - Paladin mitigation calibration assumes shield defense 50, and the quiver factor (0.877) comes from a single data pair.
 - Rotation preset notes (e.g. "holy vs physical within ~20%") are English data strings, so they are not translated in PL.
 - The greedy boss plan's spells include area spells counted at ~1.2 targets, so its label says "vs one target", not "single-target spells".

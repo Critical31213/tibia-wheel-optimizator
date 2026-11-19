@@ -1,4 +1,4 @@
-# Planner export code (S1a, iteration 3)
+# Planner export code
 
 ## Purpose
 

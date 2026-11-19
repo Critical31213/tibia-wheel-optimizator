@@ -1,4 +1,4 @@
-# Wheel data (S1 Data, iteration 2)
+# Wheel data
 
 ## Purpose
 

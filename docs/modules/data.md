@@ -1,4 +1,4 @@
-# Data module (S1 Data)
+# Data module
 
 ## Purpose
 

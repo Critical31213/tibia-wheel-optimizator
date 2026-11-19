@@ -60,7 +60,7 @@ RUNTIME (static SPA)
 
 ```
 /
-├── WORKLOG.md              # workflow journal
+├── WORKLOG.md              # decisions and open issues
 ├── ARCHITECTURE.md         # this file
 ├── README.md               # user-facing quick start
 ├── assets/icon.svg         # project icon (README)
@@ -123,7 +123,7 @@ Data flow: UI collects `OptimizerInput` (`characterOf(inputs)`, `resolveMonsters
 `monster: null`, `alternatives: 0` (D36), `rotationId` / `forcedSpells` from `usePersistentSpellPrefs`) → `optimize()` (in a Web Worker via `useOptimizer`, D42) returns `OptimizerResult` (allocation per slice, fill
 path, activated perks, stat summary, rationale, vessels, `plannerCode`) → wheel, summary, export code and vessels render the best build.
 
-## 5. Data integration (S1 Data)
+## 5. Data integration
 
 - **Source:** [tibiopedia.pl](https://tibiopedia.pl) (Polish), scraped **offline** by
   `scripts/scrape-monsters.ts` (`npm run scrape:monsters`; cheerio, 2 workers,
@@ -156,7 +156,7 @@ path, activated perks, stat summary, rationale, vessels, `plannerCode`) → whee
 - **Character formulas:** `src/data/character/`: HP/mana/cap by level, default skills 200–1500, `mitigationPercent`
   (× wheel Mitigation Multiplier). Details: [`docs/modules/character-formulas.md`](docs/modules/character-formulas.md).
 
-## 6. Wheel model and optimization algorithm (S2 Engine)
+## 6. Wheel model and optimization algorithm
 
 Full details: [`docs/modules/engine.md`](docs/modules/engine.md).
 
@@ -187,7 +187,7 @@ Full details: [`docs/modules/engine.md`](docs/modules/engine.md).
   - Recommendations are per quality at grade IV, only mods with positive value. Healing supreme gems are 0 for sorcerer/druid. Paladin uniques (Ballistic Mastery, Positional Tactics) are valued as exact damage deltas. Upgrades are +1 grade for active mods, ranked by gain.
 - **Points**: `pointsForLevel(level, scrollPoints = 0) = max(0, level − 50)` (+ extra points: scrolls, weekly, bounty, gem upgrades; up to `MAX_EXTRA_POINTS` = 1000, D54; the total is capped by the wheel).
 
-## 7. UI (S3 UI)
+## 7. UI
 
 Single-page React UI (`src/App.tsx`, `src/components/`, `src/hooks/`, `src/lib/`).
 Inputs (vocation, points/level, monster, priority) live in `usePersistentInputs`
@@ -209,7 +209,7 @@ forced spell augments; per-vocation localStorage + URL `r` / `fs`).
 Details: [docs/modules/ui.md](docs/modules/ui.md).
 Gem import from Gem Atelier screenshots (D63, browser only): [docs/modules/gem-import.md](docs/modules/gem-import.md).
 
-## 8. Quality gates (S4 Integration)
+## 8. Quality gates
 
 | Gate | Command | Status (2026-11-18, iteration 4) |
 |------|---------|---------------------|

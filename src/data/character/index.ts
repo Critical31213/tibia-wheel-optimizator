@@ -113,7 +113,7 @@ export function resolveCharacterStats(vocation: Vocation, stats: CharacterStats)
 //
 // Structure from the game:
 //   (shielding × vocFactor + offhandFactor × defense) / 100 × distanceFactor, then × (1 + wheel%/100)
-// Constants re-fitted on the user's in-game Cyclopedia values (they take priority):
+// Constants re-fitted on in-game Cyclopedia values (they take priority):
 //   RP shielding 108 + quiver → shielding part 1.07 %; same RP + shield → 2.50 % total, shield part 1.28 %;
 //   ED level 781 → shielding part 0.40 %, spellbook part 0.87 %.
 // See docs/modules/character-formulas.md (inference + uncertainty).

@@ -1,6 +1,6 @@
 # Engine module (`src/engine`): wheel model, valuation, optimizer, gems
 
-Owner: **S2 Engine** (iteration 3). Every number comes from the official test-server planner data in
+Every number comes from the official test-server planner data in
 `src/data/wheel` (see [`wheel-data.md`](wheel-data.md)); the engine contains no hand-written wheel tables.
 
 ## Public API (`src/engine/index.ts`)
@@ -229,7 +229,7 @@ Plans carry their weapon; the choice, re-choice and `result.weapon` are describe
 
 - The rotation is a single-slot model (presets with ratios, or greedy in boss mode), with no mana limits and no movement.
 - The Avatar's boss window is 120 s per 30 min.
-- Hunt targets (community averages), `maxTargets` and monk elements are approximate (S1).
+- Hunt targets (community averages), `maxTargets` and monk elements are approximate.
 - Single-target spells are ignored in hunt mode (D16).
 - 1 % effective HP is weighted like 1 % damage; `HEAL_EHP`, threat and leech factors are heuristics. Base mitigation comes from `src/data/character`.
 - Momentum is valued as a cooldown proxy.

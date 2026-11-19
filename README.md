@@ -147,7 +147,7 @@ src/integration.test.ts      end-to-end tests
 - [docs/modules/engine.md](docs/modules/engine.md) — wheel model, valuation, search, gems
 - [docs/modules/ui.md](docs/modules/ui.md) — components, state, i18n
 - [docs/modules/integration.md](docs/modules/integration.md) — integration changes and test matrix
-- [WORKLOG.md](WORKLOG.md) — development journal and decisions
+- [WORKLOG.md](WORKLOG.md) — decisions and open issues
 
 ## Limitations
 

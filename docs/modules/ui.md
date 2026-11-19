@@ -1,4 +1,4 @@
-# UI module (S3 UI)
+# UI module
 
 ## Purpose
 
@@ -218,10 +218,10 @@ the selected monster resolves. The engine is bundled eagerly (it is small).
 - 2026-11-18 — All components (`VocationPicker`, `PointsInput`, `MonsterSearch`, `MonsterCard`,
   `PrioritySlider`, `WheelChart`, `ResultsPanel`) and `App` layout; fixed `-0` / full-circle arc
   rounding in `geometry.ts`. `tsc -b`, `vitest run src/lib` (16 tests) and `npm run build` pass.
-- 2026-11-18 — (S4) Fixture fallback removed; monster data lazy-loaded; scroll points field; `MAX_POINTS` = 4000.
+- 2026-11-18 — Fixture fallback removed; monster data lazy-loaded; scroll points field; `MAX_POINTS` = 4000.
 - 2026-11-18 — (iteration 2) Fight context, My gems editor, Vessels & gems results, PL/EN i18n (`src/i18n/`),
   `SegmentedControl`; gems per vocation in localStorage, context in URL. 126 tests pass, lint/build clean.
-- 2026-11-18 — (S4, iteration 2) Removed the dev mod fixture (the UI uses `wheel.mods`).
+- 2026-11-18 — Removed the dev mod fixture (the UI uses `wheel.mods`).
   - Engine messages are rendered in PL/EN (`engineText`), with the English string as fallback.
   - Spell share (`% dmg`) and upgrade `gainToMax` (gain to grade IV) are shown.
   - Gem names come from the data, and vessels are labelled `vesselId + 1`.
