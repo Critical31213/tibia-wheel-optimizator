@@ -150,6 +150,8 @@ export interface SpellEval {
   critChance?: number;
   critExtra?: number;
   mult?: number;
+  /** D45: cooldown reduction (s) from weapon proficiency augments. */
+  cd?: number;
   /** Share of casts dealing the elemental stance's damage type (1 natural, conversion share otherwise). */
   stanceShare?: number;
   /** Hits per stage 0..3: main, extra (null if none). */
@@ -202,6 +204,12 @@ export interface SpellModel {
   stances?: string[];
   /** D24: damage type of the elemental stance (Lord of Destruction). */
   stanceElement?: Element;
+  /** D24: pierce % of the stances (all damage spells). */
+  pierce?: number;
+  /** D45: flat damage per spell hit from weapon proficiency (skill scaling), × the hit's bonus factor. */
+  flat?: number;
+  /** D45: weapon id the model includes. */
+  weaponId?: string;
 }
 
 export function elementMultiplier(monster: Monster | null, element: Element | null): number {
@@ -234,11 +242,11 @@ export function outerBeamTargets(meta: Pick<SpellMeta, 'area' | 'avgHitsHuntOute
   return meta.avgHitsHuntOuter ?? 0;
 }
 
-function hitPart(name: string, char: Required<CharacterStats>, vocation: Vocation, mode: FightContext['mode'], stage: number, part: 'main' | 'extra', magicLevelBonus = 0): HitPart | null {
+function hitPart(name: string, char: Required<CharacterStats>, vocation: Vocation, mode: FightContext['mode'], stage: number, part: 'main' | 'extra', magicLevelBonus = 0, attack?: number): HitPart | null {
   const spell = getDamageSpell(name);
   const variant = spell && spellVariant(spell, stage, part);
   if (!variant) return null;
-  const o = { vocation, stage, part, paladinWeapon: paladinWeaponFor(mode), magicLevelBonus };
+  const o = { vocation, stage, part, paladinWeapon: paladinWeaponFor(mode), magicLevelBonus, attack };
   const base = spellAverageHit(name, char, o);
   return {
     base,
@@ -252,9 +260,9 @@ const modelCache = new Map<string, SpellModel>();
 /** D24: extra magic level for spells of some elements (stances). */
 export type ElementMagicLevel = Partial<Record<Element, number>>;
 
-function cacheKey(vocation: Vocation, ctx: FightContext, monsters: { monster: Monster; weight: number }[], c: Required<CharacterStats>, eml: ElementMagicLevel) {
+function cacheKey(vocation: Vocation, ctx: FightContext, monsters: { monster: Monster; weight: number }[], c: Required<CharacterStats>, eml: ElementMagicLevel, attack?: number) {
   const m = monsters.map((x) => `${x.monster.id}:${x.weight.toFixed(6)}`).join(',');
-  return `${vocation}|${ctx.mode}|${m}|${c.level}|${c.mainSkill}|${c.magicLevel}|${c.shielding}|${JSON.stringify(eml)}`;
+  return `${vocation}|${ctx.mode}|${m}|${c.level}|${c.mainSkill}|${c.magicLevel}|${c.shielding}|${JSON.stringify(eml)}|${attack ?? ''}`;
 }
 
 export function buildSpellModel(
@@ -263,10 +271,12 @@ export function buildSpellModel(
   monsters: { monster: Monster; weight: number }[] | Monster | null,
   character?: CharacterStats,
   elementMl: ElementMagicLevel = {},
+  /** D45: weapon (+ammo) attack; default = the level bracket weapon. */
+  weaponAttack?: number,
 ): SpellModel {
   const spot = Array.isArray(monsters) ? monsters : monsters ? [{ monster: monsters, weight: 1 }] : [];
   const char = resolveCharacterStats(vocation, character ?? { level: 600 });
-  const key = cacheKey(vocation, context, spot, char, elementMl);
+  const key = cacheKey(vocation, context, spot, char, elementMl, weaponAttack);
   const cached = modelCache.get(key);
   if (cached && cached.monsters.every((m, i) => m.monster === spot[i].monster)) return cached;
 
@@ -305,8 +315,8 @@ export function buildSpellModel(
     const revelation = revOf.get(name) ?? -1;
     const ml = (element && elementMl[element]) || 0;
     const hits = [0, 1, 2, 3].map((st) => ({
-      main: (kind === 'damage' && hitPart(name, char, vocation, context.mode, st, 'main', ml)) || { base: 0, boost: 0, bf: 0 },
-      extra: kind === 'damage' && st > 0 ? hitPart(name, char, vocation, context.mode, st, 'extra', ml) : null,
+      main: (kind === 'damage' && hitPart(name, char, vocation, context.mode, st, 'main', ml, weaponAttack)) || { base: 0, boost: 0, bf: 0 },
+      extra: kind === 'damage' && st > 0 ? hitPart(name, char, vocation, context.mode, st, 'extra', ml, weaponAttack) : null,
     }));
     const isRune = dmg?.spellType === 'rune';
     spells.set(name, {
@@ -330,10 +340,8 @@ export function buildSpellModel(
     });
   }
 
-  const attack = weaponBracket(vocation, char.level, paladinWeaponFor(context.mode)).attack;
-  const autoHit = vocation === 'sorcerer' || vocation === 'druid'
-    ? levelTerm(char.level)
-    : levelTerm(char.level) + 0.5 * 0.085 * char.mainSkill * attack;
+  const attack = weaponAttack ?? weaponBracket(vocation, char.level, paladinWeaponFor(context.mode)).attack;
+  const autoHit = autoAttackHit(vocation, char, attack);
   const autoTargets = context.mode === 'boss' ? 1 : AUTO_ATTACK_TARGETS[vocation];
   const base = autoHit * autoTargets * spotElementMultiplier(spot, 'physical') * critEV(0, 0);
 
@@ -363,6 +371,11 @@ export function buildSpellModel(
 // ---------------------------------------------------------------------------
 // Rotation
 
+/** Average auto-attack hit (one target, before element and crit); mages: level term only. */
+export function autoAttackHit(vocation: Vocation, char: Required<CharacterStats>, attack: number): number {
+  return vocation === 'sorcerer' || vocation === 'druid' ? levelTerm(char.level) : levelTerm(char.level) + 0.5 * 0.085 * char.mainSkill * attack;
+}
+
 export interface SpellMods {
   /** +% base damage. */
   pct: number;
@@ -390,7 +403,8 @@ export interface RotationInput {
 export const NO_STAGES: readonly number[] = [0, 0, 0, 0];
 export const NO_BONUS: RotationInput = { stages: NO_STAGES };
 
-function critEV(chance: number, extra: number): number {
+/** Expected crit multiplier on top of the defaults (chance / extra in percentage points). */
+export function critEV(chance: number, extra: number): number {
   return 1 + (Math.min(100, BASE_CRIT_CHANCE + chance) / 100) * ((BASE_CRIT_EXTRA + extra) / 100);
 }
 
@@ -429,7 +443,7 @@ export function castDamage(model: SpellModel, s: SpellEval, r: RotationInput, m:
   const stage = s.stageDomain >= 0 ? r.stages[s.stageDomain] ?? 0 : 0;
   if (s.revelation >= 0 && stage < 1) return 0;
   const h = s.hits[stage];
-  const flat = r.flat ?? 0;
+  const flat = (r.flat ?? 0) + (model.flat ?? 0);
   const val = (p: HitPart) => p.base + (p.boost * m.pct) / 100 + flat * p.bf;
   const t = targetsAt(model, s, stage, m.extraTargets);
   const def = REVELATION_SPELLS[s.name];
@@ -477,7 +491,7 @@ function candidate(model: SpellModel, s: SpellEval, r: RotationInput): Cand | nu
   const stage = s.stageDomain >= 0 ? r.stages[s.stageDomain] ?? 0 : 0;
   const perCast = castDamage(model, s, r, m);
   if (perCast <= 0 && s.revelation >= 0) return null;
-  const cd = reducedCooldown(spellCooldown(s.name, stage), m.cd);
+  const cd = reducedCooldown(spellCooldown(s.name, stage), m.cd + (s.cd ?? 0));
   return { s, perCast, cap: 1 / Math.max(1, cd / TURN_SECONDS) };
 }
 
@@ -539,7 +553,7 @@ export function rotation(model: SpellModel, r: RotationInput): RotationResult {
     const stage = s.stageDomain >= 0 ? r.stages[s.stageDomain] ?? 0 : 0;
     const perCast = castDamage(model, s, r, m);
     if (perCast <= 0) continue;
-    const cd = reducedCooldown(spellCooldown(s.name, stage), m.cd);
+    const cd = reducedCooldown(spellCooldown(s.name, stage), m.cd + (s.cd ?? 0));
     cands.push({ s, perCast, cap: 1 / Math.max(1, cd / TURN_SECONDS) });
   }
   dropSharedCooldowns(cands);

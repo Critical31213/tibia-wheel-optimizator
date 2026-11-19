@@ -104,6 +104,8 @@ export interface ValuationContext {
   skillOff: number;
   /** D24: % EHP (× threat) of the active stances beyond shielding (damage taken, dodge, healing). */
   stanceDef?: number;
+  /** D45: sustain of the weapon loadout not in the spell model (leech, healing). */
+  weapon?: Parts;
 }
 
 export function add(a: Parts, b: Parts, k = 1): Parts {
@@ -193,7 +195,7 @@ export function characterFacts(vocation: Vocation, level: number, shielding: num
 const def = (v: Pick<ValuationContext, 'threat'>, x: number): Parts => ({ off: 0, def: x * v.threat, util: 0 });
 
 /** D31: % EHP (before threat) per +1 pp life leech = the same leech growth as +100/imbue % damage (D29). */
-const leechPoint = (v: ValuationContext) => (v.leech / Math.max(1e-9, v.threat)) * (100 / K.LIFE_LEECH_IMBUE[v.vocation]);
+export const leechPoint = (v: ValuationContext) => (v.leech / Math.max(1e-9, v.threat)) * (100 / K.LIFE_LEECH_IMBUE[v.vocation]);
 
 /** +HP → % EHP gain = HP / base HP. */
 export function hpParts(v: Pick<ValuationContext, 'hp' | 'threat'>, hp: number): Parts {

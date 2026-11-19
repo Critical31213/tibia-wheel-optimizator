@@ -151,6 +151,13 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 - Defense (`stanceDefense`, × threat, in `baseParts`): damage taken (Blood Rage +15 %, Protector −15 %, Sapped Strength −10 %), dodge 12 % × 30 %, healing (+10 % self / Sustain +35 % all × serene, healing ML) × heal share × K.HEAL_EHP.
 - Pick (`pickStances`): per plan, the stance set with the highest blended `baseParts`; a preset's `stance` is fixed.
 
+### Weapon proficiency (`proficiency.ts`, D46)
+
+Optional `input.weapons`: the loadout enters `stanceBuilder` (attack, element magic level, perks after the
+stances) and `valuationFor` (weapon skills before stance percentages; `v.weapon` sustain in `baseParts`).
+Plans carry their weapon; the choice, re-choice and `result.weapon` are described in
+[`proficiency.md`](proficiency.md#engine-d46).
+
 ## 3. Optimizer (`optimizer.ts`)
 
 0. **Plans and forced spells.** One prepared valuation per plan (see Rotation). Forced spells (`input.forcedSpells`, D21) are seeded with a Dijkstra over slice capacities to their cheapest stage I augment, and every search starts from that seed. Messages: `rationale.forced`, `rationale.forcedImpossible`, `rationale.forcedNoAugment`.

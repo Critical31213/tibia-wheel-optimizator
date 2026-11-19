@@ -1,7 +1,7 @@
 # Weapon proficiency data (D45)
 
-Stage 1 of the weapon proficiency feature: static data only. The model (perk values), the joint optimization
-with the wheel and the UI follow in later stages.
+Weapon proficiency: static data (D45), the perk model and the joint choice with the wheel (D46, see
+"Engine" below). The UI follows in a later stage.
 
 ## Import
 
@@ -55,6 +55,40 @@ leech, hit chance, perfect shot; resistances, armor and reflection are not kept)
 highest-skill scaling, on-hit/on-kill) and 30 spell augments per vocation. `shapingValue(option, rank)`
 interpolates linearly between rank 0 and 10 (the in-between ranks are an estimate, as in TibiaPal). In the game a
 weapon can have at most two reshaped slots.
+
+## Engine (D46)
+
+`src/engine/proficiency.ts` turns a weapon and one chosen perk per unlocked level (a loadout) into model inputs:
+
+| Perk | Effect |
+| --- | --- |
+| skill | main skill when it matches the weapon (knight: its type; paladin: distance; monk: fist), magic level, shielding (mitigation) |
+| attack, weapon attack | spell formulas and auto-attack (bow + Diamond Arrow 37, crossbow + Spectral Bolt 78, melee incl. element attack) |
+| magicLevel | element magic level of spells; healing magic level → healing |
+| augment | base damage (boosted part), crit chance / extra damage, cooldown (s), life / mana leech × the spell's damage share, healing × heal share |
+| crit, element crit, auto crit | spell / auto-attack crit (pp) |
+| pierce | the element's creature sensitivity via `pierceDamageMod`, on top of stance pierce |
+| bestiary | hunting only (assumed not to work on bosses): spot-weighted damage multiplier of the class |
+| boss | boss mode only |
+| alpha / omega strike | × (1 + share × value); shares hunt 0.2 / boss 0.01 and 0.3 (assumptions) |
+| spell / auto / heal skill scaling | flat damage or healing = value × skill (no skill = the highest one; fishing = 0) |
+| rangeDamage, perfect shot | auto-attack flat × 0.5 (share of shots from range) |
+| homing missile | chance × level multiplier × level per offensive cast (1 per turn) |
+| life / mana leech | sustain (D29/D31 leech point), mana leech as for convictions |
+
+Not valued: defence, armor penetration, hit chance, on-hit / on-kill, rune crit, mage auto-attack (skipped). Skills
+are entered without weapon bonuses; the main skill is assumed for every weapon type of the vocation.
+
+**Choice.** `planSpecs` ranks the owned weapons per plan with a cheap score (rotation vs the reference, shielding
+mitigation, sustain) and automatic perks (`choosePerks`: coordinate descent, 2 passes, manual choices kept); the
+best two get their own stance pick (`pickStances` with the loadout). After the search, perks and weapon are
+re-chosen with the build's rotation (stages, augments); a different choice is re-searched and kept when better.
+Two-handed weapons do not fit a plan requiring a shield.
+
+**Result** (`OptimizerResult.weapon`): `best` and `ranking` (objective difference vs the chosen weapon),
+`reshapes` (shaping option at rank 10 taken at a level without a reshape, best level per option, top 3; none
+below proficiency level 3 or with two reshaped slots) and, with `suggestWeapons`, up to three unowned weapons for
+the level that beat the chosen one (all levels unlocked; Ice Rapier excluded, it breaks on use).
 
 ## Monsters
 

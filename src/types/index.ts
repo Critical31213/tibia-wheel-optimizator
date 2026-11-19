@@ -353,6 +353,56 @@ export interface OptimizerInput {
   forcedRevelations?: ForcedRevelation[];
   /** D32: stance names chosen by the user ([] = none); undefined = engine picks per plan. */
   stances?: string[];
+  /** D45: weapons the player owns; the engine picks the best one with its proficiency perks. */
+  weapons?: OwnedWeapon[];
+  /** D45: also look for better weapons the player does not own (slower). */
+  suggestWeapons?: boolean;
+}
+
+/** D45: an owned weapon and its proficiency progress. Character skills are entered without weapon bonuses. */
+export interface OwnedWeapon {
+  /** Weapon id from the proficiency data. */
+  weaponId: string;
+  /** Proficiency level reached (0 = none; capped at the weapon's number of levels). */
+  level: number;
+  /** Chosen option index per level (index 0 = level 1); null/undefined = engine picks. */
+  perks?: (number | null)[];
+  /** Dust-reshaped slots (at most 2): option `replaces` of `level` (1-based) becomes shaping option `option` at rank 10. */
+  shaped?: ShapedSlot[];
+}
+
+export interface ShapedSlot {
+  level: number;
+  replaces: number;
+  option: string;
+}
+
+/** D45: one weapon with its perks, valued with the chosen build. */
+export interface WeaponPick {
+  weaponId: string;
+  /** Chosen option index per unlocked level. */
+  perks: number[];
+  /** Objective difference vs the chosen weapon (0 for it; negative = worse). */
+  delta: number;
+}
+
+export interface WeaponReshape {
+  level: number;
+  replaces: number;
+  option: string;
+  /** Objective gain of the reshape (rank 10). */
+  gain: number;
+}
+
+export interface WeaponResult {
+  /** The chosen weapon (also first in `ranking`). */
+  best: WeaponPick;
+  /** All owned weapons, best first. */
+  ranking: WeaponPick[];
+  /** Most valuable dust reshapes of the chosen weapon (free slots only), best first. */
+  reshapes: WeaponReshape[];
+  /** Better weapons the player does not own (all proficiency levels assumed), best first. */
+  suggestions?: WeaponPick[];
 }
 
 export interface ForcedRevelation {
@@ -419,6 +469,8 @@ export interface OptimizerResult {
   rotation?: RotationUsage;
   /** D24: stances the build assumes (picked automatically). */
   stances?: string[];
+  /** D45: weapon choice, when weapons were given. */
+  weapon?: WeaponResult;
 }
 
 export interface AlternativeBuild {

@@ -4,7 +4,7 @@
  */
 import type { Vocation } from '../../types';
 import data from './proficiency.json';
-import type { ShapingOption, Weapon } from './types';
+import type { Perk, ShapingOption, Weapon } from './types';
 
 export type * from './types';
 
@@ -25,6 +25,21 @@ export function weaponsFor(vocation: Vocation, level = Infinity): Weapon[] {
 /** Shaping options available to a vocation (general + vocation specific). */
 export function shapingOptions(vocation: Vocation): ShapingOption[] {
   return SHAPING_OPTIONS.filter((o) => o.group === 'all' || o.group === vocation);
+}
+
+/** Stable id of a shaping option, e.g. "augment:Groundshaker:baseDamage", "bestiary:Dragon", "alphaStrike". */
+export const shapingId = (o: ShapingOption): string => [o.kind, o.spell ?? o.bestiary, o.augment].filter(Boolean).join(':');
+
+const SHAPING_BY_ID = new Map(SHAPING_OPTIONS.map((o) => [shapingId(o), o]));
+export const getShapingOption = (id: string): ShapingOption | undefined => SHAPING_BY_ID.get(id);
+
+/** D45: reshaped slots are assumed at rank 10. */
+export const SHAPED_RANK = 10;
+
+/** A shaping option as a perk at the given rank. */
+export function shapedPerk(o: ShapingOption, rank = SHAPED_RANK): Perk {
+  const { group: _group, rank0: _r0, rank10: _r10, ...rest } = o;
+  return { ...rest, value: shapingValue(o, rank) };
 }
 
 /** Value of a shaping option at rank 0..10 (linear between the known rank 0 and rank 10 values). */

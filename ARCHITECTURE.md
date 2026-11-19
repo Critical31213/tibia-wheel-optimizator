@@ -81,7 +81,7 @@ RUNTIME (static SPA)
     ├── data/wheel/         # wheel-data.json (planner facts) + spells.ts, getWheelData(), plannerCode.ts
     ├── data/damage/        # spell-formulas.json + loader (spellAverageHit, isSingleTarget, …)
     ├── data/character/     # HP/mana/cap, default skills, mitigationPercent
-    ├── engine/             # wheel/build.ts, spells, values, gems, optimizer, messages
+    ├── engine/             # wheel/build.ts, spells, values, stances, proficiency, gems, optimizer, messages
     ├── components/         # React UI components
     ├── hooks/              # usePersistentInputs, usePersistentGems, useDebouncedValue
     ├── i18n/               # en/pl dictionaries (UI + engine.<key>), engineText(), provider
@@ -152,7 +152,7 @@ path, activated perks, stat summary, rationale, vessels, `plannerCode`) → whee
 - **Weapon proficiency (D45):** `scripts/import-proficiency.mjs` (`npm run import:proficiency`) →
   `src/data/proficiency/proficiency.json` (weapons with stats and proficiency trees, dust shaping options).
   API: `WEAPONS`, `getWeapon`, `weaponsFor`, `searchWeapons`, `shapingOptions`, `shapingValue`.
-  Details: [`docs/modules/proficiency.md`](docs/modules/proficiency.md).
+  Engine (D46): `src/engine/proficiency.ts` (perk model, perk choice), weapon choice in `optimizer.ts`. Details: [`docs/modules/proficiency.md`](docs/modules/proficiency.md).
 - **Character formulas:** `src/data/character/`: HP/mana/cap by level, default skills 200–1500, `mitigationPercent`
   (× wheel Mitigation Multiplier). Details: [`docs/modules/character-formulas.md`](docs/modules/character-formulas.md).
 

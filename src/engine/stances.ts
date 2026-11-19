@@ -18,6 +18,7 @@ import {
   type SpellEval,
   type SpellModel,
 } from './spells';
+import { applyLoadout, loadoutAttack, loadoutElementMl, type Loadout } from './proficiency';
 
 /** Spender damage per +1 pp Harmony base bonus (Ascetic stage I probe: +1 pp → ×1.0478). */
 export const HARMONY_PER_BASE_PCT = 0.0478;
@@ -77,7 +78,7 @@ export function applyStanceSpells(model: SpellModel, stances: readonly StanceDef
     }
     spells.set(n, s);
   }
-  let out: SpellModel = { ...model, spells, damageMult, base: model.base * damageMult, stances: stances.map((s) => s.name), stanceElement: el?.element ?? undefined };
+  let out: SpellModel = { ...model, spells, damageMult, base: model.base * damageMult, stances: stances.map((s) => s.name), stanceElement: el?.element ?? undefined, pierce };
   if (el) out = convert(out, el.element, preset, pierce);
   return out;
 }
@@ -111,15 +112,26 @@ function spotElem(monsters: SpellModel['monsters'], element: SpellEval['element'
   return monsters.length ? monsters.reduce((a, m) => a + m.weight * elementMultiplier(m.monster, element), 0) : 1;
 }
 
-/** Stanced model builder for a character (skill deltas use the same stances). */
+/**
+ * Stanced model builder for a character (skill deltas use the same stances). D45: with a weapon loadout, the
+ * character passed in must already include its skills (`loadoutCharacter`).
+ */
 export function stanceBuilder(
   vocation: Vocation,
   context: FightContext,
   monsters: { monster: Monster; weight: number }[],
   stances: readonly StanceDef[],
   preset: RotationPreset | null,
+  loadout?: Loadout,
 ) {
-  return (c: Required<CharacterStats>) => applyStanceSpells(buildSpellModel(vocation, context, monsters, c, stanceElementMl(c, stances)), stances, preset);
+  if (!loadout) return (c: Required<CharacterStats>) => applyStanceSpells(buildSpellModel(vocation, context, monsters, c, stanceElementMl(c, stances)), stances, preset);
+  const { healing: _healing, ...weaponMl } = loadoutElementMl(loadout);
+  const attack = loadoutAttack(vocation, loadout);
+  return (c: Required<CharacterStats>) => {
+    const ml: ElementMagicLevel = { ...stanceElementMl(c, stances) };
+    for (const [e, x] of Object.entries(weaponMl) as [keyof ElementMagicLevel, number][]) ml[e] = (ml[e] ?? 0) + x;
+    return applyLoadout(applyStanceSpells(buildSpellModel(vocation, context, monsters, c, ml, attack), stances, preset), loadout);
+  };
 }
 
 /** Defense of the stances in % EHP (before threat): damage taken, dodge, healing. Shielding goes through mitigation. */
