@@ -25,11 +25,13 @@ describe('weapon prefs (D47)', () => {
     const imbues = [{ id: 'strike', level: 3 }, { id: 'chop', level: 3 }, { id: 'vampirism', level: 2 }, { id: 'void', level: 3 }, { id: 'frost', level: 3 }];
     const read = (weaponId: string, vocation: 'knight' | 'monk' | 'druid', gear: unknown) =>
       parseWeaponPrefs(JSON.stringify({ weapons: [{ weaponId, level: 0, gear }] }), vocation).weapons[0].gear;
-    // Amber Greataxe: 2 slots, native axe skill and earth damage (no Chop, no Frost).
-    expect(read('amber-greataxe', 'knight', { tier: 10, imbues })).toEqual({ tier: 10, imbues: [{ id: 'strike', level: 3 }, { id: 'vampirism', level: 2 }] });
-    // Soulkamas: 3 slots, native fist (no Fist imbuement); the elemental bond allows damage imbuements.
+    // Amber Greataxe: 2 slots, deals earth damage (no Frost); Chop fits an axe even with native axe skill (D84).
+    expect(read('amber-greataxe', 'knight', { tier: 10, imbues })).toEqual({ tier: 10, imbues: [{ id: 'strike', level: 3 }, { id: 'chop', level: 3 }] });
+    // Slash does not fit an axe.
+    expect(read('amber-greataxe', 'knight', { tier: 0, imbues: [{ id: 'slash', level: 3 }] })?.imbues).toEqual([]);
+    // Soulkamas: 3 slots; Punch fits fist weapons even with native fist (D84); the elemental bond allows damage imbuements.
     const monk = read('soulkamas', 'monk', { tier: 2, imbues: [{ id: 'fist', level: 3 }, ...imbues] });
-    expect(monk?.imbues.map((x) => x.id)).toEqual(['strike', 'vampirism', 'void']);
+    expect(monk?.imbues.map((x) => x.id)).toEqual(['fist', 'strike', 'vampirism']);
     expect(read('soulkamas', 'monk', undefined)).toBeUndefined();
     expect(read('amber-greataxe', 'knight', { tier: 11, imbues: [] })?.tier).toBe(0);
     // D83: native life leech (Cobra Rod) blocks Vampirism, native crit (Lion Rod) blocks Strike, as on TibiaWiki.

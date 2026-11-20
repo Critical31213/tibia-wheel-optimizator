@@ -10,7 +10,7 @@ changes in the engine.
 |---|---|
 | `scripts/import-equipment.mjs` | `npm run import:equipment`: item pages of tibiopedia.pl per slot (helmets, armors, legs, boots, shields, spellbooks, quivers, amulets, rings), cached in `scripts/.cache/equipment/` (gitignored), low request rate. Parses vocation, required level, armor, defense, class, imbuement slots and bonuses (skills, element magic levels, resistances, critical chance, leech). Speed, reflection and other unmodelled bonuses are skipped. Same-name variants get their first skill in the name. A shield only mages can use is a spellbook. |
 | `src/data/equipment/equipment.json` | Generated items (`{ meta, items }`). |
-| `src/data/equipment/index.ts` | `ITEMS`, `getItem`, `itemsFor(slots, vocation)`, paper-doll slots (`GEAR_SLOTS`, `SLOT_ITEMS`), imbuements (`IMBUEMENTS`, `imbuementsFor(slot, vocation, item?)`: no imbuement of a skill, element protection, critical hit, life or mana leech the item already has; `weaponImbuements` likewise for weapons), forge tiers (`TIER_EFFECT`, `TIER_CHANCE`, `maxTier(class)`, `tierChance`). |
+| `src/data/equipment/index.ts` | `ITEMS`, `getItem`, `itemsFor(slots, vocation)`, paper-doll slots (`GEAR_SLOTS`, `SLOT_ITEMS`), imbuements (`IMBUEMENTS`, `imbuementsFor(slot, vocation, item?)`: no imbuement of a skill, element protection, critical hit, life or mana leech the item already has; Epiphany only on mage-exclusive helmets; `weaponImbuements` for weapons: skill imbuements only of the weapon's own skill, also with a native bonus, elemental damage only on melee weapons, bows and crossbows, no Strike on wands / rods below level 150), forge tiers (`TIER_EFFECT`, `TIER_CHANCE`, `maxTier(class)`, `tierChance`). |
 
 Imbuements (Basic / Intricate / Powerful): Strike 5/5/10 % chance and +5/15/50 % extra (Powerful = the engine's
 crit default; lower tiers approximate), Vampirism 5/10/25 %, Void 3/5/8 %, skill imbuements +1/+2/+4, protections
@@ -44,8 +44,7 @@ off-hand, so the lost mitigation counts against two-handed weapons. When the cho
 `result.gear.effects` is that set and `offhandOff` is set (the panel strikes the off-hand through). Quivers stay.
 
 Weapon tier and imbuements per weapon (D81): an owned weapon may carry its own `gear` (`OwnedWeapon.gear`: tier up
-to `maxTier(class)`, imbuements up to its `imbuementSlots`, none of a skill it raises or an elemental damage kind when
-it deals elemental damage itself; a monk elemental bond does not count). `wearBest` keeps the worn items
+to `maxTier(class)`, imbuements up to its `imbuementSlots`, as allowed by `weaponImbuements`). `wearBest` keeps the worn items
 (`input.wornPieces`); `equipmentWith(input, loadout)` rebuilds the effects with that weapon's settings (cached per
 weapon and hands) for valuations and the loadout ranking. Weapons without settings, the typical weapon and unowned
 suggestions use `gear.weapon` ("default for weapons without their own settings"), else the assumption.

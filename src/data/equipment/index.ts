@@ -104,6 +104,8 @@ export function imbuementsFor(slot: ImbueSlot, vocation: Vocation, item?: Equipm
       (!x.skill || skills.includes(x.skill)) &&
       !(x.group === 'damage' && MAGE.has(vocation)) &&
       !(x.skill && own?.skills?.[x.skill]) &&
+      // D84: Epiphany only on mage-exclusive helmets.
+      !(x.skill === 'magic' && slot === 'helmet' && item && !item.vocations?.every((v) => MAGE.has(v))) &&
       !(x.group === 'protection' && x.element && own?.resist?.[x.element as keyof typeof own.resist]) &&
       !nativeOf(x, own),
   );
@@ -122,16 +124,39 @@ const VOCATION_SKILLS: Record<Vocation, readonly ItemSkill[]> = {
   monk: ['fist', 'magic', 'shielding'],
 };
 
+/** D84: weapon types a skill imbuement fits (TibiaWiki: Punch on fist weapons, Precision on bows and crossbows, …). */
+const SKILL_WEAPONS: Partial<Record<ItemSkill, readonly string[]>> = {
+  fist: ['fist'],
+  club: ['club'],
+  sword: ['sword'],
+  axe: ['axe'],
+  distance: ['bow', 'crossbow'],
+  magic: ['wand', 'rod'],
+};
+const ELEMENT_DAMAGE_WEAPONS = new Set(['fist', 'club', 'sword', 'axe', 'bow', 'crossbow']);
+/** D84: wands and rods below this level cannot take Strike. */
+const STRIKE_MIN_WAND_LEVEL = 150;
+
 /**
- * D81: imbuements a weapon can take: none of an elemental damage kind when it deals elemental damage itself (a monk's
- * elemental bond does not count), none of a skill, critical hit, life or mana leech it already has (D83).
+ * D81 / D84: imbuements a weapon can take. Skill imbuements only of its own skill (also when the weapon already raises
+ * it); elemental damage only on melee weapons, bows and crossbows that do not deal elemental damage themselves (a
+ * monk's elemental bond does not count); no Strike on wands / rods below level 150; a native critical hit, life or
+ * mana leech blocks Strike, Vampirism or Void (D83).
  */
 export function weaponImbuements(
-  w: { type?: string; element?: string; elementAttack?: unknown; specials?: { skills?: Partial<Record<string, number>>; critChance?: number; lifeLeech?: number; manaLeech?: number } },
+  w: { type?: string; minLevel?: number; element?: string; elementAttack?: unknown; specials?: { critChance?: number; lifeLeech?: number; manaLeech?: number } },
   vocation: Vocation,
 ): ImbueDef[] {
-  const elemental = !!w.elementAttack || (!!w.element && w.element !== 'physical' && w.type !== 'fist');
-  return imbuementsFor('weapon', vocation).filter((x) => !(x.group === 'damage' && elemental) && !(x.skill && w.specials?.skills?.[x.skill]) && !nativeOf(x, w.specials));
+  const type = w.type ?? '';
+  const elemental = !!w.elementAttack || (!!w.element && w.element !== 'physical' && type !== 'fist');
+  const wand = type === 'wand' || type === 'rod';
+  return imbuementsFor('weapon', vocation).filter(
+    (x) =>
+      !(x.skill && !SKILL_WEAPONS[x.skill]?.includes(type)) &&
+      !(x.group === 'damage' && (elemental || !ELEMENT_DAMAGE_WEAPONS.has(type))) &&
+      !(x.group === 'crit' && wand && (w.minLevel ?? 0) < STRIKE_MIN_WAND_LEVEL) &&
+      !nativeOf(x, w.specials),
+  );
 }
 
 /** Imbuement slots of a weapon (unknown weapon: the usual maximum). */
