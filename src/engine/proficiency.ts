@@ -37,11 +37,8 @@ export const PROF = {
   VOID_MANA_LEECH: 8,
 } as const;
 
-/** Rending Inferniarch weapons cannot take the critical hit (Strike) imbuement. */
-export const noCritImbue = (w: Weapon) => w.id.startsWith('rending-inferniarch-');
-/** D49: Siphoning Inferniarch weapons cannot take the life leech imbuement, Draining ones not the mana leech one. */
-export const noLifeLeechImbue = (w: Weapon) => w.id.startsWith('siphoning-inferniarch-');
-export const noManaLeechImbue = (w: Weapon) => w.id.startsWith('draining-inferniarch-');
+import { noCritImbue, noLifeLeechImbue, noManaLeechImbue } from '../data/equipment';
+export { noCritImbue, noLifeLeechImbue, noManaLeechImbue };
 
 export interface Loadout {
   weapon: Weapon;

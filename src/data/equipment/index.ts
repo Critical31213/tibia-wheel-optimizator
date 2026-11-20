@@ -134,6 +134,14 @@ const SKILL_WEAPONS: Partial<Record<ItemSkill, readonly string[]>> = {
   magic: ['wand', 'rod'],
 };
 const ELEMENT_DAMAGE_WEAPONS = new Set(['fist', 'club', 'sword', 'axe', 'bow', 'crossbow']);
+/**
+ * D48 / D49: Inferniarch variants that cannot take an imbuement: Rending no Strike, Siphoning no Vampirism, Draining no
+ * Void (shared by the editor and the engine).
+ */
+export const noCritImbue = (w: { id: string }) => w.id.startsWith('rending-inferniarch-');
+export const noLifeLeechImbue = (w: { id: string }) => w.id.startsWith('siphoning-inferniarch-');
+export const noManaLeechImbue = (w: { id: string }) => w.id.startsWith('draining-inferniarch-');
+
 /** D84: wands and rods below this level cannot take Strike. */
 const STRIKE_MIN_WAND_LEVEL = 150;
 
@@ -141,10 +149,10 @@ const STRIKE_MIN_WAND_LEVEL = 150;
  * D81 / D84: imbuements a weapon can take. Skill imbuements only of its own skill (also when the weapon already raises
  * it); elemental damage only on melee weapons, bows and crossbows that do not deal elemental damage themselves (a
  * monk's elemental bond does not count); no Strike on wands / rods below level 150; a native critical hit, life or
- * mana leech blocks Strike, Vampirism or Void (D83).
+ * mana leech blocks Strike, Vampirism or Void (D83); Inferniarch variants (D86).
  */
 export function weaponImbuements(
-  w: { type?: string; minLevel?: number; element?: string; elementAttack?: unknown; specials?: { critChance?: number; lifeLeech?: number; manaLeech?: number } },
+  w: { id?: string; type?: string; minLevel?: number; element?: string; elementAttack?: unknown; specials?: { critChance?: number; lifeLeech?: number; manaLeech?: number } },
   vocation: Vocation,
 ): ImbueDef[] {
   const type = w.type ?? '';
@@ -155,7 +163,8 @@ export function weaponImbuements(
       !(x.skill && !SKILL_WEAPONS[x.skill]?.includes(type)) &&
       !(x.group === 'damage' && (elemental || !ELEMENT_DAMAGE_WEAPONS.has(type))) &&
       !(x.group === 'crit' && wand && (w.minLevel ?? 0) < STRIKE_MIN_WAND_LEVEL) &&
-      !nativeOf(x, w.specials),
+      !nativeOf(x, w.specials) &&
+      !(w.id && ((x.group === 'crit' && noCritImbue({ id: w.id })) || (x.group === 'lifeLeech' && noLifeLeechImbue({ id: w.id })) || (x.group === 'manaLeech' && noManaLeechImbue({ id: w.id })))),
   );
 }
 
