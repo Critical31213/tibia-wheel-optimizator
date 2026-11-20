@@ -493,8 +493,11 @@ export function castDamage(model: SpellModel, s: SpellEval, r: RotationInput, m:
   const stage = s.stageDomain >= 0 ? r.stages[s.stageDomain] ?? 0 : 0;
   if (s.revelation >= 0 && stage < 1) return 0;
   const h = s.hits[stage];
-  const flat = (r.flat ?? 0) + (model.flat ?? 0);
-  const val = (p: HitPart) => p.base + (p.boost * m.pct) / 100 + flat * p.bf;
+  const flat = r.flat ?? 0;
+  // D79: the proficiency flat damage is scaled by the base-damage % like the spell itself (confirmed in-game).
+  const prof = model.flat ?? 0;
+  const val = (p: HitPart) =>
+    p.base + (p.boost * m.pct) / 100 + flat * p.bf + prof * p.bf * (1 + m.pct / 100);
   const t = targetsAt(model, s, stage, m.extraTargets);
   const def = REVELATION_SPELLS[s.name];
   let dmg = val(h.main) * t;

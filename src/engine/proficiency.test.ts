@@ -4,7 +4,7 @@ import { getWeapon, type Perk } from '../data/proficiency';
 import type { OptimizerInput } from '../types';
 import { runOptimizer } from './optimizer';
 import { applyLoadout, choosePerks, levelOptions, loadoutCharacter, loadoutParts, type Loadout } from './proficiency';
-import { buildSpellModel, castDamage, elementMultiplier, NO_BONUS, rotationTotal } from './spells';
+import { buildSpellModel, castDamage, elementMultiplier, NO_BONUS, NO_MODS, rotationTotal } from './spells';
 
 const dragonLord = MONSTERS.find((m) => m.id === 'dragon-lord')!;
 const epee = getWeapon('stellar-moonsilver-epee')!;
@@ -73,6 +73,18 @@ describe('weapon proficiency model (D45)', () => {
     expect(t([{ kind: 'spellSkillScaling', value: 0.1, skill: 'sword' }])).toBeGreaterThan(t([]));
     expect(t([{ kind: 'autoCritChance', value: 0.1 }])).toBeGreaterThan(t([]));
     expect(t([{ kind: 'autoSkillScaling', value: 0.05, skill: 'fishing' }])).toBeCloseTo(t([]));
+  });
+
+  it('scales the flat spell damage with the base-damage % like the spell (D79)', () => {
+    const flat = [{ kind: 'spellSkillScaling', value: 0.1, skill: 'sword' }] as Perk[];
+    const gain = (pct: number) => {
+      const cast = (perks: Perk[]) => {
+        const m = applyLoadout(knight('boss'), lo(perks));
+        return castDamage(m, m.spells.get('Groundshaker')!, NO_BONUS, { ...NO_MODS, pct });
+      };
+      return cast(flat) - cast([]);
+    };
+    expect(gain(50) / gain(0)).toBeCloseTo(1.5, 1);
   });
 
   it('unlocks levels and replaces shaped slots', () => {
