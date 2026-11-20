@@ -184,9 +184,12 @@ interface EditorProps {
   /** Index of the item the engine wears in this slot. */
   wornIndex: number | undefined;
   onGear: (f: (g: GearPrefs) => GearPrefs) => void;
+  meleeSkill: MeleeSkill | null;
+  weapons: WeaponPrefs;
+  onWeapons: (f: (p: WeaponPrefs) => WeaponPrefs) => void;
 }
 
-function SlotEditor({ slot, vocation, gear, weaponName, wornIndex, onGear }: EditorProps) {
+function SlotEditor({ slot, vocation, gear, weaponName, wornIndex, onGear, meleeSkill, weapons, onWeapons }: EditorProps) {
   const t = useT();
   if (slot === 'weapon') {
     const w = gear.weapon ?? { tier: 0, imbues: [] };
@@ -202,6 +205,7 @@ function SlotEditor({ slot, vocation, gear, weaponName, wornIndex, onGear }: Edi
             {t('gear.weaponReset')}
           </button>
         )}
+        <OwnedWeapons vocation={vocation} meleeSkill={meleeSkill} prefs={weapons} onChange={onWeapons} />
       </div>
     );
   }
@@ -269,7 +273,7 @@ function OwnedPieces({ slot, vocation, gear, wornIndex, onGear }: { slot: GearSl
 }
 
 /** Native modal dialog (focus trap, Esc, backdrop) around the slot editor. */
-function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+function Modal({ title, wide, onClose, children }: { title: string; wide?: boolean; onClose: () => void; children: ReactNode }) {
   const t = useT();
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
@@ -284,7 +288,10 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
       aria-labelledby={id}
       onClose={onClose}
       onClick={(e) => e.target === ref.current && onClose()}
-      className="m-auto w-[min(28rem,calc(100vw-2rem))] rounded-2xl border border-ink-600 bg-ink-900 p-0 text-parchment-100 shadow-xl shadow-black/60 backdrop:bg-black/60"
+      className={cx(
+        'm-auto rounded-2xl border border-ink-600 bg-ink-900 p-0 text-parchment-100 shadow-xl shadow-black/60 backdrop:bg-black/60',
+        wide ? 'w-[min(40rem,calc(100vw-2rem))]' : 'w-[min(28rem,calc(100vw-2rem))]',
+      )}
     >
       <div className="p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -305,16 +312,19 @@ interface SlotButtonProps {
   gear: GearPrefs;
   weaponName: string | null;
   wornIndex: number | undefined;
+  /** Owned weapons (weapon slot). */
+  weaponCount: number;
   active: boolean;
   onClick: () => void;
 }
 
-function SlotButton({ slot, gear, weaponName, wornIndex, active, onClick }: SlotButtonProps) {
+function SlotButton({ slot, gear, weaponName, wornIndex, weaponCount, active, onClick }: SlotButtonProps) {
   const t = useT();
   const list = slot === 'weapon' ? [] : (gear.pieces[slot] ?? []);
   const piece = slot === 'weapon' ? gear.weapon : list[wornIndex ?? 0];
   const name = slot === 'weapon' ? weaponName : piece && 'itemId' in piece ? (getItem(piece.itemId)?.name ?? null) : null;
-  const set = slot === 'weapon' ? gear.weapon !== null : list.length > 0;
+  const set = slot === 'weapon' ? gear.weapon !== null || weaponCount > 0 : list.length > 0;
+  const count = slot === 'weapon' ? weaponCount : list.length;
   const tier = piece?.tier ?? 0;
   const imbues = piece?.imbues?.length ?? 0;
   return (
@@ -333,7 +343,7 @@ function SlotButton({ slot, gear, weaponName, wornIndex, active, onClick }: Slot
         {name ?? (slot === 'weapon' ? t('gear.weaponAutoShort') : '—')}
       </span>
       {tier > 0 && <span className="absolute right-1 top-1 rounded bg-gold-700/60 px-1 text-[10px] text-parchment-50">T{tier}</span>}
-      {list.length > 1 && <span className="absolute left-1 top-1 rounded bg-ink-700 px-1 text-[10px] text-parchment-200" title={t('gear.ownedCount', { n: list.length })}>{list.length}</span>}
+      {count > 1 && <span className="absolute left-1 top-1 rounded bg-ink-700 px-1 text-[10px] text-parchment-200" title={t('gear.ownedCount', { n: count })}>{count}</span>}
       {imbues > 0 && (
         <span className="absolute bottom-1 flex gap-0.5" aria-hidden="true">
           {Array.from({ length: imbues }, (_, k) => <span key={k} className="size-1.5 rounded-full bg-gold-400" />)}
@@ -382,11 +392,6 @@ function VariantSwitch({ value, onChange }: { value: DesignVariants; onChange: (
         <SegmentedControl size="sm" label={t('gear.variant.fallback')} value={value.fallback} onChange={(fallback) => onChange({ fallback })}
           options={[{ value: 'slot', label: t('gear.variant.slot') }, { value: 'all', label: t('gear.variant.all') }]} />
       </div>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-parchment-300">{t('gear.variant.picker')}</span>
-        <SegmentedControl size="sm" label={t('gear.variant.picker')} value={value.picker} onChange={(picker) => onChange({ picker })}
-          options={[{ value: 'modal', label: t('gear.variant.modal') }, { value: 'inline', label: t('gear.variant.inline') }]} />
-      </div>
     </div>
   );
 }
@@ -406,7 +411,7 @@ export interface EquipmentPanelProps {
   onVariants: (p: Partial<DesignVariants>) => void;
 }
 
-/** D74: equipment as a Tibia paper doll; a slot opens its item, tier and imbuement editor. Owned weapons below. */
+/** D74: equipment as a Tibia paper doll; a slot opens its editor in a window (the weapon slot: owned weapons with proficiency). */
 export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, worn, weaponName, weapons, onWeapons, variants, onVariants }: EquipmentPanelProps) {
   const t = useT();
   const [editing, setEditing] = useState<Slot | null>(null);
@@ -416,32 +421,36 @@ export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, worn, weapo
     const i = s === 'weapon' ? undefined : worn?.worn[s];
     return i !== undefined && s !== 'weapon' && i < (gear.pieces[s]?.length ?? 0) ? i : undefined;
   };
-  const editor = editing && <SlotEditor key={editing} slot={editing} vocation={vocation} gear={gear} weaponName={weaponName} wornIndex={wornIndex(editing)} onGear={onGear} />;
   return (
     <Panel title={t('gear.title')} step={6} headingId="gear-heading">
       <div className="flex flex-col gap-3">
         <div className="mx-auto grid w-full max-w-64 grid-cols-3 gap-1.5">
           {DOLL.map((s, k) =>
             s ? (
-              <SlotButton key={s} slot={s} gear={gear} weaponName={weaponName} wornIndex={wornIndex(s)} active={editing === s} onClick={() => setEditing(editing === s ? null : s)} />
+              <SlotButton key={s} slot={s} gear={gear} weaponName={weaponName} wornIndex={wornIndex(s)} weaponCount={weapons.weapons.length} active={editing === s} onClick={() => setEditing(editing === s ? null : s)} />
             ) : (
               <span key={k} aria-hidden="true" className={cx('aspect-square rounded-lg', k !== 9 && k !== 11 && 'border border-ink-700/60 bg-ink-950/20')} />
             ),
           )}
         </div>
-        {editing && variants.picker === 'modal' && <Modal title={slotName(t, editing)} onClose={close}>{editor}</Modal>}
-        {editing && variants.picker === 'inline' && (
-          <section aria-label={slotName(t, editing)} className="rounded-xl border border-gold-700/50 bg-ink-950/50 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="section-title">{slotName(t, editing)}</h3>
-              <button type="button" onClick={close} aria-label={t('gear.close')} className="rounded px-2 text-parchment-400 hover:text-parchment-100">×</button>
-            </div>
-            {editor}
-          </section>
+        {editing && (
+          <Modal title={slotName(t, editing)} wide={editing === 'weapon'} onClose={close}>
+            <SlotEditor
+              key={editing}
+              slot={editing}
+              vocation={vocation}
+              gear={gear}
+              weaponName={weaponName}
+              wornIndex={wornIndex(editing)}
+              onGear={onGear}
+              meleeSkill={meleeSkill}
+              weapons={weapons}
+              onWeapons={onWeapons}
+            />
+          </Modal>
         )}
         <Totals fx={worn?.effects} set={isGearSet(gear)} />
         <VariantSwitch value={variants} onChange={onVariants} />
-        <OwnedWeapons key={vocation} vocation={vocation} meleeSkill={meleeSkill} prefs={weapons} onChange={onWeapons} />
       </div>
     </Panel>
   );

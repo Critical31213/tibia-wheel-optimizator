@@ -64,10 +64,10 @@ Not modelled: armor value, Momentum, Transcendence, speed, Mantra, Perfect Shot.
 ## UI (`EquipmentPanel.tsx`)
 
 Paper doll (Tibia layout; backpack and ammunition are not modelled), all slots empty by default; a slot shows the worn
-item and the number of owned items. A slot opens its editor: owned items (worn one marked; tier with its effect,
+item and the number of owned items. A slot opens its editor in a modal window (`<dialog>`): owned items (worn one marked; tier with its effect,
 imbuements per the item's slots, remove) and "add item" (search for the slot). The
-weapon slot shows the engine's pick and sets its tier and up to 3 imbuements ("back to default" clears them).
-Below: the bonus totals and the owned weapons list (`OwnedWeapons.tsx`).
+weapon slot (wider window) shows the engine's pick, sets its tier and up to 3 imbuements ("back to default" clears
+them) and holds the owned weapons with their proficiency (`OwnedWeapons.tsx`). Below the doll: the bonus totals.
 
-Temporary (D74 review): a variant switch (`useDesignVariants`, localStorage) for the fallback mode and the editor
-(modal window or inline below the doll). The chosen variant stays, the switch goes.
+Temporary (D74 review): a variant switch (`useDesignVariants`, localStorage) for the fallback mode. The chosen
+variant stays, the switch goes. The editor is a modal window (D76).

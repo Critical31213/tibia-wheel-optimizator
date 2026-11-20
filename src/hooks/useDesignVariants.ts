@@ -8,19 +8,16 @@ import type { GearFallback } from '../lib/gear';
 export interface DesignVariants {
   /** How empty slots count once some equipment is set. */
   fallback: GearFallback;
-  /** Item picker: modal window or inline below the paper doll. */
-  picker: 'modal' | 'inline';
 }
 
 const KEY = 'wheel-optimizer:design-variants:v1';
-const DEFAULT: DesignVariants = { fallback: 'slot', picker: 'modal' };
+const DEFAULT: DesignVariants = { fallback: 'slot' };
 
 function read(): DesignVariants {
   try {
     const raw = JSON.parse(window.localStorage.getItem(KEY) ?? '{}') as Partial<DesignVariants>;
     return {
       fallback: raw.fallback === 'all' ? 'all' : 'slot',
-      picker: raw.picker === 'inline' ? 'inline' : 'modal',
     };
   } catch {
     return DEFAULT;
