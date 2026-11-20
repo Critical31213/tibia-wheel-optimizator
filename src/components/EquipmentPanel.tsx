@@ -22,12 +22,10 @@ import {
 } from '../data/equipment';
 import { addPiece, isGearSet, MAX_PIECES, removePiece, updatePiece, type GearPrefs, type ImbueChoice } from '../lib/gear';
 import type { WeaponPrefs } from '../lib/weapons';
-import type { DesignVariants } from '../hooks/useDesignVariants';
 import { cx } from '../lib/labels';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { OwnedWeapons } from './OwnedWeapons';
 import { Panel } from './Panel';
-import { SegmentedControl } from './SegmentedControl';
 
 type Slot = ImbueSlot;
 
@@ -381,21 +379,6 @@ function Totals({ fx, set }: { fx: GearEffects | undefined; set: boolean }) {
   );
 }
 
-/** D74 (temporary): switch between the design variants under review. */
-function VariantSwitch({ value, onChange }: { value: DesignVariants; onChange: (p: Partial<DesignVariants>) => void }) {
-  const t = useT();
-  return (
-    <div className="flex flex-col gap-1.5 rounded-lg border border-dashed border-gold-700/60 p-2 text-xs">
-      <p className="text-gold-400">{t('gear.variants')}</p>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-parchment-300">{t('gear.variant.fallback')}</span>
-        <SegmentedControl size="sm" label={t('gear.variant.fallback')} value={value.fallback} onChange={(fallback) => onChange({ fallback })}
-          options={[{ value: 'slot', label: t('gear.variant.slot') }, { value: 'all', label: t('gear.variant.all') }]} />
-      </div>
-    </div>
-  );
-}
-
 export interface EquipmentPanelProps {
   vocation: Vocation;
   meleeSkill: MeleeSkill | null;
@@ -407,12 +390,10 @@ export interface EquipmentPanelProps {
   weaponName: string | null;
   weapons: WeaponPrefs;
   onWeapons: (f: (p: WeaponPrefs) => WeaponPrefs) => void;
-  variants: DesignVariants;
-  onVariants: (p: Partial<DesignVariants>) => void;
 }
 
 /** D74: equipment as a Tibia paper doll; a slot opens its editor in a window (the weapon slot: owned weapons with proficiency). */
-export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, worn, weaponName, weapons, onWeapons, variants, onVariants }: EquipmentPanelProps) {
+export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, worn, weaponName, weapons, onWeapons }: EquipmentPanelProps) {
   const t = useT();
   const [editing, setEditing] = useState<Slot | null>(null);
   const close = () => setEditing(null);
@@ -450,7 +431,6 @@ export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, worn, weapo
           </Modal>
         )}
         <Totals fx={worn?.effects} set={isGearSet(gear)} />
-        <VariantSwitch value={variants} onChange={onVariants} />
       </div>
     </Panel>
   );

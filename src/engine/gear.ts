@@ -2,7 +2,7 @@
  * D74: effects of a worn equipment set (items, imbuements, forge tiers) as the engine uses them.
  * The choice of the set among the owned items is in `optimizer.ts` (`wearBest`).
  */
-import type { Element, GearEffects, GearFallback, GearImbue, GearPiece, GearSlot, MeleeSkill, Vocation, WeaponGear } from '../types';
+import type { Element, GearEffects, GearImbue, GearPiece, GearSlot, MeleeSkill, Vocation, WeaponGear } from '../types';
 import { GEAR_SLOTS, getImbuement, getItem, tierChance, type ItemSkill } from '../data/equipment';
 import { K } from './values';
 
@@ -40,11 +40,10 @@ function addImbues(t: Totals, imbues: readonly GearImbue[] | undefined) {
 const leechOf = (imbues: readonly GearImbue[] | undefined) => (imbues ?? []).reduce((a, c) => a + (c.id === 'vampirism' ? imbueValue(c) : 0), 0);
 
 /**
- * Engine effects of a worn set. Empty slots keep their default assumption (`slot`) or count as empty (`all`).
+ * Engine effects of a worn set. Empty slots keep their default assumption (typical off-hand, default imbuements).
  * Knights: the trained melee skill (else the best melee bonus).
  */
-export function gearEffects(g: WornGear, vocation: Vocation, meleeSkill: MeleeSkill | null | undefined, fallback: GearFallback): GearEffects {
-  const keep = fallback === 'slot';
+export function gearEffects(g: WornGear, vocation: Vocation, meleeSkill: MeleeSkill | null | undefined): GearEffects {
   const t: Totals = { skills: {}, elementMl: {}, resist: {}, lifeLeech: 0 };
   for (const s of GEAR_SLOTS) {
     const p = g.pieces[s];
@@ -58,10 +57,10 @@ export function gearEffects(g: WornGear, vocation: Vocation, meleeSkill: MeleeSk
   }
   addImbues(t, g.weapon?.imbues);
 
-  // Life leech: weapon + armor imbuements (each half of the default when not set and kept).
+  // Life leech: weapon + armor imbuements (each half of the default when not set).
   const half = K.LIFE_LEECH_IMBUE[vocation] / 2;
   const armor = g.pieces.armor;
-  const lifeLeech = t.lifeLeech + (g.weapon ? leechOf(g.weapon.imbues) : keep ? half : 0) + (armor ? leechOf(armor.imbues) : keep ? half : 0);
+  const lifeLeech = t.lifeLeech + (g.weapon ? leechOf(g.weapon.imbues) : half) + (armor ? leechOf(armor.imbues) : half);
 
   const w = g.weapon;
   const pick = (id: string) => w?.imbues.find((c) => c.id === id);
@@ -74,9 +73,7 @@ export function gearEffects(g: WornGear, vocation: Vocation, meleeSkill: MeleeSk
         lifeLeech: leechOf(w.imbues),
         manaLeech: voidImbue ? imbueValue(voidImbue) : 0,
       }
-    : keep
-      ? undefined
-      : { critChance: 0, critExtra: 0, lifeLeech: 0, manaLeech: 0 };
+    : undefined;
   const damage = w?.imbues.map((c) => ({ c, d: getImbuement(c.id) })).find((x) => x.d?.group === 'damage');
 
   const mainSkill = MAIN_SKILL[vocation];
@@ -89,9 +86,7 @@ export function gearEffects(g: WornGear, vocation: Vocation, meleeSkill: MeleeSk
   const offhandItem = g.pieces.offhand && getItem(g.pieces.offhand.itemId);
   const offhand = offhandItem
     ? { kind: offhandItem.slot as 'shield' | 'spellbook' | 'quiver', defense: offhandItem.defense ?? 0 }
-    : keep
-      ? undefined
-      : { kind: 'none' as const, defense: 0 };
+    : undefined;
 
   const amp = 1 + tierChance('amplification', g.pieces.boots?.tier ?? 0) / 100;
   return {

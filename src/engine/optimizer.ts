@@ -994,7 +994,7 @@ export function wearBest(input: OptimizerInput): GearResult | undefined {
     GEAR_SLOTS.forEach((s, k) => {
       if (w[k] !== undefined) pieces[s] = g.pieces[s]![w[k]];
     });
-    return gearEffects({ pieces, weapon: g.weapon }, input.vocation, input.meleeSkill, g.fallback);
+    return gearEffects({ pieces, weapon: g.weapon }, input.vocation, input.meleeSkill);
   };
   let worn: (number | undefined)[] = options.map((o) => o[0]);
   if (options.some((o) => o.length > 1)) {

@@ -55,8 +55,8 @@ describe('gear storage', () => {
     expect(g.pieces.legs).toEqual([{ itemId: 'bast-legs', tier: 2 }, { itemId: 'blue-legs' }]);
     expect(removePiece(g, 'legs', 0).pieces.legs).toEqual([{ itemId: 'blue-legs' }]);
     expect(removePiece(removePiece(g, 'legs', 0), 'legs', 0).pieces.legs).toBeUndefined();
-    expect(gearInput(EMPTY_GEAR, 'slot')).toBeUndefined();
-    expect(gearInput(g, 'all')).toEqual({ pieces: g.pieces, weapon: null, fallback: 'all' });
+    expect(gearInput(EMPTY_GEAR)).toBeUndefined();
+    expect(gearInput(g)).toEqual({ pieces: g.pieces, weapon: null });
   });
 });
 
@@ -70,7 +70,7 @@ describe('gear effects', () => {
       },
       { tier: 4, imbues: [{ id: 'precision', level: 3 }] },
     );
-    const fx = gearEffects(g, 'paladin', null, 'slot');
+    const fx = gearEffects(g, 'paladin', null);
     expect(fx.skills.main).toBe(2 + 4);
     expect(fx.resist.energy).toBe(4 + (getItem('void-boots')!.bonus?.resist?.energy ?? 0));
     expect(fx.onslaught).toBeCloseTo(tierChance('onslaught', 4) * (1 + tierChance('amplification', 2) / 100));
@@ -79,22 +79,18 @@ describe('gear effects', () => {
     expect(fx.weaponImbues?.lifeLeech).toBe(0);
   });
 
-  it('empty slots keep the default per slot or count as empty', () => {
-    const g = worn({ legs: { itemId: 'bast-legs' } });
-    const slot = gearEffects(g, 'paladin', null, 'slot');
-    const all = gearEffects(g, 'paladin', null, 'all');
-    expect(slot.weaponImbues).toBeUndefined();
-    expect(slot.offhand).toBeUndefined();
-    expect(slot.lifeLeech).toBeGreaterThan(0);
-    expect(all.weaponImbues).toEqual({ critChance: 0, critExtra: 0, lifeLeech: 0, manaLeech: 0 });
-    expect(all.offhand).toEqual({ kind: 'none', defense: 0 });
-    expect(all.lifeLeech).toBe(0);
+  it('empty slots keep their default assumption', () => {
+    const fx = gearEffects(worn({ legs: { itemId: 'bast-legs' } }), 'paladin', null);
+    expect(fx.weaponImbues).toBeUndefined();
+    expect(fx.crit).toBeUndefined();
+    expect(fx.offhand).toBeUndefined();
+    expect(fx.lifeLeech).toBe(50);
   });
 
   it('knights count the trained melee skill', () => {
     const g = worn({}, { tier: 0, imbues: [{ id: 'chop', level: 3 }] });
-    expect(gearEffects(g, 'knight', 'axe', 'slot').skills.main).toBe(4);
-    expect(gearEffects(g, 'knight', 'sword', 'slot').skills.main).toBe(0);
+    expect(gearEffects(g, 'knight', 'axe').skills.main).toBe(4);
+    expect(gearEffects(g, 'knight', 'sword').skills.main).toBe(0);
   });
 });
 
@@ -108,7 +104,7 @@ describe('wearing the best owned items', () => {
     monsters: [{ monster, weight: 1 }],
     priority,
     character: { level: 400, mainSkill: 110 },
-    gear: { pieces: { armor: [{ itemId: 'burial-shroud' }, { itemId: 'lavos-armor' }], legs: [{ itemId: 'blue-legs' }, { itemId: 'bast-legs' }] }, weapon: null, fallback: 'slot' },
+    gear: { pieces: { armor: [{ itemId: 'burial-shroud' }, { itemId: 'lavos-armor' }], legs: [{ itemId: 'blue-legs' }, { itemId: 'bast-legs' }] }, weapon: null },
   });
 
   it('picks per slot for the spot', () => {

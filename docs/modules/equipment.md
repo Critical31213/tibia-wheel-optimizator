@@ -26,7 +26,7 @@ extrapolated. Highest tier: class 4 → 10, classes 1–3 → their number, no c
 - `GearPrefs { pieces: slot → GearPiece[], weapon }` per vocation in localStorage (`wheel-optimizer:gear:v1:<vocation>`,
   the older one-item-per-slot format is read too), sanitised on load (unknown or unusable items, out-of-range tiers,
   duplicate or foreign imbuements dropped; at most 20 items per slot). Editing: `addPiece`, `updatePiece`, `removePiece`.
-- `gearInput(gear, fallback)` → `OptimizerInput.gear`, or `undefined` when nothing is set: the engine then keeps its
+- `gearInput(gear)` → `OptimizerInput.gear`, or `undefined` when nothing is set: the engine then keeps its
   previous assumptions (typical weapon and shield, Powerful Strike, Vampirism on weapon and armor).
 
 ## Wearing the best set (`wearBest` in `optimizer.ts`, D75)
@@ -40,9 +40,9 @@ plain character) and EHP: mitigation (shielding, off-hand), resistances against 
 
 ## Effects (`src/engine/gear.ts`)
 
-- `gearEffects(worn, vocation, meleeSkill, fallback)` → `GearEffects`.
-- Once something is set, empty slots follow the fallback mode (temporary review switch, see below):
-  `slot` keeps the assumption per empty slot; `all` drops every assumption (no imbuements, no off-hand).
+- `gearEffects(worn, vocation, meleeSkill)` → `GearEffects`.
+- Empty slots keep their assumption (D77): no weapon tier or imbuements set → Powerful Strike and half the default
+  Vampirism; no armor → the other half; no off-hand → the vocation's typical one.
 - Skills entered in Character are base values; item and imbuement skills are added to the entered fields only
   (empty fields stay estimated from level). Knights count the trained melee skill (else the best melee bonus).
 
@@ -68,6 +68,3 @@ item and the number of owned items. A slot opens its editor in a modal window (`
 imbuements per the item's slots, remove) and "add item" (search for the slot). The
 weapon slot (wider window) shows the engine's pick, sets its tier and up to 3 imbuements ("back to default" clears
 them) and holds the owned weapons with their proficiency (`OwnedWeapons.tsx`). Below the doll: the bonus totals.
-
-Temporary (D74 review): a variant switch (`useDesignVariants`, localStorage) for the fallback mode. The chosen
-variant stays, the switch goes. The editor is a modal window (D76).

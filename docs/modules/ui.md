@@ -36,13 +36,12 @@ screens it is two columns (controls left, results right).
 | `src/lib/spellPrefs.ts` | Spell-prefs sanitising + URL / JSON codec (tested). |
 | `src/components/GemsPanel.tsx` | Collapsible "My gems" editor in Lesser / Regular / Greater subsections (mods per slot, grade I–IV), empty-vessel highlight. |
 | `src/components/GemImport.tsx` | D63: toolbar at the top of "My gems": import button (multiple image files, Ctrl+V while the panel is open) → `readGems` per screenshot, duplicates of a page skipped, `mergeImported`; result line (added / to check / skipped / unrecognised); ambiguous gems get an amber "check" note in their card until edited. Trash icon with inline confirmation removes all gems. |
-| `src/components/EquipmentPanel.tsx` | D74: "Equipment" (step 6): paper doll (worn item from `result.gear`, owned count), slot editor in a modal window with the owned items (tier, imbuements, worn mark, add / remove); the weapon slot holds `OwnedWeapons` (proficiency); bonus totals; temporary fallback variant switch. See [`equipment.md`](equipment.md). |
+| `src/components/EquipmentPanel.tsx` | D74: "Equipment" (step 6): paper doll (worn item from `result.gear`, owned count), slot editor in a modal window with the owned items (tier, imbuements, worn mark, add / remove); the weapon slot holds `OwnedWeapons` (proficiency); bonus totals. See [`equipment.md`](equipment.md). |
 | `src/components/OwnedWeapons.tsx` | D47 (in the Equipment weapon slot since D76): "My weapons": weapon search (combobox, vocation's weapons with a known tree; knights with `meleeSkill` only that type, D53), per weapon proficiency level 0–n, compact tree (D50: one column of official perk icons per level, click = manual pick with a gold frame, again = Auto; locked levels dimmed; ✦ = reshaped slot; icon legend below) and dust reshapes (shaping option at rank 10 + replaced option, at most 2). D62: knight/monk weapon cards (and the best weapon) show the damage types on their own line (main element, or "physical 25 + fire 26"); proficiency level select sized to its text. |
 | `src/components/Tip.tsx` | D52: hover / focus tooltip (aligned start / center / end so edge tooltips stay in the card). |
 | `src/components/PerkIcon.tsx` | D50: perk icon from `public/proficiency/` (sprite strip frame; augment mark in the corner), decorative. |
 | `src/components/WeaponResultPanel.tsx` | D47: best weapon with its perks as an icon row (D56: with manual picks that the engine beats, an amber note lists the changed levels old → new icon, the gain and "Apply", which writes the engine picks into the manual levels) (tooltip: effect, picked / your choice; gold frame = manual; alpha strike marked "solo play only"), ammunition, other owned weapons (difference), worthwhile reshapes, collapsible "better weapons you do not own" (opening it sets `suggestWeapons`). D62: ammunition shown with its element. |
 | `src/hooks/usePerVocationStorage.ts` | Generic per-vocation localStorage value; `usePersistentGems`, `usePersistentWeapons` (D47: owned weapons + suggest flag), `usePersistentGear` (D74). Not in the URL. |
-| `src/hooks/useDesignVariants.ts` | Temporary (D74): review variants of the equipment panel. |
 | `src/lib/weapons.ts` | D47: weapon prefs sanitising / codec, `setPerk`, `setShaped`, `perkLabel`, `shapingLabel` (tested). |
 | `src/components/GemIcon.tsx` | Diamond icon tinted by gem/vessel quality. |
 | `src/components/VesselsPanel.tsx` | Vessels, recommended gems per quality, best upgrades, collapsible spell usage. |
@@ -69,7 +68,7 @@ App
 │  └─ MonsterCard      monster
 ├─ FightContextPanel   value: FightContext, onChange(patch), priority, onPriorityChange (→ PrioritySlider)
 ├─ GemsPanel           vocation, gems, mods, emptyVessels (viewed build, per quality), onChange(updater)
-├─ EquipmentPanel      vocation, gear, worn (result.gear), weaponName, weapons: WeaponPrefs, variants (+ updaters)
+├─ EquipmentPanel      vocation, gear, worn (result.gear), weaponName, weapons: WeaponPrefs (+ updaters)
 │  └─ OwnedWeapons     vocation, prefs: WeaponPrefs, onChange(updater)
 ├─ Panel › RotationPanel presets, spells (forceable), value: SpellPrefs, onChange(patch), usage = viewed build `rotation`
 ├─ Panel › WheelChart  wheel, result | null   (the *viewed* build: best or alternative)

@@ -17,7 +17,6 @@ import { VocationPicker } from './components/VocationPicker';
 import { WeaponResultPanel } from './components/WeaponResultPanel';
 import { WheelChart } from './components/WheelChart';
 import { usePersistentGear, usePersistentGems, usePersistentWeapons } from './hooks/usePerVocationStorage';
-import { useDesignVariants } from './hooks/useDesignVariants';
 import { gemFromRecommendation, setModGrade, updateGem } from './lib/gems';
 import { usePersistentInputs } from './hooks/usePersistentInputs';
 import { usePersistentSpellPrefs } from './hooks/usePersistentSpellPrefs';
@@ -42,7 +41,6 @@ export default function App() {
   const deferredWeapons = useDeferredValue(weaponPrefs);
   const [gear, setGear] = usePersistentGear(inputs.vocation);
   const deferredGear = useDeferredValue(gear);
-  const [variants, setVariants] = useDesignVariants();
   const presets = useMemo(() => getRotationPresets(inputs.vocation), [inputs.vocation]);
   const forceable = useMemo(() => getForceableSpells(inputs.vocation), [inputs.vocation]);
   const customSpells = useMemo(() => getCustomRotationSpells(inputs.vocation), [inputs.vocation]);
@@ -72,7 +70,7 @@ export default function App() {
     [deferred.vocation, points, deferredGems, character],
   );
   const meleeSkill = deferred.vocation === 'knight' ? deferred.meleeSkill : null;
-  const gearRequest = useMemo(() => gearInput(deferredGear, variants.fallback), [deferredGear, variants.fallback]);
+  const gearRequest = useMemo(() => gearInput(deferredGear), [deferredGear]);
   const request = useMemo(
     () =>
       points > 0
@@ -134,8 +132,6 @@ export default function App() {
             weaponName={weaponName}
             weapons={weaponPrefs}
             onWeapons={setWeaponPrefs}
-            variants={variants}
-            onVariants={setVariants}
           />
           <DebugCopy input={request} />
         </div>

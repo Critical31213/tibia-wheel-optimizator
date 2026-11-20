@@ -5,7 +5,7 @@
  * anything, no equipment is sent and the engine keeps its previous assumptions (typical gear, Powerful Strike,
  * Vampirism on weapon and armor).
  */
-import type { GearFallback, GearImbue, GearInput, GearPiece, GearSlot, Vocation, WeaponGear } from '../types';
+import type { GearImbue, GearInput, GearPiece, GearSlot, Vocation, WeaponGear } from '../types';
 import {
   GEAR_SLOTS,
   getItem,
@@ -19,7 +19,7 @@ import {
   type ImbueSlot,
 } from '../data/equipment';
 
-export type { GearFallback, GearPiece, WeaponGear };
+export type { GearPiece, WeaponGear };
 export type ImbueChoice = GearImbue;
 
 export interface GearPrefs {
@@ -37,8 +37,7 @@ export const gearStorageKey = (vocation: Vocation): string => `wheel-optimizer:g
 export const isGearSet = (g: GearPrefs): boolean => g.weapon !== null || GEAR_SLOTS.some((s) => g.pieces[s]?.length);
 
 /** Engine input (undefined when nothing is set). */
-export const gearInput = (g: GearPrefs, fallback: GearFallback): GearInput | undefined =>
-  isGearSet(g) ? { pieces: g.pieces, weapon: g.weapon, fallback } : undefined;
+export const gearInput = (g: GearPrefs): GearInput | undefined => (isGearSet(g) ? { pieces: g.pieces, weapon: g.weapon } : undefined);
 
 const int = (x: unknown, min: number, max: number): number | null =>
   typeof x === 'number' && Number.isInteger(x) && x >= min && x <= max ? x : null;

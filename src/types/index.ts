@@ -436,15 +436,11 @@ export interface WeaponGear {
   imbues: GearImbue[];
 }
 
-/** D74 review variants: empty slots keep the default assumption (`slot`) or count as empty (`all`). */
-export type GearFallback = 'slot' | 'all';
-
 export interface GearInput {
   /** Owned items per slot. */
   pieces: Partial<Record<GearSlot, GearPiece[]>>;
   /** null = not set (default assumption). */
   weapon: WeaponGear | null;
-  fallback: GearFallback;
 }
 
 /** D74: the worn set: index into `gear.pieces[slot]` per slot, and its effects. */
