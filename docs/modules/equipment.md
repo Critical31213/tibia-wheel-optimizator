@@ -1,7 +1,8 @@
 # Equipment (D74)
 
-The user's equipment (paper doll: helmet, amulet, armor, legs, boots, ring, off-hand, plus the tier and imbuements of
-the weapon the engine picks) and what it changes in the engine.
+The user's equipment (paper doll: helmet, amulet, armor, legs, boots, ring, off-hand — several owned items per slot —
+plus the tier and imbuements of the weapon the engine picks), how the engine wears the best set (D75) and what it
+changes in the engine.
 
 ## Data
 
@@ -20,13 +21,26 @@ Forge tiers (chance %): Onslaught (weapon, +60 % damage), Ruse (armor), Momentum
 Amplification (boots, multiplies the others). Values for tiers 1–6 follow community-published forge tables; 7–10 are
 extrapolated. Highest tier: class 4 → 10, classes 1–3 → their number, no class → 0.
 
-## Storage and effects (`src/lib/gear.ts`)
+## Storage (`src/lib/gear.ts`)
 
-- `GearPrefs { pieces, weapon }` per vocation in localStorage (`wheel-optimizer:gear:v1:<vocation>`), sanitised on
-  load (unknown or unusable items, out-of-range tiers, duplicate or foreign imbuements dropped).
-- `gearEffects(gear, vocation, meleeSkill, fallback)` → `GearEffects` (`OptimizerInput.equipment`), or `undefined` when
-  nothing is set: the engine then keeps its previous assumptions (typical weapon and shield, Powerful Strike,
-  Vampirism on weapon and armor).
+- `GearPrefs { pieces: slot → GearPiece[], weapon }` per vocation in localStorage (`wheel-optimizer:gear:v1:<vocation>`,
+  the older one-item-per-slot format is read too), sanitised on load (unknown or unusable items, out-of-range tiers,
+  duplicate or foreign imbuements dropped; at most 20 items per slot). Editing: `addPiece`, `updatePiece`, `removePiece`.
+- `gearInput(gear, fallback)` → `OptimizerInput.gear`, or `undefined` when nothing is set: the engine then keeps its
+  previous assumptions (typical weapon and shield, Powerful Strike, Vampirism on weapon and armor).
+
+## Wearing the best set (`wearBest` in `optimizer.ts`, D75)
+
+Before the wheel search, `runOptimizer` picks one owned item per slot: start with the first item of each slot, then
+per slot try every other item with the rest fixed and keep the best (`gearScorer`), up to 3 passes or until nothing
+changes. Items above the character level are skipped. The score is the priority blend of damage (best plan vs the
+plain character) and EHP: mitigation (shielding, off-hand), resistances against the spot's incoming damage, life leech
+(`leechEhp`) and Ruse as dodge. It ignores the wheel. The worn set's `gearEffects` become `input.equipment`;
+`result.gear` = `{ worn: slot → index, effects }`.
+
+## Effects (`src/engine/gear.ts`)
+
+- `gearEffects(worn, vocation, meleeSkill, fallback)` → `GearEffects`.
 - Once something is set, empty slots follow the fallback mode (temporary review switch, see below):
   `slot` keeps the assumption per empty slot; `all` drops every assumption (no imbuements, no off-hand).
 - Skills entered in Character are base values; item and imbuement skills are added to the entered fields only
@@ -45,12 +59,13 @@ extrapolated. Highest tier: class 4 → 10, classes 1–3 → their number, no c
 | Resistances | `resistParts` divides by the damage still taken after the equipment resistances |
 | Off-hand | worn shield defense (or no off-hand) in mitigation |
 
-Not modelled: armor value, Ruse (shown only), Momentum, Transcendence, speed, Mantra, Perfect Shot.
+Not modelled: armor value, Momentum, Transcendence, speed, Mantra, Perfect Shot. Ruse counts only in the choice of items.
 
 ## UI (`EquipmentPanel.tsx`)
 
-Paper doll (Tibia layout; backpack and ammunition are not modelled), all slots empty by default. A slot opens its
-editor: item search for the slot, tier (with the effect), imbuements per the item's slots, change / remove. The
+Paper doll (Tibia layout; backpack and ammunition are not modelled), all slots empty by default; a slot shows the worn
+item and the number of owned items. A slot opens its editor: owned items (worn one marked; tier with its effect,
+imbuements per the item's slots, remove) and "add item" (search for the slot). The
 weapon slot shows the engine's pick and sets its tier and up to 3 imbuements ("back to default" clears them).
 Below: the bonus totals and the owned weapons list (`OwnedWeapons.tsx`).
 

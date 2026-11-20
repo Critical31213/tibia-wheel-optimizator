@@ -27,7 +27,7 @@ import { getCustomRotationSpells, getWeapon, getForceableSpells, getMonsterById,
 import { stanceNames } from './lib/spellPrefs';
 import type { BuildResult } from './lib/api';
 import { characterOf, contextOf } from './lib/inputState';
-import { gearEffects } from './lib/gear';
+import { gearInput } from './lib/gear';
 import { resolveMonsters } from './lib/monsters';
 import { emptyUnlockedByQuality } from './lib/vessels';
 import { VOCATION_LABELS } from './lib/labels';
@@ -72,10 +72,7 @@ export default function App() {
     [deferred.vocation, points, deferredGems, character],
   );
   const meleeSkill = deferred.vocation === 'knight' ? deferred.meleeSkill : null;
-  const equipment = useMemo(
-    () => gearEffects(deferredGear, deferred.vocation, meleeSkill, variants.fallback),
-    [deferredGear, deferred.vocation, meleeSkill, variants.fallback],
-  );
+  const gearRequest = useMemo(() => gearInput(deferredGear, variants.fallback), [deferredGear, variants.fallback]);
   const request = useMemo(
     () =>
       points > 0
@@ -98,10 +95,10 @@ export default function App() {
             stances: stance === null ? undefined : stanceNames(stance),
             weapons: deferredWeapons.weapons.length ? deferredWeapons.weapons : undefined,
             suggestWeapons: deferredWeapons.weapons.length && deferredWeapons.suggest ? true : undefined,
-            equipment,
+            gear: gearRequest,
           }
         : null,
-    [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, meleeSkill, rotationId, customRotation, forcedSpells, forcedStage2, forcedRevelations, stance, deferredWeapons, equipment],
+    [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, meleeSkill, rotationId, customRotation, forcedSpells, forcedStage2, forcedRevelations, stance, deferredWeapons, gearRequest],
   );
   const optimized = useOptimizer(request);
   // The shown build may lag the inputs while the worker computes; everything below follows its own vocation.
@@ -133,7 +130,7 @@ export default function App() {
             meleeSkill={inputs.meleeSkill}
             gear={gear}
             onGear={setGear}
-            effects={equipment}
+            worn={current ? shown?.gear : undefined}
             weaponName={weaponName}
             weapons={weaponPrefs}
             onWeapons={setWeaponPrefs}

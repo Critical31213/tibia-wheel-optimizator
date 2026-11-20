@@ -11,6 +11,9 @@ import type {
   EngineMessage,
   Element,
   GainEffect,
+  GearEffects,
+  GearResult,
+  GearSlot,
   FightContext,
   GemModRef,
   GemRecommendation,
@@ -36,6 +39,8 @@ import { ammoFor, shapedPerk, shapingId, shapingOptions, weaponsFor, type Ammo, 
 import { choosePerks, loadoutCharacter, loadoutOf, loadoutParts, ownedOptions, type Loadout } from './proficiency';
 import { encodePlannerCode, gridForSliceId, plannerVesselIssues, type PlannerVessel } from '../data/wheel/plannerCode';
 import { resolveCharacterStats } from '../data/character';
+import { GEAR_SLOTS, getItem } from '../data/equipment';
+import { gearEffects, type WornGear } from './gear';
 import { BALLISTIC_MASTERY, healingAverage, pierceDamageMod, POSITIONAL_TACTICS, TURN_SECONDS } from '../data/damage';
 import { customPreset, getRotationPresets } from '../data/damage/rotations';
 import { getStance, stanceCombos, type StanceDef } from '../data/damage/stances';
@@ -941,6 +946,80 @@ function offhandOf(input: Pick<OptimizerInput, 'equipment'>, shieldPlan: boolean
   return worn ? { offhand: worn.kind, defense: worn.defense } : {};
 }
 
+// ---------------------------------------------------------------------------
+// Equipment (D74)
+
+const GEAR_PASSES = 3;
+
+/**
+ * Wheel-independent value of worn equipment (blend units): damage of the best plan vs the plain character,
+ * mitigation (shielding, off-hand), resistances against the spot's incoming damage, life leech and Ruse as dodge.
+ */
+function gearScorer(input: OptimizerInput): (fx: GearEffects) => number {
+  const chosen = presetById(input.vocation, input.rotationId, input.customRotation);
+  const plans: (RotationPreset | null)[] = chosen ? [chosen] : [...getRotationPresets(input.vocation), null];
+  const base = modelInputs({ ...input, equipment: undefined });
+  const best = (m: SpellModel) => Math.max(1, ...plans.map((x) => planTotal(m, x)));
+  const ref = best(base.model);
+  const threat = threatOf(spotMonster(base.monsters));
+  const incoming = incomingShares(base.monsters);
+  const blend = blendWith(weightsFor(input.priority, leechEhp(base.model, threat)));
+  const mitRef = characterFacts(input.vocation, base.level, base.character.shielding).mitigation;
+  return (fx) => {
+    const mi = modelInputs({ ...input, equipment: fx });
+    const off = 100 * (best(mi.model) / ref - 1);
+    const mit = characterFacts(input.vocation, mi.level, mi.character.shielding, offhandOf({ equipment: fx }, false)).mitigation;
+    let taken = 0;
+    for (const [e, s] of Object.entries(incoming) as [Element, number][]) taken += s * Math.max(0.05, 1 - (fx.resist[e] ?? 0) / 100);
+    const ruse = Math.min(50, fx.ruse) / 100;
+    const ehp = ((100 - mitRef) / Math.max(50, 100 - mit)) / Math.max(0.05, taken) / (1 - ruse);
+    const def = 100 * (ehp - 1) * threat + 100 * leechEhp(mi.model, threat, fx.lifeLeech ?? K.LIFE_LEECH_IMBUE[input.vocation]);
+    return blend({ off, def, util: 0 });
+  };
+}
+
+/**
+ * D74: the owned items worn on this spot. Per slot the item with the best `gearScorer` value with the other slots
+ * fixed, repeated until nothing changes. Items above the character level are skipped.
+ */
+export function wearBest(input: OptimizerInput): GearResult | undefined {
+  const g = input.gear;
+  if (!g) return undefined;
+  const level = levelFor(input);
+  const options = GEAR_SLOTS.map((s) =>
+    (g.pieces[s] ?? []).map((_, i) => i).filter((i) => (getItem(g.pieces[s]![i].itemId)?.minLevel ?? Infinity) <= level),
+  );
+  const effectsOf = (w: readonly (number | undefined)[]) => {
+    const pieces: WornGear['pieces'] = {};
+    GEAR_SLOTS.forEach((s, k) => {
+      if (w[k] !== undefined) pieces[s] = g.pieces[s]![w[k]];
+    });
+    return gearEffects({ pieces, weapon: g.weapon }, input.vocation, input.meleeSkill, g.fallback);
+  };
+  let worn: (number | undefined)[] = options.map((o) => o[0]);
+  if (options.some((o) => o.length > 1)) {
+    const score = gearScorer(input);
+    let top = score(effectsOf(worn));
+    for (let pass = 0; pass < GEAR_PASSES; pass++) {
+      let changed = false;
+      options.forEach((opts, k) => {
+        for (const i of opts) {
+          if (i === worn[k]) continue;
+          const trial = worn.map((x, j) => (j === k ? i : x));
+          const s = score(effectsOf(trial));
+          if (s > top + 1e-9) [worn, top, changed] = [trial, s, true];
+        }
+      });
+      if (!changed) break;
+    }
+  }
+  const out: Partial<Record<GearSlot, number>> = {};
+  GEAR_SLOTS.forEach((s, k) => {
+    if (worn[k] !== undefined) out[s] = worn[k];
+  });
+  return { worn: out, effects: effectsOf(worn) };
+}
+
 /**
  * D21: Positional Tactics (+3 distance 70 % of the time, else +3 holy & healing magic level) and Ballistic Mastery
  * (hunt/bow: +4 % physical & holy pierce; boss/crossbow: +10 % critical extra damage) as exact rotation deltas.
@@ -1748,7 +1827,9 @@ export function pickStances(input: OptimizerInput, preset: RotationPreset | null
 }
 
 export function runOptimizer(raw: OptimizerInput): OptimizerResult {
-  const input = raw.gems?.length ? { ...raw, gems: withSharedGrades(raw.gems) } : raw;
+  const gear = wearBest(raw);
+  const dressed = gear ? { ...raw, equipment: gear.effects } : raw;
+  const input = dressed.gems?.length ? { ...dressed, gems: withSharedGrades(dressed.gems) } : dressed;
   const { p, plans, main } = bestBuild(input);
   const n = Math.max(0, Math.min(5, Math.floor(input.alternatives ?? DEFAULT_ALTERNATIVES)));
   const count = Number.isFinite(n) ? n : DEFAULT_ALTERNATIVES;
@@ -1756,6 +1837,7 @@ export function runOptimizer(raw: OptimizerInput): OptimizerResult {
   result.gemRecommendations = withRmReoptimized(input, p, main, result.gemRecommendations);
   const weapon = weaponResult(p, main);
   if (weapon) result.weapon = weapon;
+  if (gear) result.gear = gear;
   return result;
 }
 

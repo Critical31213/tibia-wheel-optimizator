@@ -36,7 +36,7 @@ screens it is two columns (controls left, results right).
 | `src/lib/spellPrefs.ts` | Spell-prefs sanitising + URL / JSON codec (tested). |
 | `src/components/GemsPanel.tsx` | Collapsible "My gems" editor in Lesser / Regular / Greater subsections (mods per slot, grade I–IV), empty-vessel highlight. |
 | `src/components/GemImport.tsx` | D63: toolbar at the top of "My gems": import button (multiple image files, Ctrl+V while the panel is open) → `readGems` per screenshot, duplicates of a page skipped, `mergeImported`; result line (added / to check / skipped / unrecognised); ambiguous gems get an amber "check" note in their card until edited. Trash icon with inline confirmation removes all gems. |
-| `src/components/EquipmentPanel.tsx` | D74: "Equipment" (step 6): paper doll, slot editor (item search, tier, imbuements; modal or inline — temporary variant switch), bonus totals, `OwnedWeapons` below. See [`equipment.md`](equipment.md). |
+| `src/components/EquipmentPanel.tsx` | D74: "Equipment" (step 6): paper doll (worn item from `result.gear`, owned count), slot editor with the owned items (tier, imbuements, worn mark, add / remove; modal or inline — temporary variant switch), bonus totals, `OwnedWeapons` below. See [`equipment.md`](equipment.md). |
 | `src/components/OwnedWeapons.tsx` | D47 (inside Equipment since D74): "My weapons": weapon search (combobox, vocation's weapons with a known tree; knights with `meleeSkill` only that type, D53), per weapon proficiency level 0–n, compact tree (D50: one column of official perk icons per level, click = manual pick with a gold frame, again = Auto; locked levels dimmed; ✦ = reshaped slot; icon legend below) and dust reshapes (shaping option at rank 10 + replaced option, at most 2). D62: knight/monk weapon cards (and the best weapon) show the damage types on their own line (main element, or "physical 25 + fire 26"); proficiency level select sized to its text. |
 | `src/components/Tip.tsx` | D52: hover / focus tooltip (aligned start / center / end so edge tooltips stay in the card). |
 | `src/components/PerkIcon.tsx` | D50: perk icon from `public/proficiency/` (sprite strip frame; augment mark in the corner), decorative. |
@@ -69,7 +69,7 @@ App
 │  └─ MonsterCard      monster
 ├─ FightContextPanel   value: FightContext, onChange(patch), priority, onPriorityChange (→ PrioritySlider)
 ├─ GemsPanel           vocation, gems, mods, emptyVessels (viewed build, per quality), onChange(updater)
-├─ EquipmentPanel      vocation, gear, effects, weaponName, weapons: WeaponPrefs, variants (+ updaters)
+├─ EquipmentPanel      vocation, gear, worn (result.gear), weaponName, weapons: WeaponPrefs, variants (+ updaters)
 │  └─ OwnedWeapons     vocation, prefs: WeaponPrefs, onChange(updater)
 ├─ Panel › RotationPanel presets, spells (forceable), value: SpellPrefs, onChange(patch), usage = viewed build `rotation`
 ├─ Panel › WheelChart  wheel, result | null   (the *viewed* build: best or alternative)
@@ -101,7 +101,7 @@ Components never import `src/engine` / `src/data` directly — only `src/lib/api
    `monsters = resolveMonsters(entries, getMonsterById)`, `character = characterOf(inputs)` (only the vocation's skill
    fields; level falls back to `points + 50`; `undefined` when nothing entered) and `alternatives: 0`; `context = contextOf(inputs)` (`{ mode }` only),
    `rotationId` / `forcedSpells` from `usePersistentSpellPrefs(vocation)` (deferred; auto / none → `undefined`),
-   `gems` from `usePersistentGems(vocation)` (also deferred), `weapons` / `suggestWeapons` from `usePersistentWeapons(vocation)` (deferred; none → `undefined`), `equipment` = `gearEffects(usePersistentGear(vocation))` (deferred; nothing set → `undefined`). `points = 0` → `result = null` → empty state.
+   `gems` from `usePersistentGems(vocation)` (also deferred), `weapons` / `suggestWeapons` from `usePersistentWeapons(vocation)` (deferred; none → `undefined`), `gear` = `gearInput(usePersistentGear(vocation))` (deferred; nothing set → `undefined`). `points = 0` → `result = null` → empty state.
 4. A local `view` index (0 = best, i = `result.alternatives[i-1]`) picks the *viewed* build (`BuildResult` =
    `Omit<OptimizerResult, 'alternatives'>`) shown by the wheel, summary, export and vessels panels; it falls back
    to 0 when the alternative disappears.

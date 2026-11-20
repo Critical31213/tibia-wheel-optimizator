@@ -408,8 +408,49 @@ export interface OptimizerInput {
   weapons?: OwnedWeapon[];
   /** D45: also look for better weapons the player does not own (slower). */
   suggestWeapons?: boolean;
-  /** D74: effects of the equipment the user set; undefined = the previous assumptions (typical gear, default imbuements). */
+  /** D74: equipment the player owns (several items per slot); the engine wears the best set for the spot. */
+  gear?: GearInput;
+  /** D74: effects of the worn equipment (set by the engine from `gear`); undefined = the previous assumptions. */
   equipment?: GearEffects;
+}
+
+/** D74: paper-doll slots the player fills (the weapon comes from the owned weapons). */
+export type GearSlot = 'helmet' | 'amulet' | 'armor' | 'legs' | 'boots' | 'ring' | 'offhand';
+
+export interface GearImbue {
+  id: string;
+  /** Basic, Intricate, Powerful. */
+  level: 1 | 2 | 3;
+}
+
+export interface GearPiece {
+  itemId: string;
+  /** Forge tier (0 = none). */
+  tier?: number;
+  imbues?: GearImbue[];
+}
+
+/** Tier and imbuements of the weapon the engine picks. */
+export interface WeaponGear {
+  tier: number;
+  imbues: GearImbue[];
+}
+
+/** D74 review variants: empty slots keep the default assumption (`slot`) or count as empty (`all`). */
+export type GearFallback = 'slot' | 'all';
+
+export interface GearInput {
+  /** Owned items per slot. */
+  pieces: Partial<Record<GearSlot, GearPiece[]>>;
+  /** null = not set (default assumption). */
+  weapon: WeaponGear | null;
+  fallback: GearFallback;
+}
+
+/** D74: the worn set: index into `gear.pieces[slot]` per slot, and its effects. */
+export interface GearResult {
+  worn: Partial<Record<GearSlot, number>>;
+  effects: GearEffects;
 }
 
 /**
@@ -559,6 +600,8 @@ export interface OptimizerResult {
   stances?: string[];
   /** D45: weapon choice, when weapons were given. */
   weapon?: WeaponResult;
+  /** D74: worn equipment, when equipment was given. */
+  gear?: GearResult;
 }
 
 export interface AlternativeBuild {

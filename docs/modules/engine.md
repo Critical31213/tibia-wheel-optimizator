@@ -166,8 +166,9 @@ Plans carry their weapon; the choice, re-choice and `result.weapon` are describe
 
 ### Equipment (D74)
 
-Optional `input.equipment` (`GearEffects`): skills added to entered skills, element magic levels, crit / Onslaught /
-conversion in the spell model (`model.gear`), leech, resistances and off-hand. See [`equipment.md`](equipment.md).
+Optional `input.gear` (owned items per slot, D75): `wearBest` picks the set for the spot and sets `input.equipment`
+(`GearEffects`): skills added to entered skills, element magic levels, crit / Onslaught / conversion in the spell model
+(`model.gear`), leech, resistances and off-hand. `result.gear` = the worn set. See [`equipment.md`](equipment.md).
 
 ## 3. Optimizer (`optimizer.ts`)
 

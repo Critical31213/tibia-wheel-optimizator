@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { GearEffects, MeleeSkill, Vocation } from '../types';
+import type { GearEffects, GearResult, MeleeSkill, Vocation } from '../types';
 import { useT, type TFunction } from '../i18n';
 import {
   getImbuement,
@@ -20,7 +20,7 @@ import {
   type ImbueLevel,
   type ImbueSlot,
 } from '../data/equipment';
-import { setPiece, updatePiece, type GearPrefs, type ImbueChoice } from '../lib/gear';
+import { addPiece, isGearSet, MAX_PIECES, removePiece, updatePiece, type GearPrefs, type ImbueChoice } from '../lib/gear';
 import type { WeaponPrefs } from '../lib/weapons';
 import type { DesignVariants } from '../hooks/useDesignVariants';
 import { cx } from '../lib/labels';
@@ -71,7 +71,7 @@ const slotName = (t: TFunction, s: Slot) => t(`gear.slot.${s}`);
 // ---------------------------------------------------------------------------
 // Editors
 
-function ItemPicker({ slot, vocation, current, onPick }: { slot: GearSlot; vocation: Vocation; current?: string; onPick: (i: EquipmentItem) => void }) {
+function ItemPicker({ slot, vocation, onPick }: { slot: GearSlot; vocation: Vocation; onPick: (i: EquipmentItem) => void }) {
   const t = useT();
   const id = useId();
   const [query, setQuery] = useState('');
@@ -91,8 +91,7 @@ function ItemPicker({ slot, vocation, current, onPick }: { slot: GearSlot; vocat
               <button
                 type="button"
                 onClick={() => onPick(i)}
-                aria-pressed={i.id === current}
-                className={cx('flex w-full flex-col px-3 py-1 text-left text-sm hover:bg-gold-700/25', i.id === current ? 'text-gold-300' : 'text-parchment-200')}
+                className="flex w-full flex-col px-3 py-1 text-left text-sm text-parchment-200 hover:bg-gold-700/25"
               >
                 <span className="flex w-full items-baseline justify-between gap-2">
                   <span className="truncate">{i.name}</span>
@@ -182,12 +181,13 @@ interface EditorProps {
   vocation: Vocation;
   gear: GearPrefs;
   weaponName: string | null;
+  /** Index of the item the engine wears in this slot. */
+  wornIndex: number | undefined;
   onGear: (f: (g: GearPrefs) => GearPrefs) => void;
 }
 
-function SlotEditor({ slot, vocation, gear, weaponName, onGear }: EditorProps) {
+function SlotEditor({ slot, vocation, gear, weaponName, wornIndex, onGear }: EditorProps) {
   const t = useT();
-  const [changing, setChanging] = useState(false);
   if (slot === 'weapon') {
     const w = gear.weapon ?? { tier: 0, imbues: [] };
     const set = (patch: Partial<typeof w>) => onGear((g) => ({ ...g, weapon: { ...w, ...patch } }));
@@ -205,34 +205,65 @@ function SlotEditor({ slot, vocation, gear, weaponName, onGear }: EditorProps) {
       </div>
     );
   }
-  const piece = gear.pieces[slot];
-  const item = piece && getItem(piece.itemId);
-  if (!item || changing) {
-    return (
-      <ItemPicker
-        slot={slot}
-        vocation={vocation}
-        current={item?.id}
-        onPick={(i) => {
-          onGear((g) => setPiece(g, slot, i));
-          setChanging(false);
-        }}
-      />
-    );
-  }
-  const bonus = itemBonusText(t, item);
+  return <OwnedPieces slot={slot} vocation={vocation} gear={gear} wornIndex={wornIndex} onGear={onGear} />;
+}
+
+function OwnedPieces({ slot, vocation, gear, wornIndex, onGear }: { slot: GearSlot; vocation: Vocation; gear: GearPrefs; wornIndex: number | undefined; onGear: EditorProps['onGear'] }) {
+  const t = useT();
+  const list = gear.pieces[slot] ?? [];
+  const [adding, setAdding] = useState(list.length === 0);
   return (
     <div className="flex flex-col gap-3">
-      <div>
-        <p className="text-sm font-medium text-parchment-100">{item.name}</p>
-        <p className="text-xs text-parchment-400">{[t('weapons.minLevel', { n: item.minLevel }), bonus].filter(Boolean).join(' · ')}</p>
-      </div>
-      <TierSelect slot={slot} max={maxTier(item.class)} value={piece.tier ?? 0} onChange={(tier) => onGear((g) => updatePiece(g, slot, { tier }))} />
-      <ImbueEditor slot={slot} vocation={vocation} count={item.imbuementSlots ?? 0} value={piece.imbues ?? []} onChange={(imbues) => onGear((g) => updatePiece(g, slot, { imbues }))} />
-      <div className="flex gap-3 text-xs">
-        <button type="button" onClick={() => setChanging(true)} className="text-gold-400 hover:underline">{t('gear.change')}</button>
-        <button type="button" onClick={() => onGear((g) => setPiece(g, slot, null))} className="text-resist hover:underline">{t('gear.remove')}</button>
-      </div>
+      {list.length > 1 && <p className="text-xs text-parchment-400">{t('gear.multiHint')}</p>}
+      {list.length > 0 && (
+        <ul className="flex flex-col gap-2">
+          {list.map((piece, i) => {
+            const item = getItem(piece.itemId);
+            if (!item) return null;
+            const bonus = itemBonusText(t, item);
+            const worn = list.length > 1 && i === wornIndex;
+            return (
+              <li key={i} className={cx('flex flex-col gap-2 rounded-xl border p-2.5', worn ? 'border-gold-600 bg-gold-700/10' : 'border-ink-600 bg-ink-950/50')}>
+                <div className="flex items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-parchment-100">
+                      {item.name}
+                      {worn && <span className="ml-2 rounded bg-gold-700/50 px-1 text-[10px] font-normal text-parchment-50 uppercase">{t('gear.worn')}</span>}
+                    </p>
+                    <p className="text-xs text-parchment-400">{[t('weapons.minLevel', { n: item.minLevel }), bonus].filter(Boolean).join(' · ')}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onGear((g) => removePiece(g, slot, i))}
+                    aria-label={t('gear.removeAria', { name: item.name })}
+                    className="shrink-0 rounded-md px-1.5 py-0.5 text-sm text-resist hover:bg-resist/10"
+                  >
+                    ×
+                  </button>
+                </div>
+                <TierSelect slot={slot} max={maxTier(item.class)} value={piece.tier ?? 0} onChange={(tier) => onGear((g) => updatePiece(g, slot, i, { tier }))} />
+                <ImbueEditor slot={slot} vocation={vocation} count={item.imbuementSlots ?? 0} value={piece.imbues ?? []} onChange={(imbues) => onGear((g) => updatePiece(g, slot, i, { imbues }))} />
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {adding ? (
+        <ItemPicker
+          slot={slot}
+          vocation={vocation}
+          onPick={(item) => {
+            onGear((g) => addPiece(g, slot, item));
+            setAdding(false);
+          }}
+        />
+      ) : (
+        list.length < MAX_PIECES && (
+          <button type="button" onClick={() => setAdding(true)} className="self-start rounded-md border border-dashed border-ink-500 px-2 py-1 text-xs text-gold-400 hover:border-gold-600">
+            + {t('gear.add')}
+          </button>
+        )
+      )}
     </div>
   );
 }
@@ -269,11 +300,21 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 // ---------------------------------------------------------------------------
 // Paper doll
 
-function SlotButton({ slot, gear, weaponName, active, onClick }: { slot: Slot; gear: GearPrefs; weaponName: string | null; active: boolean; onClick: () => void }) {
+interface SlotButtonProps {
+  slot: Slot;
+  gear: GearPrefs;
+  weaponName: string | null;
+  wornIndex: number | undefined;
+  active: boolean;
+  onClick: () => void;
+}
+
+function SlotButton({ slot, gear, weaponName, wornIndex, active, onClick }: SlotButtonProps) {
   const t = useT();
-  const piece = slot === 'weapon' ? gear.weapon : gear.pieces[slot];
-  const name = slot === 'weapon' ? weaponName : gear.pieces[slot] ? getItem(gear.pieces[slot].itemId)?.name : null;
-  const set = slot === 'weapon' ? gear.weapon !== null : !!piece;
+  const list = slot === 'weapon' ? [] : (gear.pieces[slot] ?? []);
+  const piece = slot === 'weapon' ? gear.weapon : list[wornIndex ?? 0];
+  const name = slot === 'weapon' ? weaponName : piece && 'itemId' in piece ? (getItem(piece.itemId)?.name ?? null) : null;
+  const set = slot === 'weapon' ? gear.weapon !== null : list.length > 0;
   const tier = piece?.tier ?? 0;
   const imbues = piece?.imbues?.length ?? 0;
   return (
@@ -292,6 +333,7 @@ function SlotButton({ slot, gear, weaponName, active, onClick }: { slot: Slot; g
         {name ?? (slot === 'weapon' ? t('gear.weaponAutoShort') : '—')}
       </span>
       {tier > 0 && <span className="absolute right-1 top-1 rounded bg-gold-700/60 px-1 text-[10px] text-parchment-50">T{tier}</span>}
+      {list.length > 1 && <span className="absolute left-1 top-1 rounded bg-ink-700 px-1 text-[10px] text-parchment-200" title={t('gear.ownedCount', { n: list.length })}>{list.length}</span>}
       {imbues > 0 && (
         <span className="absolute bottom-1 flex gap-0.5" aria-hidden="true">
           {Array.from({ length: imbues }, (_, k) => <span key={k} className="size-1.5 rounded-full bg-gold-400" />)}
@@ -301,9 +343,10 @@ function SlotButton({ slot, gear, weaponName, active, onClick }: { slot: Slot; g
   );
 }
 
-function Totals({ fx }: { fx: GearEffects | undefined }) {
+function Totals({ fx, set }: { fx: GearEffects | undefined; set: boolean }) {
   const t = useT();
-  if (!fx) return <p className="text-xs text-parchment-400">{t('gear.hint')}</p>;
+  if (!set) return <p className="text-xs text-parchment-400">{t('gear.hint')}</p>;
+  if (!fx) return null;
   const chips: string[] = [];
   const s = fx.skills;
   if (s.main) chips.push(`+${s.main} ${t('gear.mainSkill')}`);
@@ -353,8 +396,8 @@ export interface EquipmentPanelProps {
   meleeSkill: MeleeSkill | null;
   gear: GearPrefs;
   onGear: (f: (g: GearPrefs) => GearPrefs) => void;
-  /** Effects sent to the engine (for the totals). */
-  effects: GearEffects | undefined;
+  /** Equipment the engine wore for the shown build. */
+  worn: GearResult | undefined;
   /** The weapon the optimizer picked, if any. */
   weaponName: string | null;
   weapons: WeaponPrefs;
@@ -364,18 +407,23 @@ export interface EquipmentPanelProps {
 }
 
 /** D74: equipment as a Tibia paper doll; a slot opens its item, tier and imbuement editor. Owned weapons below. */
-export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, effects, weaponName, weapons, onWeapons, variants, onVariants }: EquipmentPanelProps) {
+export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, worn, weaponName, weapons, onWeapons, variants, onVariants }: EquipmentPanelProps) {
   const t = useT();
   const [editing, setEditing] = useState<Slot | null>(null);
   const close = () => setEditing(null);
-  const editor = editing && <SlotEditor key={editing} slot={editing} vocation={vocation} gear={gear} weaponName={weaponName} onGear={onGear} />;
+  // The shown build may lag behind edits: a worn index past the list falls back to the first item.
+  const wornIndex = (s: Slot) => {
+    const i = s === 'weapon' ? undefined : worn?.worn[s];
+    return i !== undefined && s !== 'weapon' && i < (gear.pieces[s]?.length ?? 0) ? i : undefined;
+  };
+  const editor = editing && <SlotEditor key={editing} slot={editing} vocation={vocation} gear={gear} weaponName={weaponName} wornIndex={wornIndex(editing)} onGear={onGear} />;
   return (
     <Panel title={t('gear.title')} step={6} headingId="gear-heading">
       <div className="flex flex-col gap-3">
         <div className="mx-auto grid w-full max-w-64 grid-cols-3 gap-1.5">
           {DOLL.map((s, k) =>
             s ? (
-              <SlotButton key={s} slot={s} gear={gear} weaponName={weaponName} active={editing === s} onClick={() => setEditing(editing === s ? null : s)} />
+              <SlotButton key={s} slot={s} gear={gear} weaponName={weaponName} wornIndex={wornIndex(s)} active={editing === s} onClick={() => setEditing(editing === s ? null : s)} />
             ) : (
               <span key={k} aria-hidden="true" className={cx('aspect-square rounded-lg', k !== 9 && k !== 11 && 'border border-ink-700/60 bg-ink-950/20')} />
             ),
@@ -391,7 +439,7 @@ export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, effects, we
             {editor}
           </section>
         )}
-        <Totals fx={effects} />
+        <Totals fx={worn?.effects} set={isGearSet(gear)} />
         <VariantSwitch value={variants} onChange={onVariants} />
         <OwnedWeapons key={vocation} vocation={vocation} meleeSkill={meleeSkill} prefs={weapons} onChange={onWeapons} />
       </div>

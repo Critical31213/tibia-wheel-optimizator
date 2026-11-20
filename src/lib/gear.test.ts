@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { EMPTY_GEAR, gearEffects, parseGear, sanitizeGear, setPiece, updatePiece, type GearPrefs } from './gear';
+import { addPiece, EMPTY_GEAR, gearInput, parseGear, removePiece, sanitizeGear, updatePiece } from './gear';
+import { gearEffects, type WornGear } from '../engine/gear';
+import { optimize } from '../engine';
 import { getItem, itemsFor, maxTier, SLOT_ITEMS, tierChance } from '../data/equipment';
-import { valuationFor } from '../engine/optimizer';
+import { valuationFor, wearBest } from '../engine/optimizer';
 import { buildSpellModel } from '../engine/spells';
 import { resistParts } from '../engine/values';
-import type { GearEffects } from '../types';
+import type { GearEffects, Monster, OptimizerInput } from '../types';
 
 const item = (id: string) => getItem(id)!;
 
@@ -20,20 +22,22 @@ describe('equipment data', () => {
   });
 });
 
+const worn = (pieces: WornGear['pieces'], weapon: WornGear['weapon'] = null): WornGear => ({ pieces, weapon });
+
 describe('gear storage', () => {
   it('drops unknown or unusable items, bad tiers and duplicate or foreign imbuements', () => {
     const g = sanitizeGear(
       {
         pieces: {
-          helmet: { itemId: 'cobra-crown', tier: 9 },
-          legs: { itemId: 'nope' },
-          armor: { itemId: 'molten-plate' },
+          helmet: [{ itemId: 'cobra-crown', tier: 9 }, { itemId: 'hat-of-the-mad' }],
+          legs: [{ itemId: 'nope' }],
+          armor: [{ itemId: 'molten-plate' }],
         },
         weapon: { tier: 3, imbues: [{ id: 'strike', level: 3 }, { id: 'strike', level: 1 }, { id: 'slash', level: 2 }, { id: 'vampirism', level: 2 }] },
       },
       'sorcerer',
     );
-    expect(g.pieces.helmet).toEqual({ itemId: 'cobra-crown' });
+    expect(g.pieces.helmet).toEqual([{ itemId: 'cobra-crown' }, { itemId: 'hat-of-the-mad' }]);
     expect(g.pieces.legs).toBeUndefined();
     expect(g.pieces.armor).toBeUndefined();
     expect(g.weapon).toEqual({ tier: 3, imbues: [{ id: 'strike', level: 3 }, { id: 'vampirism', level: 2 }] });
@@ -41,29 +45,32 @@ describe('gear storage', () => {
     expect(parseGear(JSON.stringify(g), 'sorcerer')).toEqual(g);
   });
 
-  it('edits pieces', () => {
-    let g = setPiece(EMPTY_GEAR, 'legs', item('bast-legs'));
-    g = updatePiece(g, 'legs', { tier: 2 });
-    expect(g.pieces.legs).toEqual({ itemId: 'bast-legs', tier: 2 });
-    expect(setPiece(g, 'legs', null).pieces.legs).toBeUndefined();
+  it('reads the single-item format', () => {
+    expect(sanitizeGear({ pieces: { helmet: { itemId: 'cobra-crown' } }, weapon: null }, 'druid').pieces.helmet).toEqual([{ itemId: 'cobra-crown' }]);
+  });
+
+  it('edits owned items', () => {
+    let g = addPiece(addPiece(EMPTY_GEAR, 'legs', item('bast-legs')), 'legs', item('blue-legs'));
+    g = updatePiece(g, 'legs', 0, { tier: 2 });
+    expect(g.pieces.legs).toEqual([{ itemId: 'bast-legs', tier: 2 }, { itemId: 'blue-legs' }]);
+    expect(removePiece(g, 'legs', 0).pieces.legs).toEqual([{ itemId: 'blue-legs' }]);
+    expect(removePiece(removePiece(g, 'legs', 0), 'legs', 0).pieces.legs).toBeUndefined();
+    expect(gearInput(EMPTY_GEAR, 'slot')).toBeUndefined();
+    expect(gearInput(g, 'all')).toEqual({ pieces: g.pieces, weapon: null, fallback: 'all' });
   });
 });
 
 describe('gear effects', () => {
-  it('none until something is set', () => {
-    expect(gearEffects(EMPTY_GEAR, 'paladin', null, 'slot')).toBeUndefined();
-  });
-
   it('sums item and imbuement skills, resistances and tiers', () => {
-    const g: GearPrefs = {
-      pieces: {
+    const g = worn(
+      {
         legs: { itemId: 'bast-legs' },
         helmet: { itemId: 'cobra-crown', imbues: [{ id: 'epiphany', level: 3 }] },
         boots: { itemId: 'void-boots', tier: 2 },
       },
-      weapon: { tier: 4, imbues: [{ id: 'precision', level: 3 }] },
-    };
-    const fx = gearEffects(g, 'paladin', null, 'slot')!;
+      { tier: 4, imbues: [{ id: 'precision', level: 3 }] },
+    );
+    const fx = gearEffects(g, 'paladin', null, 'slot');
     expect(fx.skills.main).toBe(2 + 4);
     expect(fx.resist.energy).toBe(4 + (getItem('void-boots')!.bonus?.resist?.energy ?? 0));
     expect(fx.onslaught).toBeCloseTo(tierChance('onslaught', 4) * (1 + tierChance('amplification', 2) / 100));
@@ -73,9 +80,9 @@ describe('gear effects', () => {
   });
 
   it('empty slots keep the default per slot or count as empty', () => {
-    const g = setPiece(EMPTY_GEAR, 'legs', item('bast-legs'));
-    const slot = gearEffects(g, 'paladin', null, 'slot')!;
-    const all = gearEffects(g, 'paladin', null, 'all')!;
+    const g = worn({ legs: { itemId: 'bast-legs' } });
+    const slot = gearEffects(g, 'paladin', null, 'slot');
+    const all = gearEffects(g, 'paladin', null, 'all');
     expect(slot.weaponImbues).toBeUndefined();
     expect(slot.offhand).toBeUndefined();
     expect(slot.lifeLeech).toBeGreaterThan(0);
@@ -85,9 +92,39 @@ describe('gear effects', () => {
   });
 
   it('knights count the trained melee skill', () => {
-    const g: GearPrefs = { pieces: {}, weapon: { tier: 0, imbues: [{ id: 'chop', level: 3 }] } };
-    expect(gearEffects(g, 'knight', 'axe', 'slot')!.skills.main).toBe(4);
-    expect(gearEffects(g, 'knight', 'sword', 'slot')!.skills.main).toBe(0);
+    const g = worn({}, { tier: 0, imbues: [{ id: 'chop', level: 3 }] });
+    expect(gearEffects(g, 'knight', 'axe', 'slot').skills.main).toBe(4);
+    expect(gearEffects(g, 'knight', 'sword', 'slot').skills.main).toBe(0);
+  });
+});
+
+describe('wearing the best owned items', () => {
+  const fire: Monster = { id: 'fire', name: 'fire', elementModifiers: {}, damageTypes: ['fire'], maxDamage: 1000 };
+  const death: Monster = { ...fire, id: 'death', name: 'death', damageTypes: ['death'] };
+  const input = (monster: Monster, priority = 50): OptimizerInput => ({
+    vocation: 'paladin',
+    points: 400,
+    monster: null,
+    monsters: [{ monster, weight: 1 }],
+    priority,
+    character: { level: 400, mainSkill: 110 },
+    gear: { pieces: { armor: [{ itemId: 'burial-shroud' }, { itemId: 'lavos-armor' }], legs: [{ itemId: 'blue-legs' }, { itemId: 'bast-legs' }] }, weapon: null, fallback: 'slot' },
+  });
+
+  it('picks per slot for the spot', () => {
+    expect(wearBest(input(fire))!.worn).toEqual({ armor: 1, legs: 1 });
+    expect(wearBest(input(death))!.worn).toEqual({ armor: 0, legs: 1 });
+  });
+
+  it('skips items above the character level', () => {
+    const low = { ...input(fire), character: { level: 100, mainSkill: 80 } };
+    expect(wearBest(low)!.worn).toEqual({ armor: 1, legs: 0 });
+  });
+
+  it('reports the worn set with the build', () => {
+    const r = optimize({ ...input(death), alternatives: 0 });
+    expect(r.gear?.worn.armor).toBe(0);
+    expect(r.gear?.effects.resist.death).toBe(5);
   });
 });
 
