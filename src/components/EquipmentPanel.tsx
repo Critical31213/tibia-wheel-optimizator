@@ -342,16 +342,34 @@ function SlotButton({ slot, gear, weaponName, wornIndex, weaponCount, off, activ
       title={off ? t('gear.offhandOff') : undefined}
       className={cx(
         'relative flex aspect-square min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border p-1 text-center',
-        active ? 'border-gold-400 bg-gold-700/25' : set ? 'border-gold-700/70 bg-ink-950/70 hover:border-gold-500' : 'border-dashed border-ink-500 bg-ink-950/40 hover:border-gold-600',
+        active
+          ? 'border-gold-400 bg-gold-700/25'
+          : off
+            ? 'border-dashed border-resist/80 bg-resist/10 hover:border-resist'
+            : set
+              ? 'border-gold-700/70 bg-ink-950/70 hover:border-gold-500'
+              : 'border-dashed border-ink-500 bg-ink-950/40 hover:border-gold-600',
       )}
     >
+      {/* D78: a two-handed weapon takes the off-hand off — crossed out, dimmed and labelled. */}
+      {off && (
+        <svg aria-hidden="true" viewBox="0 0 100 100" preserveAspectRatio="none" className="pointer-events-none absolute inset-0 size-full text-resist/70">
+          <line x1="8" y1="8" x2="92" y2="92" stroke="currentColor" strokeWidth="3" vectorEffect="non-scaling-stroke" />
+          <line x1="92" y1="8" x2="8" y2="92" stroke="currentColor" strokeWidth="3" vectorEffect="non-scaling-stroke" />
+        </svg>
+      )}
       <span className="text-[10px] uppercase tracking-wide text-parchment-400">{slotName(t, slot)}</span>
-      <span className={cx('line-clamp-2 text-[11px] leading-tight', off ? 'text-parchment-500 line-through' : name ? 'text-parchment-100' : 'text-parchment-500')}>
+      <span className={cx('line-clamp-2 text-[11px] leading-tight', off ? 'text-parchment-400 line-through opacity-70' : name ? 'text-parchment-100' : 'text-parchment-500')}>
         {name ?? (slot === 'weapon' ? t('gear.weaponAutoShort') : '—')}
       </span>
+      {off && (
+        <span className="absolute inset-x-1 bottom-1 rounded bg-resist px-1 text-[9px] font-semibold tracking-wide text-ink-950 uppercase">
+          {t('gear.offhandOffShort')}
+        </span>
+      )}
       {tier > 0 && <span className="absolute right-1 top-1 rounded bg-gold-700/60 px-1 text-[10px] text-parchment-50">T{tier}</span>}
       {count > 1 && <span className="absolute left-1 top-1 rounded bg-ink-700 px-1 text-[10px] text-parchment-200" title={t('gear.ownedCount', { n: count })}>{count}</span>}
-      {imbues > 0 && (
+      {imbues > 0 && !off && (
         <span className="absolute bottom-1 flex gap-0.5" aria-hidden="true">
           {Array.from({ length: imbues }, (_, k) => <span key={k} className="size-1.5 rounded-full bg-gold-400" />)}
         </span>
