@@ -65,7 +65,8 @@ license for its data; on request of its owners the data will be removed or repla
 
 ## TibiaWiki
 
-Some spell cooldowns, stance values and a few wand damage values were checked against TibiaWiki
+Some spell cooldowns, stance values, a few wand damage values, imbuement protection values and the stacking of
+protections were checked against TibiaWiki
 (https://tibia.fandom.com). Only individual facts (numbers) are used; no wiki text is copied. TibiaWiki text is
 licensed under CC BY-SA.
 

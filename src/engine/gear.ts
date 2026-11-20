@@ -27,13 +27,18 @@ function addTo<T extends string>(to: Partial<Record<T, number>>, from: Partial<R
   for (const [k, v] of Object.entries(from ?? {}) as [T, number][]) to[k] = (to[k] ?? 0) + v;
 }
 
+/** D80: protections stack multiplicatively (damage taken = Π (1 − r)); the total is the combined %. */
+function stackResist(to: Partial<Record<Element, number>>, from: Partial<Record<Element, number>> | undefined) {
+  for (const [k, v] of Object.entries(from ?? {}) as [Element, number][]) to[k] = Math.round(1e6 * (1 - (1 - (to[k] ?? 0) / 100) * (1 - v / 100))) / 1e4;
+}
+
 function addImbues(t: Totals, imbues: readonly GearImbue[] | undefined) {
   for (const c of imbues ?? []) {
     const d = getImbuement(c.id);
     if (!d) continue;
     const v = imbueValue(c);
     if (d.group === 'skill' && d.skill) t.skills[d.skill] = (t.skills[d.skill] ?? 0) + v;
-    else if (d.group === 'protection' && d.element) t.resist[d.element] = (t.resist[d.element] ?? 0) + v;
+    else if (d.group === 'protection' && d.element) stackResist(t.resist, { [d.element]: v });
   }
 }
 
@@ -51,7 +56,7 @@ export function gearEffects(g: WornGear, vocation: Vocation, meleeSkill: MeleeSk
     if (!p || !item) continue;
     addTo(t.skills, item.bonus?.skills);
     addTo(t.elementMl, item.bonus?.elementMl);
-    addTo(t.resist, item.bonus?.resist);
+    stackResist(t.resist, item.bonus?.resist);
     t.lifeLeech += item.bonus?.lifeLeech ?? 0;
     addImbues(t, p.imbues);
   }

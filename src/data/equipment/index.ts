@@ -77,7 +77,7 @@ export const IMBUEMENTS: readonly ImbueDef[] = [
   { id: 'snake-skin', name: 'Snake Skin', group: 'protection', element: 'earth', values: [3, 8, 15], slots: PROTECTION_SLOTS },
   { id: 'cloud-fabric', name: 'Cloud Fabric', group: 'protection', element: 'energy', values: [3, 8, 15], slots: PROTECTION_SLOTS },
   { id: 'quara-scale', name: 'Quara Scale', group: 'protection', element: 'ice', values: [3, 8, 15], slots: PROTECTION_SLOTS },
-  { id: 'lich-shroud', name: 'Lich Shroud', group: 'protection', element: 'death', values: [3, 8, 15], slots: PROTECTION_SLOTS },
+  { id: 'lich-shroud', name: 'Lich Shroud', group: 'protection', element: 'death', values: [2, 5, 10], slots: PROTECTION_SLOTS },
   { id: 'demon-presence', name: 'Demon Presence', group: 'protection', element: 'holy', values: [3, 8, 15], slots: PROTECTION_SLOTS },
   { id: 'scorch', name: 'Scorch', group: 'damage', element: 'fire', values: [10, 25, 50], slots: ['weapon'] },
   { id: 'venom', name: 'Venom', group: 'damage', element: 'earth', values: [10, 25, 50], slots: ['weapon'] },
@@ -91,10 +91,21 @@ export const getImbuement = (id: string): ImbueDef | undefined => IMBUE_BY_ID.ge
 export const IMBUE_LEVELS = [1, 2, 3] as const;
 export type ImbueLevel = (typeof IMBUE_LEVELS)[number];
 
-/** Imbuements for a slot; skill imbuements only for the vocation's skills. */
-export function imbuementsFor(slot: ImbueSlot, vocation: Vocation): ImbueDef[] {
+/**
+ * Imbuements for a slot; skill imbuements only for the vocation's skills. An item with a native skill or element
+ * protection cannot take the imbuement of the same skill / element.
+ */
+export function imbuementsFor(slot: ImbueSlot, vocation: Vocation, item?: EquipmentItem): ImbueDef[] {
   const skills = VOCATION_SKILLS[vocation];
-  return IMBUEMENTS.filter((x) => x.slots.includes(slot) && (!x.skill || skills.includes(x.skill)) && !(x.group === 'damage' && MAGE.has(vocation)));
+  const own = item?.bonus;
+  return IMBUEMENTS.filter(
+    (x) =>
+      x.slots.includes(slot) &&
+      (!x.skill || skills.includes(x.skill)) &&
+      !(x.group === 'damage' && MAGE.has(vocation)) &&
+      !(x.skill && own?.skills?.[x.skill]) &&
+      !(x.group === 'protection' && x.element && own?.resist?.[x.element as keyof typeof own.resist]),
+  );
 }
 
 const MAGE = new Set<Vocation>(['sorcerer', 'druid']);

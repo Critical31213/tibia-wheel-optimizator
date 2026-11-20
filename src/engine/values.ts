@@ -248,15 +248,18 @@ export function mitigationParts(v: Pick<ValuationContext, 'mitigation' | 'threat
 
 /**
  * Elemental resistance: like damage reduction, × the element's share of incoming damage. D74: with equipment
- * resistances the share is of the damage still taken (Σ share × (1 − resist)).
+ * resistances the share is of the damage still taken (Σ share × (1 − resist)); D80: a new protection multiplies the
+ * element's remaining damage (1 − resist), as protections stack multiplicatively.
  */
 export function resistParts(v: Pick<ValuationContext, 'mitigation' | 'threat' | 'incoming' | 'resist'>, e: Element, pct: number): Parts {
   let taken = 1;
+  let left = 1;
   if (v.resist) {
     taken = 0;
     for (const [k, s] of Object.entries(v.incoming) as [Element, number][]) taken += s * Math.max(0.05, 1 - (v.resist[k] ?? 0) / 100);
+    left = Math.max(0.05, 1 - (v.resist[e] ?? 0) / 100);
   }
-  return { ...ZERO, def: (reductionParts(v, pct).def * incomingShare(v, e)) / Math.max(0.05, taken) };
+  return { ...ZERO, def: (reductionParts(v, pct).def * incomingShare(v, e) * left) / Math.max(0.05, taken) };
 }
 
 /** Flat damage & healing bonus: real per-hit damage (× bonus factor × targets) and healing per cast. */

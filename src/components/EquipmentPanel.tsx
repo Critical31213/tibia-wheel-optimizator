@@ -125,10 +125,10 @@ function TierSelect({ slot, max, value, onChange }: { slot: Slot; max: number; v
   );
 }
 
-function ImbueEditor({ slot, vocation, count, value, onChange }: { slot: Slot; vocation: Vocation; count: number; value: readonly ImbueChoice[]; onChange: (v: ImbueChoice[]) => void }) {
+function ImbueEditor({ slot, vocation, item, count, value, onChange }: { slot: Slot; vocation: Vocation; item?: EquipmentItem; count: number; value: readonly ImbueChoice[]; onChange: (v: ImbueChoice[]) => void }) {
   const t = useT();
   const id = useId();
-  const options = useMemo(() => imbuementsFor(slot, vocation), [slot, vocation]);
+  const options = useMemo(() => imbuementsFor(slot, vocation, item), [slot, vocation, item]);
   if (count === 0 || options.length === 0) return <p className="text-xs text-parchment-400">{t('gear.noImbueSlots')}</p>;
   const set = (k: number, c: ImbueChoice | null) => {
     const next = [...value];
@@ -251,7 +251,7 @@ function OwnedPieces({ slot, vocation, gear, wornIndex, onGear }: { slot: GearSl
                   </button>
                 </div>
                 <TierSelect slot={slot} max={maxTier(item.class)} value={piece.tier ?? 0} onChange={(tier) => onGear((g) => updatePiece(g, slot, i, { tier }))} />
-                <ImbueEditor slot={slot} vocation={vocation} count={item.imbuementSlots ?? 0} value={piece.imbues ?? []} onChange={(imbues) => onGear((g) => updatePiece(g, slot, i, { imbues }))} />
+                <ImbueEditor slot={slot} vocation={vocation} item={item} count={item.imbuementSlots ?? 0} value={piece.imbues ?? []} onChange={(imbues) => onGear((g) => updatePiece(g, slot, i, { imbues }))} />
               </li>
             );
           })}
@@ -388,7 +388,7 @@ function Totals({ fx, set }: { fx: GearEffects | undefined; set: boolean }) {
   if (s.magic) chips.push(`+${s.magic} ${t('skill.magic')}`);
   if (s.shielding) chips.push(`+${s.shielding} ${t('skill.shielding')}`);
   for (const [e, v] of Object.entries(fx.elementMl)) if (v) chips.push(`+${v} ML ${t(`element.${e}` as 'element.fire').toLowerCase()}`);
-  for (const [e, v] of Object.entries(fx.resist)) if (v) chips.push(`${t(`element.${e}` as 'element.fire').toLowerCase()} ${v > 0 ? '+' : ''}${v}%`);
+  for (const [e, v] of Object.entries(fx.resist)) if (v) chips.push(`${t(`element.${e}` as 'element.fire').toLowerCase()} ${v > 0 ? '+' : ''}${+v.toFixed(1)}%`);
   if (fx.onslaught) chips.push(`${t('gear.effect.onslaught')} ${fx.onslaught.toFixed(2)}%`);
   if (fx.ruse) chips.push(`${t('gear.effect.ruse')} ${fx.ruse.toFixed(2)}%`);
   return (

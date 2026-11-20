@@ -42,8 +42,8 @@ export const gearInput = (g: GearPrefs): GearInput | undefined => (isGearSet(g) 
 const int = (x: unknown, min: number, max: number): number | null =>
   typeof x === 'number' && Number.isInteger(x) && x >= min && x <= max ? x : null;
 
-function sanitizeImbues(raw: unknown, slot: ImbueSlot, vocation: Vocation, max: number): GearImbue[] {
-  const allowed = new Set(imbuementsFor(slot, vocation).map((x) => x.id));
+function sanitizeImbues(raw: unknown, slot: ImbueSlot, vocation: Vocation, max: number, item?: EquipmentItem): GearImbue[] {
+  const allowed = new Set(imbuementsFor(slot, vocation, item).map((x) => x.id));
   const out: GearImbue[] = [];
   for (const r of Array.isArray(raw) ? raw : []) {
     const id = typeof r?.id === 'string' ? r.id : '';
@@ -59,7 +59,7 @@ function sanitizePiece(raw: unknown, slot: GearSlot, vocation: Vocation): GearPi
   const item = typeof r?.itemId === 'string' ? getItem(r.itemId) : undefined;
   if (!item || !SLOT_ITEMS[slot].includes(item.slot) || !usableBy(item, vocation)) return null;
   const tier = int(r?.tier, 0, maxTier(item.class)) ?? 0;
-  const imbues = sanitizeImbues(r?.imbues, slot, vocation, item.imbuementSlots ?? 0);
+  const imbues = sanitizeImbues(r?.imbues, slot, vocation, item.imbuementSlots ?? 0, item);
   return { itemId: item.id, ...(tier ? { tier } : {}), ...(imbues.length ? { imbues } : {}) };
 }
 

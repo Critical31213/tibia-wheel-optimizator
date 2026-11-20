@@ -3,7 +3,7 @@ import { addPiece, EMPTY_GEAR, gearInput, parseGear, removePiece, sanitizeGear, 
 import { gearEffects, type WornGear } from '../engine/gear';
 import { optimize } from '../engine';
 import { getWeapon } from '../data/proficiency';
-import { getItem, itemsFor, maxTier, SLOT_ITEMS, tierChance } from '../data/equipment';
+import { getImbuement, getItem, imbuementsFor, itemsFor, maxTier, SLOT_ITEMS, tierChance } from '../data/equipment';
 import { valuationFor, wearBest } from '../engine/optimizer';
 import { buildSpellModel } from '../engine/spells';
 import { resistParts } from '../engine/values';
@@ -73,7 +73,9 @@ describe('gear effects', () => {
     );
     const fx = gearEffects(g, 'paladin', null);
     expect(fx.skills.main).toBe(2 + 4);
-    expect(fx.resist.energy).toBe(4 + (getItem('void-boots')!.bonus?.resist?.energy ?? 0));
+    // Protections stack multiplicatively (D80).
+    const boots = getItem('void-boots')!.bonus?.resist?.energy ?? 0;
+    expect(fx.resist.energy).toBeCloseTo(100 * (1 - 0.96 * (1 - boots / 100)), 6);
     expect(fx.onslaught).toBeCloseTo(tierChance('onslaught', 4) * (1 + tierChance('amplification', 2) / 100));
     // The weapon is set: only its chosen imbuements count (no Strike, no Vampirism).
     expect(fx.crit).toEqual({ chance: 0, extra: 0 });
@@ -182,5 +184,20 @@ describe('engine with equipment', () => {
     expect(resistParts({ ...v, resist: {} }, 'fire', 5).def).toBeCloseTo(plain);
     // Less physical damage taken: each fire point removes a larger share of what is left.
     expect(resistParts({ ...v, resist: { physical: 20 } }, 'fire', 5).def).toBeGreaterThan(plain);
+  });
+
+  it('stacks protections multiplicatively (D80)', () => {
+    const v = { ...valuationFor(base), incoming: { fire: 1 } };
+    // 5 % more on top of 20 % fire: 0.8 → 0.76 of the damage, i.e. 5 % of what is left.
+    expect(resistParts({ ...v, resist: { fire: 20 } }, 'fire', 5).def).toBeCloseTo(resistParts({ ...v, resist: {} }, 'fire', 5).def, 6);
+    // Lavos Armor has native fire protection: no Dragon Hide.
+    expect(imbuementsFor('armor', 'knight', getItem('lavos-armor')).some((x) => x.id === 'dragon-hide')).toBe(false);
+  });
+
+  it('blocks imbuements of a native skill or protection; Lich Shroud is 2 / 5 / 10 %', () => {
+    const hat = getItem('ethereal-coned-hat')!;
+    expect(imbuementsFor('helmet', 'monk', hat).some((x) => x.id === 'fist')).toBe(false);
+    expect(imbuementsFor('helmet', 'monk').some((x) => x.id === 'fist')).toBe(true);
+    expect(getImbuement('lich-shroud')!.values).toEqual([2, 5, 10]);
   });
 });

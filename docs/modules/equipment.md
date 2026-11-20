@@ -10,7 +10,7 @@ changes in the engine.
 |---|---|
 | `scripts/import-equipment.mjs` | `npm run import:equipment`: item pages of tibiopedia.pl per slot (helmets, armors, legs, boots, shields, spellbooks, quivers, amulets, rings), cached in `scripts/.cache/equipment/` (gitignored), low request rate. Parses vocation, required level, armor, defense, class, imbuement slots and bonuses (skills, element magic levels, resistances, critical chance, leech). Speed, reflection and other unmodelled bonuses are skipped. Same-name variants get their first skill in the name. A shield only mages can use is a spellbook. |
 | `src/data/equipment/equipment.json` | Generated items (`{ meta, items }`). |
-| `src/data/equipment/index.ts` | `ITEMS`, `getItem`, `itemsFor(slots, vocation)`, paper-doll slots (`GEAR_SLOTS`, `SLOT_ITEMS`), imbuements (`IMBUEMENTS`, `imbuementsFor(slot, vocation)`), forge tiers (`TIER_EFFECT`, `TIER_CHANCE`, `maxTier(class)`, `tierChance`). |
+| `src/data/equipment/index.ts` | `ITEMS`, `getItem`, `itemsFor(slots, vocation)`, paper-doll slots (`GEAR_SLOTS`, `SLOT_ITEMS`), imbuements (`IMBUEMENTS`, `imbuementsFor(slot, vocation, item?)`: no imbuement of a skill or element the item already has), forge tiers (`TIER_EFFECT`, `TIER_CHANCE`, `maxTier(class)`, `tierChance`). |
 
 Imbuements (Basic / Intricate / Powerful): Strike 5/5/10 % chance and +5/15/50 % extra (Powerful = the engine's
 crit default; lower tiers approximate), Vampirism 5/10/25 %, Void 3/5/8 %, skill imbuements +1/+2/+4, protections
@@ -61,7 +61,7 @@ off-hand, so the lost mitigation counts against two-handed weapons. When the cho
 | Elemental damage imbuement | physical part of weapon spells and auto attacks converted (`convertedPhysical`) |
 | Onslaught | damage × (1 + chance × 0.6) |
 | Life / mana leech | `leechEhp` and weapon perk valuation (`loadoutParts`) use the chosen values; `leechPoint` values +1 pp when the leech is 0 |
-| Resistances | `resistParts` divides by the damage still taken after the equipment resistances |
+| Resistances | Protections of items and imbuements stack multiplicatively (D80): taken = Π (1 − r), `resist` holds the combined %. `resistParts` values a new protection on the element's remaining damage, divided by the damage still taken |
 | Off-hand | worn shield defense (or no off-hand) in mitigation |
 
 Not modelled: armor value, Momentum, Transcendence, speed, Mantra, Perfect Shot. Ruse counts only in the choice of items.
