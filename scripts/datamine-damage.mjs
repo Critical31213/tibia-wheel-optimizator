@@ -288,6 +288,11 @@ const MODELS = {
     terms: ['const', 'levelTerm', 'shielding', 'shieldDefense', 'shieldingDefense'],
     x: (s) => [1, levelTerm(s.level), s.shielding, s.shieldDefense, s.shielding * s.shieldDefense],
   },
+  // Paladin Ethereal spells: weapon and ammunition attack do not change the damage (fitted coefficients ≈ 0).
+  distance: {
+    terms: ['const', 'levelTerm', 'skill'],
+    x: (s) => [1, levelTerm(s.level), s.skill],
+  },
 };
 
 const round = (v, d = 6) => (Math.abs(v) < 1e-9 ? 0 : Number(v.toFixed(d)));
@@ -327,7 +332,8 @@ function fitSpellWith(samples, modelName, field, excluded) {
 
 function modelFor(spell) {
   if (spell.scalesWith === 'shielding') return 'shield';
-  if (spell.scalesWith === 'melee' || spell.scalesWith === 'distance') return 'weapon';
+  if (spell.scalesWith === 'distance') return 'distance';
+  if (spell.scalesWith === 'melee') return 'weapon';
   return 'magic';
 }
 

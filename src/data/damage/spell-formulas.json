@@ -1243,23 +1243,17 @@
           "avg": {
             "const": 8.384087,
             "levelTerm": 0.999645,
-            "skill": 2.25,
-            "attack": -0.002512,
-            "skillAttack": 0
+            "skill": 2.25
           },
           "min": {
             "const": 7.384087,
             "levelTerm": 0.999645,
-            "skill": 2.083333,
-            "attack": -0.002512,
-            "skillAttack": 0
+            "skill": 2.083333
           },
           "max": {
             "const": 10.744783,
             "levelTerm": 0.999648,
-            "skill": 2.4,
-            "attack": 0.000548,
-            "skillAttack": 0
+            "skill": 2.4
           },
           "fit": {
             "n": 59,
@@ -1301,23 +1295,17 @@
           "avg": {
             "const": 4.744783,
             "levelTerm": 0.999648,
-            "skill": 0.833333,
-            "attack": 0.000548,
-            "skillAttack": 0
+            "skill": 0.833333
           },
           "min": {
             "const": 3.744783,
             "levelTerm": 0.999648,
-            "skill": 0.666667,
-            "attack": 0.000548,
-            "skillAttack": 0
+            "skill": 0.666667
           },
           "max": {
             "const": 5.744783,
             "levelTerm": 0.999648,
-            "skill": 1,
-            "attack": 0.000548,
-            "skillAttack": 0
+            "skill": 1
           },
           "fit": {
             "n": 59,
@@ -1407,23 +1395,17 @@
           "avg": {
             "const": 5.744783,
             "levelTerm": 0.999648,
-            "skill": 1.3,
-            "attack": 0.000548,
-            "skillAttack": 0
+            "skill": 1.3
           },
           "min": {
             "const": 4.744783,
             "levelTerm": 0.999648,
-            "skill": 1.033333,
-            "attack": 0.000548,
-            "skillAttack": 0
+            "skill": 1.033333
           },
           "max": {
             "const": 5.744783,
             "levelTerm": 0.999648,
-            "skill": 1.566667,
-            "attack": 0.000548,
-            "skillAttack": 0
+            "skill": 1.566667
           },
           "fit": {
             "n": 59,

@@ -102,6 +102,8 @@ export interface ValuationContext {
   unique: Partial<Record<string, Parts>>;
   /** Share of incoming damage per element (weighted over the spot). */
   incoming: Partial<Record<Element, number>>;
+  /** D74: resistances % of the user's equipment (undefined = none known). */
+  resist?: Partial<Record<Element, number>>;
   /** Δ% damage of +1 main skill / magic level (skill boost convictions). */
   skillOff: number;
   /** D24: % EHP (× threat) of the active stances beyond shielding (damage taken, dodge, healing). */
@@ -122,7 +124,7 @@ export function sub(a: Parts, b: Parts): Parts {
  * D29: % EHP per +1 % damage via imbuement life leech. Leech per hit (the game) =
  * damage × leech × (0.1n + 0.9) / n for n targets; its share of sustain vs the main heal cast every turn × HEAL_EHP.
  */
-export function leechEhp(model: SpellModel, threat: number): number {
+export function leechEhp(model: SpellModel, threat: number, lifeLeech = lifeLeechOf(model)): number {
   const f = (n: number) => (0.1 * Math.max(1, n) + 0.9) / Math.max(1, n);
   const r = rotation(model, { stages: NO_STAGES });
   let dmg = model.base * f(model.autoTargets ?? (model.context.mode === 'boss' ? 1 : AUTO_ATTACK_TARGETS[model.vocation]));
@@ -130,7 +132,7 @@ export function leechEhp(model: SpellModel, threat: number): number {
     const s = model.spells.get(name);
     if (s) dmg += x.rate * x.perCast * f(targetsAt(model, s, 0));
   }
-  const leech = (dmg * K.LIFE_LEECH_IMBUE[model.vocation]) / 100 / TURN_SECONDS;
+  const leech = (dmg * lifeLeech) / 100 / TURN_SECONDS;
   let heal = 0;
   let best = -1;
   for (const s of model.spells.values()) {
@@ -184,20 +186,46 @@ export function spotMonster(monsters: { monster: Monster; weight: number }[]): M
   };
 }
 
-/** Base character facts for valuation (mitigation with the given offhand, else the D19 default). */
-export function characterFacts(vocation: Vocation, level: number, shielding: number, offhand?: Offhand) {
+/** Worn offhand: kind and defense (undefined = typical for the level). */
+export interface OffhandChoice {
+  offhand?: Offhand;
+  defense?: number;
+}
+
+/**
+ * Base character facts for valuation: mitigation with the given offhand (else the D19 default); the reference
+ * uses `ref` (D74: the user's offhand), else the vocation default.
+ */
+export function characterFacts(vocation: Vocation, level: number, shielding: number, oh: OffhandChoice = {}, ref: OffhandChoice = {}) {
   return {
     hp: maxHitPoints(vocation, level),
     mana: maxMana(vocation, level),
-    mitigation: mitigationPercent(vocation, level, { shielding, offhand }),
-    mitigationRef: mitigationPercent(vocation, level, { shielding }),
+    mitigation: mitigationPercent(vocation, level, { shielding, offhand: oh.offhand, offhandDefense: oh.defense }),
+    mitigationRef: mitigationPercent(vocation, level, { shielding, offhand: ref.offhand, offhandDefense: ref.defense }),
   };
 }
 
 const def = (v: Pick<ValuationContext, 'threat'>, x: number): Parts => ({ off: 0, def: x * v.threat, util: 0 });
 
-/** D31: % EHP (before threat) per +1 pp life leech = the same leech growth as +100/imbue % damage (D29). */
-export const leechPoint = (v: ValuationContext) => (v.leech / Math.max(1e-9, v.threat)) * (100 / K.LIFE_LEECH_IMBUE[v.vocation]);
+/** D74: life leech % of the imbuements (the user's equipment, else the D29 default). */
+export const lifeLeechOf = (model: SpellModel) => model.gear?.lifeLeech ?? K.LIFE_LEECH_IMBUE[model.vocation];
+
+const leechPerPoint = new WeakMap<SpellModel, number>();
+
+/**
+ * D31: % EHP (before threat) per +1 pp life leech = the same leech growth as +100/imbue % damage (D29).
+ * D74: without any leech, the value of the first point (+1 pp).
+ */
+export function leechPoint(v: ValuationContext): number {
+  const imbue = lifeLeechOf(v.model);
+  if (imbue > 0) return (v.leech / Math.max(1e-9, v.threat)) * (100 / imbue);
+  let x = leechPerPoint.get(v.model);
+  if (x === undefined) {
+    x = (leechEhp(v.model, v.threat, 1) / Math.max(1e-9, v.threat)) * 100;
+    leechPerPoint.set(v.model, x);
+  }
+  return x;
+}
 
 /** +HP → % EHP gain = HP / base HP. */
 export function hpParts(v: Pick<ValuationContext, 'hp' | 'threat'>, hp: number): Parts {
@@ -218,9 +246,17 @@ export function mitigationParts(v: Pick<ValuationContext, 'mitigation' | 'threat
   return reductionParts(v, mitigationGain(v, multiplierPct));
 }
 
-/** Elemental resistance: like damage reduction, × the element's share of incoming damage. */
-export function resistParts(v: Pick<ValuationContext, 'mitigation' | 'threat' | 'incoming'>, e: Element, pct: number): Parts {
-  return { ...ZERO, def: reductionParts(v, pct).def * incomingShare(v, e) };
+/**
+ * Elemental resistance: like damage reduction, × the element's share of incoming damage. D74: with equipment
+ * resistances the share is of the damage still taken (Σ share × (1 − resist)).
+ */
+export function resistParts(v: Pick<ValuationContext, 'mitigation' | 'threat' | 'incoming' | 'resist'>, e: Element, pct: number): Parts {
+  let taken = 1;
+  if (v.resist) {
+    taken = 0;
+    for (const [k, s] of Object.entries(v.incoming) as [Element, number][]) taken += s * Math.max(0.05, 1 - (v.resist[k] ?? 0) / 100);
+  }
+  return { ...ZERO, def: (reductionParts(v, pct).def * incomingShare(v, e)) / Math.max(0.05, taken) };
 }
 
 /** Flat damage & healing bonus: real per-hit damage (× bonus factor × targets) and healing per cast. */

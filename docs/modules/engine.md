@@ -164,6 +164,11 @@ stances) and `valuationFor` (weapon skills before stance percentages; `v.weapon`
 Plans carry their weapon; the choice, re-choice and `result.weapon` are described in
 [`proficiency.md`](proficiency.md#engine-d46).
 
+### Equipment (D74)
+
+Optional `input.equipment` (`GearEffects`): skills added to entered skills, element magic levels, crit / Onslaught /
+conversion in the spell model (`model.gear`), leech, resistances and off-hand. See [`equipment.md`](equipment.md).
+
 ## 3. Optimizer (`optimizer.ts`)
 
 0. **Plans and forced spells.** One prepared valuation per plan (see Rotation). Forced spells (`input.forcedSpells`, D21) are seeded with a Dijkstra over slice capacities to their cheapest stage I augment, and every search starts from that seed. Messages: `rationale.forced`, `rationale.forcedImpossible`, `rationale.forcedNoAugment`.

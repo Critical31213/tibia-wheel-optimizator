@@ -8,7 +8,7 @@ import { perkLabel, shapingLabel } from '../lib/weapons';
 import { Gain } from './Gain';
 import { PerkIcon } from './PerkIcon';
 import { Tip } from './Tip';
-import { WeaponElement, WeaponMeta } from './WeaponsPanel';
+import { WeaponElement, WeaponMeta } from './OwnedWeapons';
 
 /** Alpha strike only pays off when the player hits a fresh target first, i.e. playing solo. */
 const SoloNote = ({ kind, t }: { kind?: string; t: TFunction }) =>

@@ -15,7 +15,8 @@
     "extract:wheel": "node scripts/extract-wheel.mjs",
     "datamine:damage": "node scripts/datamine-damage.mjs",
     "check:planner": "node scripts/check-live-planner.mjs",
-    "import:proficiency": "node scripts/import-proficiency.mjs"
+    "import:proficiency": "node scripts/import-proficiency.mjs",
+    "import:equipment": "node scripts/import-equipment.mjs"
   },
   "dependencies": {
     "@fontsource/cinzel": "5.2.6",

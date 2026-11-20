@@ -408,6 +408,33 @@ export interface OptimizerInput {
   weapons?: OwnedWeapon[];
   /** D45: also look for better weapons the player does not own (slower). */
   suggestWeapons?: boolean;
+  /** D74: effects of the equipment the user set; undefined = the previous assumptions (typical gear, default imbuements). */
+  equipment?: GearEffects;
+}
+
+/**
+ * D74: equipment effects (items, imbuements, forge tiers) as the engine uses them. Skills are added to the
+ * entered (base) skills only. Optional fields left undefined keep the default assumption.
+ */
+export interface GearEffects {
+  skills: { main: number; magic: number; shielding: number };
+  /** Extra magic level for spells of an element (and healing). */
+  elementMl: Partial<Record<Element, number>>;
+  /** Resistance % per element (summed over items and imbuements). */
+  resist: Partial<Record<Element, number>>;
+  /** Worn offhand (shield / spellbook defense); undefined = the vocation default. */
+  offhand?: { kind: 'shield' | 'spellbook' | 'quiver' | 'none'; defense: number };
+  /** Critical hit chance / extra damage (pp); replaces the default Powerful Strike. */
+  crit?: { chance: number; extra: number };
+  /** Total life leech % of the imbuements; replaces the default. */
+  lifeLeech?: number;
+  /** The weapon's own imbuements (removed for weapons that cannot take them); undefined = default assumption. */
+  weaponImbues?: { critChance: number; critExtra: number; lifeLeech: number; manaLeech: number };
+  /** Elemental damage imbuement: share (%) of the weapon's physical damage dealt as this element. */
+  conversion?: { element: Element; pct: number };
+  /** Forge: Onslaught chance (%, +60 % damage), Ruse dodge chance (%). */
+  onslaught: number;
+  ruse: number;
 }
 
 /** D45: an owned weapon and its proficiency progress. Character skills are entered without weapon bonuses. */

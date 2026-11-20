@@ -30,10 +30,12 @@ Missing character fields are filled by `resolveCharacterStats` (`src/data/charac
 |---|---|
 | magic | `const + a·g(L) + M·mlvl` |
 | weapon | `const + a·g(L) + S·skill + A·attack + SA·skill·attack` (+ `LSA·g·skill·attack/1000` for 4 monk spells) |
+| distance | `const + a·g(L) + S·skill` (paladin Ethereal spells: no attack terms) |
 | shield | `const + a·g(L) + H·shielding + D·shieldDef + HD·shielding·shieldDef` |
 
 `attack` = weapon + ammo. Knight/monk weapon spells are essentially pure `skill·attack`; paladin Ethereal spells are
-linear in distance skill only. `a` is the variant's level multiplier (`bonusFactor`): 1 for normal hits,
+linear in distance skill only (the fitted attack coefficients were ≈ 0 across three bow/crossbow + ammo setups, so
+they are dropped). `a` is the variant's level multiplier (`bonusFactor`): 1 for normal hits,
 0.25/0.4/0.7 for Great Death Beam sides, 1.5 Death Echo, 2/2.25/2.5 Executioner's Throw stages, 1.2/1.4/1.6 bursts.
 
 **Fit quality:** 144 variants. All within ≤ 1.7 damage absolute (< 0.7 %), except Sweeping Takedown, Spiritual
@@ -68,8 +70,8 @@ The committed fixture `__fixtures__/api-samples.json` (10 API responses) is re-c
 - Bows: Jungle Bow, Soulbleeder, Sanguine Bow, Grand Sanguine Bow, Moonsilver Bow, Stellar Moonsilver Bow, each with
   Diamond Arrow (37). Crossbows: the existing brackets with Spectral Bolt (78).
 - Pass `paladinWeapon` in `HitOptions` to choose the weapon.
-- Paladin spells barely depend on weapon attack in the API (Ethereal Barrage ≈ −0.0025/attack). The weapon choice
-  therefore matters only through Ballistic Mastery and auto-attack.
+- Paladin spells do not depend on weapon attack. The weapon choice therefore matters only through Ballistic Mastery,
+  auto-attack and the weapon's skill / magic level bonuses.
 
 **Ballistic Mastery** (`BALLISTIC_MASTERY`)
 - **Bow: +4 % physical and holy pierce.** A cached damage API probe (`node scripts/probe-pierce.mjs`, 6 API calls)

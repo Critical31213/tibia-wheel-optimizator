@@ -56,7 +56,8 @@ SOFTWARE.
 ## tibiopedia.pl
 
 Monster facts (element modifiers, damage types, hit points, experience, bestiary class) and weapon facts (attack and
-element, defence, class, imbuement slots, bonuses, required level and vocation, ammunition attack and element) come from
+element, defence, class, imbuement slots, bonuses, required level and vocation, ammunition attack and element) and equipment facts (armor,
+defence, class, imbuement slots, bonuses, required level and vocation) come from
 https://tibiopedia.pl.
 They are collected offline at a low request rate and shipped as static JSON; the app makes no requests to the
 site and shows no images from it. Each monster keeps a link to its source page. The site publishes no

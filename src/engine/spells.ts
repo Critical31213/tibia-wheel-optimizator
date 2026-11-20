@@ -8,7 +8,7 @@
  * D16: in hunt mode single-target spells never enter the rotation (zero value for their augments/gems).
  * Perk values are ΔT / T0 (T0 = rotation without wheel bonuses, no revelation).
  */
-import { GREEDY_ROTATION_ID, type CharacterStats, type Element, type FightContext, type Monster, type RotationPreset, type Vocation, type WeightedMonster } from '../types';
+import { GREEDY_ROTATION_ID, type CharacterStats, type Element, type FightContext, type GearEffects, type Monster, type RotationPreset, type Vocation, type WeightedMonster } from '../types';
 import { getSpell, getWheelSpellNames, type SpellMeta } from '../data/wheel';
 import { MAX_CHAIN_TARGETS } from '../data/wheel/update';
 import {
@@ -206,6 +206,43 @@ export interface SpellModel {
   weaponId?: string;
   /** D59: auto-attack targets of the weapon loadout (ammunition); default `AUTO_ATTACK_TARGETS`. */
   autoTargets?: number;
+  /** D74: equipment the model includes (crit shift vs the defaults, Onslaught multiplier, elemental imbuement). */
+  gear?: GearModel;
+}
+
+/** D74: equipment effects inside the damage model. */
+export interface GearModel {
+  /** Crit chance / extra damage (pp) relative to the default Powerful Strike. */
+  critChance: number;
+  critExtra: number;
+  /** Onslaught: expected damage multiplier. */
+  mult: number;
+  conversion?: { element: Element; pct: number };
+  /** Total life leech % (undefined = default imbuements). */
+  lifeLeech?: number;
+  weaponImbues?: GearEffects['weaponImbues'];
+}
+
+/** Onslaught (fatal hit) extra damage. */
+export const ONSLAUGHT_DAMAGE = 0.6;
+
+export function gearModel(g: GearEffects | undefined): GearModel | undefined {
+  if (!g) return undefined;
+  return {
+    critChance: g.crit ? g.crit.chance - IMBUE_CRIT.chance : 0,
+    critExtra: g.crit ? g.crit.extra - IMBUE_CRIT.extra : 0,
+    mult: 1 + (Math.max(0, g.onslaught) / 100) * ONSLAUGHT_DAMAGE,
+    ...(g.conversion && g.conversion.pct > 0 ? { conversion: g.conversion } : {}),
+    ...(g.lifeLeech !== undefined ? { lifeLeech: g.lifeLeech } : {}),
+    ...(g.weaponImbues ? { weaponImbues: g.weaponImbues } : {}),
+  };
+}
+
+/** Element multiplier of weapon damage over the spot with an elemental imbuement converting part of `physical`. */
+export function convertedPhysical(monsters: { monster: Monster; weight: number }[], conversion: GearModel['conversion'], physical = spotElementMultiplier(monsters, 'physical')): number {
+  if (!conversion) return physical;
+  const p = Math.min(100, conversion.pct) / 100;
+  return (1 - p) * physical + p * spotElementMultiplier(monsters, conversion.element);
 }
 
 export function elementMultiplier(monster: Monster | null, element: Element | null): number {
@@ -256,9 +293,9 @@ const modelCache = new Map<string, SpellModel>();
 /** D24: extra magic level for spells of some elements (stances). */
 export type ElementMagicLevel = Partial<Record<Element, number>>;
 
-function cacheKey(vocation: Vocation, ctx: FightContext, monsters: { monster: Monster; weight: number }[], c: Required<CharacterStats>, eml: ElementMagicLevel, attack?: number) {
+function cacheKey(vocation: Vocation, ctx: FightContext, monsters: { monster: Monster; weight: number }[], c: Required<CharacterStats>, eml: ElementMagicLevel, attack?: number, gear?: GearModel) {
   const m = monsters.map((x) => `${x.monster.id}:${x.weight.toFixed(6)}`).join(',');
-  return `${vocation}|${ctx.mode}|${m}|${c.level}|${c.mainSkill}|${c.magicLevel}|${c.shielding}|${JSON.stringify(eml)}|${attack ?? ''}`;
+  return `${vocation}|${ctx.mode}|${m}|${c.level}|${c.mainSkill}|${c.magicLevel}|${c.shielding}|${JSON.stringify(eml)}|${attack ?? ''}|${gear ? JSON.stringify(gear) : ''}`;
 }
 
 export function buildSpellModel(
@@ -269,10 +306,18 @@ export function buildSpellModel(
   elementMl: ElementMagicLevel = {},
   /** D45: weapon (+ammo) attack; default = the level bracket weapon. */
   weaponAttack?: number,
+  /** D74: equipment (its element magic levels are added to `elementMl`). */
+  equipment?: GearEffects,
 ): SpellModel {
   const spot = Array.isArray(monsters) ? monsters : monsters ? [{ monster: monsters, weight: 1 }] : [];
   const char = resolveCharacterStats(vocation, character ?? { level: 600 });
-  const key = cacheKey(vocation, context, spot, char, elementMl, weaponAttack);
+  const gear = gearModel(equipment);
+  if (equipment) {
+    const merged: ElementMagicLevel = { ...elementMl };
+    for (const [e, x] of Object.entries(equipment.elementMl) as [Element, number][]) merged[e] = (merged[e] ?? 0) + x;
+    elementMl = merged;
+  }
+  const key = cacheKey(vocation, context, spot, char, elementMl, weaponAttack, gear);
   const cached = modelCache.get(key);
   if (cached && cached.monsters.every((m, i) => m.monster === spot[i].monster)) return cached;
 
@@ -327,7 +372,8 @@ export function buildSpellModel(
       areaGap: context.mode === 'hunt' && !singleTarget && areaAug.has(name) ? AREA_AUGMENT_GAP : 0,
       targets: singleTarget ? 1 : Math.max(1, expectedTargets(shape, context) - (context.mode === 'hunt' && areaAug.has(name) ? AREA_AUGMENT_GAP : 0)),
       outerTargets: outerBeamTargets({ area, avgHitsHuntOuter: meta?.avgHitsHuntOuter ?? dmg?.avgTargetsHuntOuter }, context),
-      elem: kind === 'damage' ? spotElementMultiplier(spot, element) : 1,
+      elem: kind === 'damage' ? (dmg?.weaponElement && gear?.conversion ? convertedPhysical(spot, gear.conversion) : spotElementMultiplier(spot, element)) : 1,
+      ...(gear && kind === 'damage' ? { critChance: gear.critChance, critExtra: gear.critExtra, mult: gear.mult } : {}),
       revelation,
       stageDomain: stageOf.get(name) ?? -1,
       avatar: meta?.isAvatar ?? false,
@@ -339,7 +385,9 @@ export function buildSpellModel(
   const attack = weaponAttack ?? weaponBracket(vocation, char.level, paladinWeaponFor(context.mode)).attack;
   const autoHit = autoAttackHit(vocation, char, attack);
   const autoTargets = context.mode === 'boss' ? 1 : AUTO_ATTACK_TARGETS[vocation];
-  const base = autoHit * autoTargets * spotElementMultiplier(spot, 'physical') * critEV(0, 0);
+  const mage = vocation === 'sorcerer' || vocation === 'druid';
+  const autoElem = mage ? spotElementMultiplier(spot, 'physical') : convertedPhysical(spot, gear?.conversion);
+  const base = autoHit * autoTargets * autoElem * critEV(gear?.critChance ?? 0, gear?.critExtra ?? 0) * (gear?.mult ?? 1);
 
   const model: SpellModel = {
     vocation,
@@ -355,6 +403,7 @@ export function buildSpellModel(
     total: 1,
     flatOffPerPoint: 0,
     flatHealPerPoint: 0,
+    ...(gear ? { gear } : {}),
   };
   model.total = Math.max(1, rotationTotal(model, NO_BONUS));
   model.flatOffPerPoint = (100 * (rotationTotal(model, { ...NO_BONUS, flat: 1 }) - model.total)) / model.total;

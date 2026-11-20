@@ -23,7 +23,7 @@ screens it is two columns (controls left, results right).
 | `src/lib/monsters.ts` | `resolveMonsters`, `combinedModifiers` (weighted average, missing = 100), `combinedDamageTypes` (tested). |
 | `src/lib/planner.ts` | Re-exports `PLANNER_URL`/`plannerUrl(code)` from `src/data/wheel/plannerCode` (single source); `copyText` (Clipboard API → `execCommand` fallback) (tested). |
 | `src/components/MonsterCard.tsx` | Name, HP/exp, element chips, damage types. |
-| `src/components/DebugCopy.tsx` | Temporary (D60): link under "My weapons" copying the exact `OptimizerInput` as JSON (textarea fallback) so a reported build can be reproduced. |
+| `src/components/DebugCopy.tsx` | Temporary (D60): link under "Equipment" copying the exact `OptimizerInput` as JSON (textarea fallback) so a reported build can be reproduced. |
 | `src/components/Gain.tsx` | D55: a gain shown as `±x% dmg` (offense colour) and `±y% EHP` (defense colour), negatives red, parts below 0.05 hidden; the blended optimizer score only in the tooltip (shown as `pts` when neither part is visible, e.g. utility). Used for gem recommendations, upgrades (and to IV), weapon ranking, reshapes and suggestions. |
 | `src/components/NotesPanel.tsx` | D54: collapsed "For the curious" section at the end of the page with the descriptive hints (extra points, skills, knight skill, fight mode, monster weight, weapon grid, proficiency assumptions, units, storage); icons credit moved to the footer. |
 | `src/components/PrioritySlider.tsx` | 0–100 range slider (no own panel since D54, rendered inside `FightContextPanel`). |
@@ -36,17 +36,18 @@ screens it is two columns (controls left, results right).
 | `src/lib/spellPrefs.ts` | Spell-prefs sanitising + URL / JSON codec (tested). |
 | `src/components/GemsPanel.tsx` | Collapsible "My gems" editor in Lesser / Regular / Greater subsections (mods per slot, grade I–IV), empty-vessel highlight. |
 | `src/components/GemImport.tsx` | D63: toolbar at the top of "My gems": import button (multiple image files, Ctrl+V while the panel is open) → `readGems` per screenshot, duplicates of a page skipped, `mergeImported`; result line (added / to check / skipped / unrecognised); ambiguous gems get an amber "check" note in their card until edited. Trash icon with inline confirmation removes all gems. |
-| `src/components/WeaponsPanel.tsx` | D47: collapsible "My weapons": weapon search (combobox, vocation's weapons with a known tree; knights with `meleeSkill` only that type, D53), per weapon proficiency level 0–n, compact tree (D50: one column of official perk icons per level, click = manual pick with a gold frame, again = Auto; locked levels dimmed; ✦ = reshaped slot; icon legend below) and dust reshapes (shaping option at rank 10 + replaced option, at most 2). D62: knight/monk weapon cards (and the best weapon) show the damage types on their own line (main element, or "physical 25 + fire 26"); proficiency level select sized to its text. |
+| `src/components/EquipmentPanel.tsx` | D74: "Equipment" (step 6): paper doll, slot editor (item search, tier, imbuements; modal or inline — temporary variant switch), bonus totals, `OwnedWeapons` below. See [`equipment.md`](equipment.md). |
+| `src/components/OwnedWeapons.tsx` | D47 (inside Equipment since D74): "My weapons": weapon search (combobox, vocation's weapons with a known tree; knights with `meleeSkill` only that type, D53), per weapon proficiency level 0–n, compact tree (D50: one column of official perk icons per level, click = manual pick with a gold frame, again = Auto; locked levels dimmed; ✦ = reshaped slot; icon legend below) and dust reshapes (shaping option at rank 10 + replaced option, at most 2). D62: knight/monk weapon cards (and the best weapon) show the damage types on their own line (main element, or "physical 25 + fire 26"); proficiency level select sized to its text. |
 | `src/components/Tip.tsx` | D52: hover / focus tooltip (aligned start / center / end so edge tooltips stay in the card). |
 | `src/components/PerkIcon.tsx` | D50: perk icon from `public/proficiency/` (sprite strip frame; augment mark in the corner), decorative. |
 | `src/components/WeaponResultPanel.tsx` | D47: best weapon with its perks as an icon row (D56: with manual picks that the engine beats, an amber note lists the changed levels old → new icon, the gain and "Apply", which writes the engine picks into the manual levels) (tooltip: effect, picked / your choice; gold frame = manual; alpha strike marked "solo play only"), ammunition, other owned weapons (difference), worthwhile reshapes, collapsible "better weapons you do not own" (opening it sets `suggestWeapons`). D62: ammunition shown with its element. |
-| `src/hooks/usePersistentWeapons.ts` | D47: owned weapons + suggest flag per vocation in localStorage (not in the URL). |
+| `src/hooks/usePerVocationStorage.ts` | Generic per-vocation localStorage value; `usePersistentGems`, `usePersistentWeapons` (D47: owned weapons + suggest flag), `usePersistentGear` (D74). Not in the URL. |
+| `src/hooks/useDesignVariants.ts` | Temporary (D74): review variants of the equipment panel. |
 | `src/lib/weapons.ts` | D47: weapon prefs sanitising / codec, `setPerk`, `setShaped`, `perkLabel`, `shapingLabel` (tested). |
 | `src/components/GemIcon.tsx` | Diamond icon tinted by gem/vessel quality. |
 | `src/components/VesselsPanel.tsx` | Vessels, recommended gems per quality, best upgrades, collapsible spell usage. |
 | `src/lib/vessels.ts` | `emptyUnlockedByQuality`, `recommendationsByQuality`, `activeRevelationsByDomain` (tested). |
 | `src/components/LanguageSwitch.tsx` | PL / EN segmented toggle. |
-| `src/hooks/usePersistentGems.ts` | Owned gems per vocation in localStorage (not in the URL). |
 | `src/lib/gems.ts` | Gem slot rules, mod filtering, gem (de)serialisation, shared mod grades (D27) (tested). |
 | `src/i18n/engine.ts` | `engineText(t, msg, fallback)`: renders engine messages (`engine.<key>`) and translates id params. |
 | `src/i18n/` | `en.ts` / `pl.ts` dictionaries, `lang.ts` (pure helpers), `context.ts` (`useT`, `useI18n`), `I18nProvider.tsx` (tested). |
@@ -68,7 +69,8 @@ App
 │  └─ MonsterCard      monster
 ├─ FightContextPanel   value: FightContext, onChange(patch), priority, onPriorityChange (→ PrioritySlider)
 ├─ GemsPanel           vocation, gems, mods, emptyVessels (viewed build, per quality), onChange(updater)
-├─ WeaponsPanel        vocation, prefs: WeaponPrefs, onChange(updater)
+├─ EquipmentPanel      vocation, gear, effects, weaponName, weapons: WeaponPrefs, variants (+ updaters)
+│  └─ OwnedWeapons     vocation, prefs: WeaponPrefs, onChange(updater)
 ├─ Panel › RotationPanel presets, spells (forceable), value: SpellPrefs, onChange(patch), usage = viewed build `rotation`
 ├─ Panel › WheelChart  wheel, result | null   (the *viewed* build: best or alternative)
 ├─ Panel › WeaponResultPanel result.weapon, owned (weapons of the computed input), suggest, busy, onSuggestChange   (only with weapons)
@@ -99,7 +101,7 @@ Components never import `src/engine` / `src/data` directly — only `src/lib/api
    `monsters = resolveMonsters(entries, getMonsterById)`, `character = characterOf(inputs)` (only the vocation's skill
    fields; level falls back to `points + 50`; `undefined` when nothing entered) and `alternatives: 0`; `context = contextOf(inputs)` (`{ mode }` only),
    `rotationId` / `forcedSpells` from `usePersistentSpellPrefs(vocation)` (deferred; auto / none → `undefined`),
-   `gems` from `usePersistentGems(vocation)` (also deferred), `weapons` / `suggestWeapons` from `usePersistentWeapons(vocation)` (deferred; none → `undefined`). `points = 0` → `result = null` → empty state.
+   `gems` from `usePersistentGems(vocation)` (also deferred), `weapons` / `suggestWeapons` from `usePersistentWeapons(vocation)` (deferred; none → `undefined`), `equipment` = `gearEffects(usePersistentGear(vocation))` (deferred; nothing set → `undefined`). `points = 0` → `result = null` → empty state.
 4. A local `view` index (0 = best, i = `result.alternatives[i-1]`) picks the *viewed* build (`BuildResult` =
    `Omit<OptimizerResult, 'alternatives'>`) shown by the wheel, summary, export and vessels panels; it falls back
    to 0 when the alternative disappears.

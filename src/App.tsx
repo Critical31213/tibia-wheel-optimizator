@@ -1,6 +1,7 @@
 import { useDeferredValue, useMemo } from 'react';
 import { useOptimizer } from './hooks/useOptimizer';
 import { CharacterPanel } from './components/CharacterPanel';
+import { EquipmentPanel } from './components/EquipmentPanel';
 import { DebugCopy } from './components/DebugCopy';
 import { ExportPanel } from './components/ExportPanel';
 import { FightContextPanel } from './components/FightContextPanel';
@@ -14,19 +15,19 @@ import { RotationPanel } from './components/RotationPanel';
 import { VesselsPanel } from './components/VesselsPanel';
 import { VocationPicker } from './components/VocationPicker';
 import { WeaponResultPanel } from './components/WeaponResultPanel';
-import { WeaponsPanel } from './components/WeaponsPanel';
 import { WheelChart } from './components/WheelChart';
-import { usePersistentGems } from './hooks/usePersistentGems';
+import { usePersistentGear, usePersistentGems, usePersistentWeapons } from './hooks/usePerVocationStorage';
+import { useDesignVariants } from './hooks/useDesignVariants';
 import { gemFromRecommendation, setModGrade, updateGem } from './lib/gems';
 import { usePersistentInputs } from './hooks/usePersistentInputs';
 import { usePersistentSpellPrefs } from './hooks/usePersistentSpellPrefs';
-import { usePersistentWeapons } from './hooks/usePersistentWeapons';
 import { useT } from './i18n';
 import { CUSTOM_ROTATION_ID } from './types';
-import { getCustomRotationSpells, getForceableSpells, getMonsterById, getRotationPresets, getStanceOptions, getWheel, revelationOptions, useMonsterData } from './lib/api';
+import { getCustomRotationSpells, getWeapon, getForceableSpells, getMonsterById, getRotationPresets, getStanceOptions, getWheel, revelationOptions, useMonsterData } from './lib/api';
 import { stanceNames } from './lib/spellPrefs';
 import type { BuildResult } from './lib/api';
 import { characterOf, contextOf } from './lib/inputState';
+import { gearEffects } from './lib/gear';
 import { resolveMonsters } from './lib/monsters';
 import { emptyUnlockedByQuality } from './lib/vessels';
 import { VOCATION_LABELS } from './lib/labels';
@@ -39,6 +40,9 @@ export default function App() {
   const deferredPrefs = useDeferredValue(spellPrefs);
   const [weaponPrefs, setWeaponPrefs] = usePersistentWeapons(inputs.vocation);
   const deferredWeapons = useDeferredValue(weaponPrefs);
+  const [gear, setGear] = usePersistentGear(inputs.vocation);
+  const deferredGear = useDeferredValue(gear);
+  const [variants, setVariants] = useDesignVariants();
   const presets = useMemo(() => getRotationPresets(inputs.vocation), [inputs.vocation]);
   const forceable = useMemo(() => getForceableSpells(inputs.vocation), [inputs.vocation]);
   const customSpells = useMemo(() => getCustomRotationSpells(inputs.vocation), [inputs.vocation]);
@@ -67,6 +71,11 @@ export default function App() {
     () => revelationOptions({ vocation: deferred.vocation, points, gems: deferredGems, character }),
     [deferred.vocation, points, deferredGems, character],
   );
+  const meleeSkill = deferred.vocation === 'knight' ? deferred.meleeSkill : null;
+  const equipment = useMemo(
+    () => gearEffects(deferredGear, deferred.vocation, meleeSkill, variants.fallback),
+    [deferredGear, deferred.vocation, meleeSkill, variants.fallback],
+  );
   const request = useMemo(
     () =>
       points > 0
@@ -79,7 +88,7 @@ export default function App() {
             context: { mode },
             gems: deferredGems,
             character,
-            meleeSkill: deferred.vocation === 'knight' ? (deferred.meleeSkill ?? undefined) : undefined,
+            meleeSkill: meleeSkill ?? undefined,
             alternatives: 0,
             rotationId: rotationId ?? undefined,
             customRotation: rotationId === CUSTOM_ROTATION_ID && customRotation.length ? customRotation : undefined,
@@ -89,9 +98,10 @@ export default function App() {
             stances: stance === null ? undefined : stanceNames(stance),
             weapons: deferredWeapons.weapons.length ? deferredWeapons.weapons : undefined,
             suggestWeapons: deferredWeapons.weapons.length && deferredWeapons.suggest ? true : undefined,
+            equipment,
           }
         : null,
-    [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, deferred.meleeSkill, rotationId, customRotation, forcedSpells, forcedStage2, forcedRevelations, stance, deferredWeapons],
+    [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, meleeSkill, rotationId, customRotation, forcedSpells, forcedStage2, forcedRevelations, stance, deferredWeapons, equipment],
   );
   const optimized = useOptimizer(request);
   // The shown build may lag the inputs while the worker computes; everything below follows its own vocation.
@@ -99,6 +109,7 @@ export default function App() {
   const current = resultVocation === inputs.vocation;
   const resultWheel = useMemo(() => getWheel(resultVocation), [resultVocation]);
   const shown: BuildResult | null = request ? optimized.result : null;
+  const weaponName = (current && shown?.weapon && getWeapon(shown.weapon.best.weaponId)?.name) || null;
   const emptyVessels = useMemo(() => (shown && current ? emptyUnlockedByQuality(shown.vessels) : null), [shown, current]);
 
   return (
@@ -116,7 +127,19 @@ export default function App() {
           <MonsterSearch value={spot} ready={monstersReady} onChange={(monsters) => update({ monsters })} />
           <FightContextPanel value={context} onChange={update} priority={inputs.priority} onPriorityChange={(priority) => update({ priority })} />
           <GemsPanel vocation={inputs.vocation} gems={gems} mods={wheel.mods} emptyVessels={emptyVessels} onChange={setGems} />
-          <WeaponsPanel key={inputs.vocation} vocation={inputs.vocation} meleeSkill={inputs.meleeSkill} prefs={weaponPrefs} onChange={setWeaponPrefs} />
+          <EquipmentPanel
+            key={inputs.vocation}
+            vocation={inputs.vocation}
+            meleeSkill={inputs.meleeSkill}
+            gear={gear}
+            onGear={setGear}
+            effects={equipment}
+            weaponName={weaponName}
+            weapons={weaponPrefs}
+            onWeapons={setWeaponPrefs}
+            variants={variants}
+            onVariants={setVariants}
+          />
           <DebugCopy input={request} />
         </div>
 

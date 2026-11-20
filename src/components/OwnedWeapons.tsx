@@ -6,7 +6,6 @@ import { getShapingOption, getWeapon, levelOptions, searchWeapons, shapingId, sh
 import { cx } from '../lib/labels';
 import { MAX_SHAPED, ownWeapon, perkLabel, setPerk, setShaped, shapingLabel, type WeaponPrefs } from '../lib/weapons';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
-import { Panel } from './Panel';
 import { PerkIcon } from './PerkIcon';
 import { Tip } from './Tip';
 
@@ -371,40 +370,26 @@ function WeaponCard({ owned, vocation, meleeSkill, onChange, onRemove }: WeaponC
   );
 }
 
-interface WeaponsPanelProps {
+export interface OwnedWeaponsProps {
   vocation: Vocation;
   meleeSkill: MeleeSkill | null;
   prefs: WeaponPrefs;
   onChange: (update: (prefs: WeaponPrefs) => WeaponPrefs) => void;
 }
 
-/** D47: collapsible list of owned weapons with proficiency level, perk choices and dust reshapes. */
-export function WeaponsPanel({ vocation, meleeSkill, prefs, onChange }: WeaponsPanelProps) {
+/** D47: owned weapons with proficiency level, perk choices and dust reshapes (inside the equipment panel, D74). */
+export function OwnedWeapons({ vocation, meleeSkill, prefs, onChange }: OwnedWeaponsProps) {
   const t = useT();
-  const bodyId = useId();
-  const [open, setOpen] = useState(() => prefs.weapons.length > 0);
   const owned = useMemo(() => new Set(prefs.weapons.map((w) => w.weaponId)), [prefs.weapons]);
   const update = (weapons: (all: OwnedWeapon[]) => OwnedWeapon[]) => onChange((p) => ({ ...p, weapons: weapons(p.weapons) }));
 
   return (
-    <Panel
-      title={t('weapons.title')}
-      step={6}
-      headingId="weapons-heading"
-      aside={
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-controls={bodyId}
-          onClick={() => setOpen((o) => !o)}
-          className="flex items-center gap-2 text-xs text-gold-400 hover:underline"
-        >
-          {prefs.weapons.length > 0 && <span className="text-parchment-400">{t('weapons.count', { n: prefs.weapons.length })}</span>}
-          {open ? t('common.hide') : t('common.show')}
-        </button>
-      }
-    >
-      <div id={bodyId} hidden={!open} className="flex flex-col gap-3">
+    <section aria-labelledby="weapons-heading" className="flex flex-col gap-3">
+      <h3 id="weapons-heading" className="flex items-center justify-between text-sm font-medium text-gold-300">
+        {t('weapons.title')}
+        {prefs.weapons.length > 0 && <span className="text-xs font-normal text-parchment-400">{t('weapons.count', { n: prefs.weapons.length })}</span>}
+      </h3>
+      <div className="flex flex-col gap-3">
         <WeaponSearch vocation={vocation} meleeSkill={meleeSkill} owned={owned} onAdd={(w) => update((all) => [...all, ownWeapon(w)])} />
         {prefs.weapons.length === 0 ? (
           <p className="text-sm text-parchment-300">{t('weapons.empty')}</p>
@@ -423,6 +408,6 @@ export function WeaponsPanel({ vocation, meleeSkill, prefs, onChange }: WeaponsP
           </ul>
         )}
       </div>
-    </Panel>
+    </section>
   );
 }

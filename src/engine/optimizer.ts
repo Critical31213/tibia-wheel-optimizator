@@ -95,6 +95,7 @@ import {
   K,
   leechEhp,
   mitigationParts,
+  type OffhandChoice,
   type Parts,
   parseEffects,
   revelationIndex,
@@ -896,7 +897,7 @@ function rationale(p: Prepared, best: State, stages: number[], revPoints: number
 const pointsOf = (input: Pick<OptimizerInput, 'points'>) =>
   Math.max(0, Math.floor(Number.isFinite(input.points) ? input.points : 0));
 
-type ValuationInput = Pick<OptimizerInput, 'vocation' | 'points' | 'monster' | 'context' | 'character' | 'monsters'> &
+type ValuationInput = Pick<OptimizerInput, 'vocation' | 'points' | 'monster' | 'context' | 'character' | 'monsters' | 'equipment'> &
   Partial<Pick<OptimizerInput, 'rotationId' | 'forcedSpells' | 'customRotation'>>;
 
 /** Level used for valuation: `character.level`, else points + 50. */
@@ -916,15 +917,28 @@ function modelInputs(input: ValuationInput) {
   const context: FightContext = { mode: input.context?.mode === 'boss' ? 'boss' : 'hunt' };
   const level = levelFor(input);
   const clean = (x: number | undefined) => (Number.isFinite(x) && x! >= 0 ? x : undefined);
+  // D74: equipment skills are added to the entered (base) skills; empty fields keep the typical values (with gear).
+  const gear = input.equipment?.skills;
+  const plus = (x: number | undefined, bonus = 0) => (x === undefined ? undefined : x + bonus);
   const character = resolveCharacterStats(input.vocation, {
     level,
-    mainSkill: clean(input.character?.mainSkill),
-    magicLevel: clean(input.character?.magicLevel),
-    shielding: clean(input.character?.shielding),
+    mainSkill: plus(clean(input.character?.mainSkill), gear?.main),
+    magicLevel: plus(clean(input.character?.magicLevel), gear?.magic),
+    shielding: plus(clean(input.character?.shielding), gear?.shielding),
   });
   const monsters = normaliseMonsters(input.monsters, input.monster ?? null);
-  const model = buildSpellModel(input.vocation, context, monsters, character);
+  const model = buildSpellModel(input.vocation, context, monsters, character, {}, undefined, input.equipment);
   return { context, level, character, monsters, model };
+}
+
+/**
+ * Offhand for mitigation (D19, D74): the user's offhand, else the vocation default; a shield rotation needs a shield
+ * (the user's when worn, else a typical one).
+ */
+function offhandOf(input: Pick<OptimizerInput, 'equipment'>, shieldPlan: boolean): OffhandChoice {
+  const worn = input.equipment?.offhand;
+  if (shieldPlan) return worn?.kind === 'shield' ? { offhand: 'shield', defense: worn.defense } : { offhand: 'shield' };
+  return worn ? { offhand: worn.kind, defense: worn.defense } : {};
 }
 
 /**
@@ -995,7 +1009,7 @@ export function valuationFor(
 ): ValuationContext {
   const mi0 = modelInputs(input);
   const { context, level, monsters } = mi0;
-  const build = stanceBuilder(input.vocation, context, monsters, stances, preset, loadout, preCd);
+  const build = stanceBuilder(input.vocation, context, monsters, stances, preset, loadout, preCd, input.equipment);
   const armed = loadout ? loadoutCharacter(mi0.character, input.vocation, loadout) : mi0.character;
   const character = stancedCharacter(armed, stances);
   const mi = stances.length || loadout || preCd ? { ...mi0, character, model: build(character) } : mi0;
@@ -1006,10 +1020,9 @@ export function valuationFor(
   const skillOff = (100 * (planTotal(build(boosted), preset) - t0)) / model.total;
   const monster = spotMonster(monsters);
   const threat = threatOf(monster);
-  const offhand = model.plan.shield ? 'shield' : undefined;
-  const facts = characterFacts(input.vocation, level, character.shielding, offhand);
+  const facts = characterFacts(input.vocation, level, character.shielding, offhandOf(input, model.plan.shield));
   // EHP reference without stances and weapon, so Protector's (and the weapon's) shielding counts.
-  facts.mitigationRef = characterFacts(input.vocation, level, mi0.character.shielding).mitigationRef;
+  facts.mitigationRef = characterFacts(input.vocation, level, mi0.character.shielding, {}, offhandOf(input, false)).mitigationRef;
   const v: ValuationContext = {
     vocation: input.vocation,
     context,
@@ -1021,6 +1034,7 @@ export function valuationFor(
     leech: leechEhp(model, threat),
     stanceDef: stanceDefense(model, armed, stances, K.HEAL_EHP) * threat,
     incoming: incomingShares(monsters),
+    ...(input.equipment ? { resist: input.equipment.resist } : {}),
     skillOff: Math.max(0, skillOff),
     forced: new Set(input.forcedSpells ?? []),
     ...(preCd ? { preCd } : {}),
@@ -1928,11 +1942,11 @@ function loadoutScorer(input: OptimizerInput, spec: Pick<PlanSpec, 'preset' | 'r
 /** Unblended `loadoutScorer`. */
 function loadoutValuer(input: OptimizerInput, spec: Pick<PlanSpec, 'preset' | 'reference' | 'stances' | 'preCd'>, v0: ValuationContext, ri: RotationInput = NO_BONUS) {
   const mi = modelInputs(input);
-  const offhand = v0.model.plan.shield ? 'shield' : undefined;
+  const offhand = offhandOf(input, v0.model.plan.shield);
   const { preset, reference, stances, preCd } = spec;
   return (lo: Loadout): Parts => {
     const c = stancedCharacter(loadoutCharacter(mi.character, input.vocation, lo), stances);
-    const m0 = stanceBuilder(input.vocation, mi.context, mi.monsters, stances, preset, lo, preCd)(c);
+    const m0 = stanceBuilder(input.vocation, mi.context, mi.monsters, stances, preset, lo, preCd, input.equipment)(c);
     const model: SpellModel = { ...m0, plan: planFor(m0, preset), total: reference };
     const off = (100 * (rotationTotal(model, ri) - reference)) / reference;
     const mitigation = characterFacts(input.vocation, mi.level, c.shielding, offhand).mitigation;

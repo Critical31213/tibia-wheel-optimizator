@@ -151,8 +151,10 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
   const c = model.character;
   const pp = (f: (p: Perk) => boolean) => 100 * sum(perks, f);
   const noImbue = noCritImbue(w);
-  const critChance = pp((p) => p.kind === 'critChance') + 100 * (w.specials?.critChance ?? 0) - (noImbue ? IMBUE_CRIT.chance : 0);
-  const critExtra = pp((p) => p.kind === 'critDamage') + 100 * (w.specials?.critDamage ?? 0) - (noImbue ? IMBUE_CRIT.extra : 0);
+  const gear = model.gear;
+  const strike = gear?.weaponImbues ? { chance: gear.weaponImbues.critChance, extra: gear.weaponImbues.critExtra } : IMBUE_CRIT;
+  const critChance = pp((p) => p.kind === 'critChance') + 100 * (w.specials?.critChance ?? 0) - (noImbue ? strike.chance : 0);
+  const critExtra = pp((p) => p.kind === 'critDamage') + 100 * (w.specials?.critDamage ?? 0) - (noImbue ? strike.extra : 0);
   const elemCrit = (e: Element | null) => [pp((p) => p.kind === 'elementCritChance' && p.element === e), pp((p) => p.kind === 'elementCritDamage' && p.element === e)];
   const pierce = (e: Element | null) => pp((p) => p.kind === 'pierce' && p.element === e);
   const mult =
@@ -165,13 +167,21 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
   const attack = loadoutAttack(model.vocation, lo) ?? 0;
   const mainElement: Element = isMage(model.vocation) ? 'physical' : (w.element ?? 'physical');
   const elemental = w.elementAttack && attack > 0 ? w.elementAttack : null;
+  // D74: an elemental damage imbuement converts part of the physical damage.
+  const conv = gear?.conversion;
+  const mainMix = (e: Element) => {
+    const own = piercedOr(model, e, pierce(e));
+    if (e !== 'physical' || !conv) return own;
+    const p = Math.min(100, conv.pct) / 100;
+    return (1 - p) * own + p * piercedOr(model, conv.element, pierce(conv.element));
+  };
   const weaponMix =
-    mainElement === 'physical' && !elemental
+    mainElement === 'physical' && !elemental && !conv
       ? null
       : elemental
-      ? ((attack - elemental.value) / attack) * piercedOr(model, mainElement, pierce(mainElement)) +
+      ? ((attack - elemental.value) / attack) * mainMix(mainElement) +
         (elemental.value / attack) * piercedOr(model, elemental.element, pierce(elemental.element))
-      : piercedOr(model, mainElement, pierce(mainElement));
+      : mainMix(mainElement);
   const flat = perks.reduce((a, p) => a + (p.kind === 'spellSkillScaling' ? p.value * scalingSkill(c, p) : 0), 0);
 
   const spells = new Map<string, SpellEval>();
@@ -220,10 +230,10 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
     targets = mode === 'boss' ? 1 : hunt;
     const [pc, pd] = elemCrit(autoElement);
     const crit = critEV(
-      critChance + pc + pp((p) => p.kind === 'autoCritChance'),
-      critExtra + pd + pp((p) => p.kind === 'autoCritDamage'),
+      critChance + pc + pp((p) => p.kind === 'autoCritChance') + (gear?.critChance ?? 0),
+      critExtra + pd + pp((p) => p.kind === 'autoCritDamage') + (gear?.critExtra ?? 0),
     );
-    base = hit * targets * autoMix * crit * (model.damageMult ?? 1) * mult;
+    base = hit * targets * autoMix * crit * (model.damageMult ?? 1) * mult * (gear?.mult ?? 1);
   }
   for (const p of perks) {
     if (p.kind !== 'homingMissile' || !p.element) continue;
@@ -248,9 +258,10 @@ export function loadoutParts(v: ValuationContext, lo: Loadout): Parts {
   const m = v.model;
   let life = 100 * (sum(perks, (p) => p.kind === 'lifeLeech') + (w.specials?.lifeLeech ?? 0));
   let mana = 100 * (sum(perks, (p) => p.kind === 'manaLeech') + (w.specials?.manaLeech ?? 0));
-  // The weapon's share of the assumed imbuements (life leech: half of K.LIFE_LEECH_IMBUE, i.e. one of two items).
-  if (noLifeLeechImbue(w)) life -= K.LIFE_LEECH_IMBUE[m.vocation] / 2;
-  if (noManaLeechImbue(w)) mana -= PROF.VOID_MANA_LEECH;
+  // The weapon's share of the imbuements (default: half of K.LIFE_LEECH_IMBUE, i.e. one of two items).
+  const imbues = m.gear?.weaponImbues;
+  if (noLifeLeechImbue(w)) life -= imbues ? imbues.lifeLeech : K.LIFE_LEECH_IMBUE[m.vocation] / 2;
+  if (noManaLeechImbue(w)) mana -= imbues ? imbues.manaLeech : PROF.VOID_MANA_LEECH;
   let heal = 0;
   const c = m.character;
   const flatHeal = perks.reduce((a, p) => a + (p.kind === 'healSkillScaling' ? p.value * scalingSkill(c, p) : 0), 0);

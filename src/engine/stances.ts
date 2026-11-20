@@ -2,7 +2,7 @@
  * D24 stances: applied to the character (skill / shielding), the spell model (element magic level, element
  * stance bonuses and conversion, pierce, harmony, damage dealt) and defense (damage taken, dodge, healing).
  */
-import type { CharacterStats, FightContext, Monster, RotationPreset, Vocation } from '../types';
+import type { CharacterStats, FightContext, GearEffects, Monster, RotationPreset, Vocation } from '../types';
 import { healingAverage, pierceDamageMod } from '../data/damage';
 import { NON_ADJACENT_SHARE, sereneFactor, type StanceDef } from '../data/damage/stances';
 import {
@@ -125,15 +125,16 @@ export function stanceBuilder(
   loadout?: Loadout,
   /** D69: cooldown cuts (s) applied to the base spells (a plan's rotation augments). */
   preCd?: ReadonlyMap<string, number>,
+  equipment?: GearEffects,
 ) {
   const cut = (m: SpellModel) => (preCd?.size ? withCooldownCuts(m, preCd) : m);
-  if (!loadout) return (c: Required<CharacterStats>) => cut(applyStanceSpells(buildSpellModel(vocation, context, monsters, c, stanceElementMl(c, stances)), stances, preset));
+  if (!loadout) return (c: Required<CharacterStats>) => cut(applyStanceSpells(buildSpellModel(vocation, context, monsters, c, stanceElementMl(c, stances), undefined, equipment), stances, preset));
   const { healing: _healing, ...weaponMl } = loadoutElementMl(loadout);
   const attack = loadoutAttack(vocation, loadout);
   return (c: Required<CharacterStats>) => {
     const ml: ElementMagicLevel = { ...stanceElementMl(c, stances) };
     for (const [e, x] of Object.entries(weaponMl) as [keyof ElementMagicLevel, number][]) ml[e] = (ml[e] ?? 0) + x;
-    return cut(applyLoadout(applyStanceSpells(buildSpellModel(vocation, context, monsters, c, ml, attack), stances, preset), loadout));
+    return cut(applyLoadout(applyStanceSpells(buildSpellModel(vocation, context, monsters, c, ml, attack, equipment), stances, preset), loadout));
   };
 }
 
