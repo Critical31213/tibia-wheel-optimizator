@@ -10,7 +10,7 @@ changes in the engine.
 |---|---|
 | `scripts/import-equipment.mjs` | `npm run import:equipment`: item pages of tibiopedia.pl per slot (helmets, armors, legs, boots, shields, spellbooks, quivers, amulets, rings), cached in `scripts/.cache/equipment/` (gitignored), low request rate. Parses vocation, required level, armor, defense, class, imbuement slots and bonuses (skills, element magic levels, resistances, critical chance, leech). Speed, reflection and other unmodelled bonuses are skipped. Same-name variants get their first skill in the name. A shield only mages can use is a spellbook. |
 | `src/data/equipment/equipment.json` | Generated items (`{ meta, items }`). |
-| `src/data/equipment/index.ts` | `ITEMS`, `getItem`, `itemsFor(slots, vocation)`, paper-doll slots (`GEAR_SLOTS`, `SLOT_ITEMS`), imbuements (`IMBUEMENTS`, `imbuementsFor(slot, vocation, item?)`: no imbuement of a skill or element the item already has), forge tiers (`TIER_EFFECT`, `TIER_CHANCE`, `maxTier(class)`, `tierChance`). |
+| `src/data/equipment/index.ts` | `ITEMS`, `getItem`, `itemsFor(slots, vocation)`, paper-doll slots (`GEAR_SLOTS`, `SLOT_ITEMS`), imbuements (`IMBUEMENTS`, `imbuementsFor(slot, vocation, item?)`: no imbuement of a skill, element protection, critical hit, life or mana leech the item already has; `weaponImbuements` likewise for weapons), forge tiers (`TIER_EFFECT`, `TIER_CHANCE`, `maxTier(class)`, `tierChance`). |
 
 Imbuements (Basic / Intricate / Powerful): Strike 5/5/10 % chance and +5/15/50 % extra (Powerful = the engine's
 crit default; lower tiers approximate), Vampirism 5/10/25 %, Void 3/5/8 %, skill imbuements +1/+2/+4, protections

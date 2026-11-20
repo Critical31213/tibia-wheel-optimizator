@@ -23,7 +23,7 @@ describe('weapon prefs (D47)', () => {
 
   it('keeps a tier and imbuements per weapon within its limits (D81)', () => {
     const imbues = [{ id: 'strike', level: 3 }, { id: 'chop', level: 3 }, { id: 'vampirism', level: 2 }, { id: 'void', level: 3 }, { id: 'frost', level: 3 }];
-    const read = (weaponId: string, vocation: 'knight' | 'monk', gear: unknown) =>
+    const read = (weaponId: string, vocation: 'knight' | 'monk' | 'druid', gear: unknown) =>
       parseWeaponPrefs(JSON.stringify({ weapons: [{ weaponId, level: 0, gear }] }), vocation).weapons[0].gear;
     // Amber Greataxe: 2 slots, native axe skill and earth damage (no Chop, no Frost).
     expect(read('amber-greataxe', 'knight', { tier: 10, imbues })).toEqual({ tier: 10, imbues: [{ id: 'strike', level: 3 }, { id: 'vampirism', level: 2 }] });
@@ -32,6 +32,10 @@ describe('weapon prefs (D47)', () => {
     expect(monk?.imbues.map((x) => x.id)).toEqual(['strike', 'vampirism', 'void']);
     expect(read('soulkamas', 'monk', undefined)).toBeUndefined();
     expect(read('amber-greataxe', 'knight', { tier: 11, imbues: [] })?.tier).toBe(0);
+    // D83: native life leech (Cobra Rod) blocks Vampirism, native crit (Lion Rod) blocks Strike, as on TibiaWiki.
+    const mage = [{ id: 'strike', level: 3 }, { id: 'vampirism', level: 3 }, { id: 'void', level: 3 }];
+    expect(read('cobra-rod', 'druid', { tier: 0, imbues: mage })?.imbues.map((x) => x.id)).toEqual(['strike', 'void']);
+    expect(read('lion-rod', 'druid', { tier: 0, imbues: mage })?.imbues.map((x) => x.id)).toEqual(['vampirism', 'void']);
   });
 
   it('edits perks and reshapes', () => {

@@ -92,8 +92,8 @@ export const IMBUE_LEVELS = [1, 2, 3] as const;
 export type ImbueLevel = (typeof IMBUE_LEVELS)[number];
 
 /**
- * Imbuements for a slot; skill imbuements only for the vocation's skills. An item with a native skill or element
- * protection cannot take the imbuement of the same skill / element.
+ * Imbuements for a slot; skill imbuements only for the vocation's skills. An item with a native skill, element
+ * protection, critical hit, life or mana leech cannot take the imbuement of the same kind (D83).
  */
 export function imbuementsFor(slot: ImbueSlot, vocation: Vocation, item?: EquipmentItem): ImbueDef[] {
   const skills = VOCATION_SKILLS[vocation];
@@ -104,9 +104,14 @@ export function imbuementsFor(slot: ImbueSlot, vocation: Vocation, item?: Equipm
       (!x.skill || skills.includes(x.skill)) &&
       !(x.group === 'damage' && MAGE.has(vocation)) &&
       !(x.skill && own?.skills?.[x.skill]) &&
-      !(x.group === 'protection' && x.element && own?.resist?.[x.element as keyof typeof own.resist]),
+      !(x.group === 'protection' && x.element && own?.resist?.[x.element as keyof typeof own.resist]) &&
+      !nativeOf(x, own),
   );
 }
+
+/** D83: a native critical hit, life or mana leech blocks Strike, Vampirism or Void. */
+const nativeOf = (x: ImbueDef, own: { critChance?: number; lifeLeech?: number; manaLeech?: number } | undefined) =>
+  (x.group === 'crit' && !!own?.critChance) || (x.group === 'lifeLeech' && !!own?.lifeLeech) || (x.group === 'manaLeech' && !!own?.manaLeech);
 
 const MAGE = new Set<Vocation>(['sorcerer', 'druid']);
 const VOCATION_SKILLS: Record<Vocation, readonly ItemSkill[]> = {
@@ -119,14 +124,14 @@ const VOCATION_SKILLS: Record<Vocation, readonly ItemSkill[]> = {
 
 /**
  * D81: imbuements a weapon can take: none of an elemental damage kind when it deals elemental damage itself (a monk's
- * elemental bond does not count), none of a skill it already raises.
+ * elemental bond does not count), none of a skill, critical hit, life or mana leech it already has (D83).
  */
 export function weaponImbuements(
-  w: { type?: string; element?: string; elementAttack?: unknown; specials?: { skills?: Partial<Record<string, number>> } },
+  w: { type?: string; element?: string; elementAttack?: unknown; specials?: { skills?: Partial<Record<string, number>>; critChance?: number; lifeLeech?: number; manaLeech?: number } },
   vocation: Vocation,
 ): ImbueDef[] {
   const elemental = !!w.elementAttack || (!!w.element && w.element !== 'physical' && w.type !== 'fist');
-  return imbuementsFor('weapon', vocation).filter((x) => !(x.group === 'damage' && elemental) && !(x.skill && w.specials?.skills?.[x.skill]));
+  return imbuementsFor('weapon', vocation).filter((x) => !(x.group === 'damage' && elemental) && !(x.skill && w.specials?.skills?.[x.skill]) && !nativeOf(x, w.specials));
 }
 
 /** Imbuement slots of a weapon (unknown weapon: the usual maximum). */
