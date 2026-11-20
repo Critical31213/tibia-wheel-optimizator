@@ -1,6 +1,8 @@
 /** D47: owned weapons (proficiency) — storage, editing helpers and perk labels. No React here. */
 import type { OwnedWeapon, ShapedSlot, Vocation } from '../types';
 import { getShapingOption, getWeapon, type Perk, type ShapingOption, type Weapon } from '../data/proficiency';
+import { maxTier, WEAPON_IMBUE_SLOTS, weaponImbuements } from '../data/equipment';
+import { sanitizeImbues } from './gear';
 import type { MessageKey, TFunction } from '../i18n';
 
 /** In the game a weapon has at most two reshaped slots. */
@@ -34,13 +36,22 @@ export function sanitizeWeapon(raw: unknown, vocation: Vocation): OwnedWeapon | 
     const replaces = int(s.replaces, 0, w.levels[L - 1].length - 1);
     if (replaces !== null && typeof s.option === 'string' && getShapingOption(s.option)) shaped.push({ level: L, replaces, option: s.option });
   }
+  const g = r.gear && typeof r.gear === 'object' ? r.gear : null;
+  const gear = g
+    ? { tier: int(g.tier, 0, weaponMaxTier(w)) ?? 0, imbues: sanitizeImbues(g.imbues, 'weapon', vocation, weaponImbueSlots(w), undefined, weaponImbuements(w, vocation)) }
+    : null;
   return {
     weaponId: w.id,
     level,
     ...(perks.some((p) => p !== null) ? { perks } : {}),
     ...(shaped.length ? { shaped } : {}),
+    ...(gear ? { gear } : {}),
   };
 }
+
+/** D81: forge tier limit and imbuement slots of a weapon. */
+export const weaponMaxTier = (w: Weapon): number => maxTier(w.class);
+export const weaponImbueSlots = (w: Weapon): number => w.imbuementSlots ?? WEAPON_IMBUE_SLOTS;
 
 export function parseWeaponPrefs(json: string | null, vocation: Vocation): WeaponPrefs {
   if (!json) return EMPTY_WEAPON_PREFS;

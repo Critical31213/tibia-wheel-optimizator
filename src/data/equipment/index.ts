@@ -117,6 +117,18 @@ const VOCATION_SKILLS: Record<Vocation, readonly ItemSkill[]> = {
   monk: ['fist', 'magic', 'shielding'],
 };
 
+/**
+ * D81: imbuements a weapon can take: none of an elemental damage kind when it deals elemental damage itself (a monk's
+ * elemental bond does not count), none of a skill it already raises.
+ */
+export function weaponImbuements(
+  w: { type?: string; element?: string; elementAttack?: unknown; specials?: { skills?: Partial<Record<string, number>> } },
+  vocation: Vocation,
+): ImbueDef[] {
+  const elemental = !!w.elementAttack || (!!w.element && w.element !== 'physical' && w.type !== 'fist');
+  return imbuementsFor('weapon', vocation).filter((x) => !(x.group === 'damage' && elemental) && !(x.skill && w.specials?.skills?.[x.skill]));
+}
+
 /** Imbuement slots of a weapon (unknown weapon: the usual maximum). */
 export const WEAPON_IMBUE_SLOTS = 3;
 

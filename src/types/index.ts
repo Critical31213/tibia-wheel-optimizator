@@ -414,6 +414,8 @@ export interface OptimizerInput {
   equipment?: GearEffects;
   /** D78: `equipment` without the shield / spellbook, used with a two-handed weapon. */
   equipmentTwoHanded?: GearEffects;
+  /** D81: the worn items (set by the engine), so a loadout's own weapon tier and imbuements can be applied. */
+  wornPieces?: Partial<Record<GearSlot, GearPiece>>;
 }
 
 /** D74: paper-doll slots the player fills (the weapon comes from the owned weapons). */
@@ -488,6 +490,8 @@ export interface OwnedWeapon {
   perks?: (number | null)[];
   /** Dust-reshaped slots (at most 2): option `replaces` of `level` (1-based) becomes shaping option `option` at rank 10. */
   shaped?: ShapedSlot[];
+  /** D81: forge tier and imbuements of this weapon; undefined = the default (`gear.weapon`, else the assumption). */
+  gear?: WeaponGear;
 }
 
 export interface ShapedSlot {

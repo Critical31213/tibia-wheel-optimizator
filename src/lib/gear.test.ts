@@ -149,6 +149,25 @@ describe('wearing the best owned items', () => {
     expect(v1.mitigation).toBeCloseTo(w1.mitigation);
   });
 
+  it('applies the chosen weapon\'s own tier and imbuements (D81)', () => {
+    const knight = (gear?: { tier: number; imbues: { id: string; level: 1 | 2 | 3 }[] }): OptimizerInput => ({
+      vocation: 'knight',
+      points: 400,
+      monster: null,
+      priority: 0,
+      meleeSkill: 'axe',
+      character: { level: 400, mainSkill: 110, shielding: 100 },
+      weapons: [{ weaponId: 'amber-axe', level: 0, ...(gear ? { gear } : {}) }],
+      gear: { pieces: { legs: [{ itemId: 'bast-legs' }] }, weapon: { tier: 0, imbues: [] } },
+      alternatives: 0,
+    });
+    // Default: `gear.weapon` (no imbuements).
+    expect(optimize(knight()).gear?.effects.crit).toEqual({ chance: 0, extra: 0 });
+    const own = optimize(knight({ tier: 3, imbues: [{ id: 'strike', level: 3 }] }));
+    expect(own.gear?.effects.crit?.chance).toBeGreaterThan(0);
+    expect(own.gear?.effects.onslaught).toBeGreaterThan(0);
+  });
+
   it('reports the worn set with the build', () => {
     const r = optimize({ ...input(death), alternatives: 0 });
     expect(r.gear?.worn.armor).toBe(0);

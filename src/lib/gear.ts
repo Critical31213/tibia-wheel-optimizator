@@ -42,8 +42,8 @@ export const gearInput = (g: GearPrefs): GearInput | undefined => (isGearSet(g) 
 const int = (x: unknown, min: number, max: number): number | null =>
   typeof x === 'number' && Number.isInteger(x) && x >= min && x <= max ? x : null;
 
-function sanitizeImbues(raw: unknown, slot: ImbueSlot, vocation: Vocation, max: number, item?: EquipmentItem): GearImbue[] {
-  const allowed = new Set(imbuementsFor(slot, vocation, item).map((x) => x.id));
+export function sanitizeImbues(raw: unknown, slot: ImbueSlot, vocation: Vocation, max: number, item?: EquipmentItem, options?: readonly { id: string }[]): GearImbue[] {
+  const allowed = new Set((options ?? imbuementsFor(slot, vocation, item)).map((x) => x.id));
   const out: GearImbue[] = [];
   for (const r of Array.isArray(raw) ? raw : []) {
     const id = typeof r?.id === 'string' ? r.id : '';

@@ -1,5 +1,5 @@
 import { useId, useMemo, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import type { KeyboardEvent, ReactNode } from 'react';
 import type { MeleeSkill, OwnedWeapon, Vocation } from '../types';
 import { useT } from '../i18n';
 import { getShapingOption, getWeapon, levelOptions, searchWeapons, shapingId, shapingOptions, type Weapon } from '../lib/api';
@@ -320,9 +320,10 @@ interface WeaponCardProps {
   meleeSkill: MeleeSkill | null;
   onChange: (o: OwnedWeapon) => void;
   onRemove: () => void;
+  gearEditor?: (owned: OwnedWeapon, weapon: Weapon, onChange: (o: OwnedWeapon) => void) => ReactNode;
 }
 
-function WeaponCard({ owned, vocation, meleeSkill, onChange, onRemove }: WeaponCardProps) {
+function WeaponCard({ owned, vocation, meleeSkill, onChange, onRemove, gearEditor }: WeaponCardProps) {
   const t = useT();
   const id = useId();
   const weapon = getWeapon(owned.weaponId);
@@ -366,6 +367,7 @@ function WeaponCard({ owned, vocation, meleeSkill, onChange, onRemove }: WeaponC
       </div>
       <PerkGrid owned={owned} weapon={weapon} onChange={onChange} />
       <ShapeEditor owned={owned} weapon={weapon} vocation={vocation} onChange={onChange} />
+      {gearEditor?.(owned, weapon, onChange)}
     </li>
   );
 }
@@ -375,10 +377,12 @@ export interface OwnedWeaponsProps {
   meleeSkill: MeleeSkill | null;
   prefs: WeaponPrefs;
   onChange: (update: (prefs: WeaponPrefs) => WeaponPrefs) => void;
+  /** D81: forge tier and imbuements of each weapon (rendered by the equipment panel). */
+  gearEditor?: WeaponCardProps['gearEditor'];
 }
 
 /** D47: owned weapons with proficiency level, perk choices and dust reshapes (inside the equipment panel, D74). */
-export function OwnedWeapons({ vocation, meleeSkill, prefs, onChange }: OwnedWeaponsProps) {
+export function OwnedWeapons({ vocation, meleeSkill, prefs, onChange, gearEditor }: OwnedWeaponsProps) {
   const t = useT();
   const owned = useMemo(() => new Set(prefs.weapons.map((w) => w.weaponId)), [prefs.weapons]);
   const update = (weapons: (all: OwnedWeapon[]) => OwnedWeapon[]) => onChange((p) => ({ ...p, weapons: weapons(p.weapons) }));
@@ -403,6 +407,7 @@ export function OwnedWeapons({ vocation, meleeSkill, prefs, onChange }: OwnedWea
                 meleeSkill={meleeSkill}
                 onChange={(next) => update((all) => all.map((x) => (x.weaponId === w.weaponId ? next : x)))}
                 onRemove={() => update((all) => all.filter((x) => x.weaponId !== w.weaponId))}
+                gearEditor={gearEditor}
               />
             ))}
           </ul>

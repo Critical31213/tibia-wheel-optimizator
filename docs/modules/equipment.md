@@ -43,6 +43,14 @@ Two-handed weapons (D78): when a shield or spellbook is worn, `wearBest` also re
 off-hand, so the lost mitigation counts against two-handed weapons. When the chosen weapon is two-handed,
 `result.gear.effects` is that set and `offhandOff` is set (the panel strikes the off-hand through). Quivers stay.
 
+Weapon tier and imbuements per weapon (D81): an owned weapon may carry its own `gear` (`OwnedWeapon.gear`: tier up
+to `maxTier(class)`, imbuements up to its `imbuementSlots`, none of a skill it raises or an elemental damage kind when
+it deals elemental damage itself; a monk elemental bond does not count). `wearBest` keeps the worn items
+(`input.wornPieces`); `equipmentWith(input, loadout)` rebuilds the effects with that weapon's settings (cached per
+weapon and hands) for valuations and the loadout ranking. Weapons without settings, the typical weapon and unowned
+suggestions use `gear.weapon` ("default for weapons without their own settings"), else the assumption.
+`result.gear.effects` follows the chosen weapon.
+
 ## Effects (`src/engine/gear.ts`)
 
 - `gearEffects(worn, vocation, meleeSkill)` → `GearEffects`.

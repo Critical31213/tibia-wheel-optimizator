@@ -21,6 +21,19 @@ describe('weapon prefs (D47)', () => {
     expect(parseWeaponPrefs('{bad', 'knight')).toEqual({ weapons: [], suggest: false });
   });
 
+  it('keeps a tier and imbuements per weapon within its limits (D81)', () => {
+    const imbues = [{ id: 'strike', level: 3 }, { id: 'chop', level: 3 }, { id: 'vampirism', level: 2 }, { id: 'void', level: 3 }, { id: 'frost', level: 3 }];
+    const read = (weaponId: string, vocation: 'knight' | 'monk', gear: unknown) =>
+      parseWeaponPrefs(JSON.stringify({ weapons: [{ weaponId, level: 0, gear }] }), vocation).weapons[0].gear;
+    // Amber Greataxe: 2 slots, native axe skill and earth damage (no Chop, no Frost).
+    expect(read('amber-greataxe', 'knight', { tier: 10, imbues })).toEqual({ tier: 10, imbues: [{ id: 'strike', level: 3 }, { id: 'vampirism', level: 2 }] });
+    // Soulkamas: 3 slots, native fist (no Fist imbuement); the elemental bond allows damage imbuements.
+    const monk = read('soulkamas', 'monk', { tier: 2, imbues: [{ id: 'fist', level: 3 }, ...imbues] });
+    expect(monk?.imbues.map((x) => x.id)).toEqual(['strike', 'vampirism', 'void']);
+    expect(read('soulkamas', 'monk', undefined)).toBeUndefined();
+    expect(read('amber-greataxe', 'knight', { tier: 11, imbues: [] })?.tier).toBe(0);
+  });
+
   it('edits perks and reshapes', () => {
     const o = setPerk(ownWeapon(epee), 2, 1);
     expect(o.perks?.[2]).toBe(1);

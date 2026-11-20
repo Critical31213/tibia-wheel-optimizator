@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { GearEffects, GearResult, MeleeSkill, Vocation } from '../types';
+import type { GearEffects, GearResult, MeleeSkill, OwnedWeapon, Vocation } from '../types';
 import { useT, type TFunction } from '../i18n';
 import {
   getImbuement,
@@ -14,6 +14,7 @@ import {
   TIER_EFFECT,
   tierChance,
   WEAPON_IMBUE_SLOTS,
+  weaponImbuements,
   type EquipmentItem,
   type GearSlot,
   type ImbueDef,
@@ -21,7 +22,8 @@ import {
   type ImbueSlot,
 } from '../data/equipment';
 import { addPiece, isGearSet, MAX_PIECES, removePiece, updatePiece, type GearPrefs, type ImbueChoice } from '../lib/gear';
-import type { WeaponPrefs } from '../lib/weapons';
+import { weaponImbueSlots, weaponMaxTier, type WeaponPrefs } from '../lib/weapons';
+import type { Weapon } from '../lib/api';
 import { cx } from '../lib/labels';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { OwnedWeapons } from './OwnedWeapons';
@@ -125,10 +127,10 @@ function TierSelect({ slot, max, value, onChange }: { slot: Slot; max: number; v
   );
 }
 
-function ImbueEditor({ slot, vocation, item, count, value, onChange }: { slot: Slot; vocation: Vocation; item?: EquipmentItem; count: number; value: readonly ImbueChoice[]; onChange: (v: ImbueChoice[]) => void }) {
+function ImbueEditor({ slot, vocation, item, weapon, count, value, onChange }: { slot: Slot; vocation: Vocation; item?: EquipmentItem; weapon?: Weapon; count: number; value: readonly ImbueChoice[]; onChange: (v: ImbueChoice[]) => void }) {
   const t = useT();
   const id = useId();
-  const options = useMemo(() => imbuementsFor(slot, vocation, item), [slot, vocation, item]);
+  const options = useMemo(() => (weapon ? weaponImbuements(weapon, vocation) : imbuementsFor(slot, vocation, item)), [slot, vocation, item, weapon]);
   if (count === 0 || options.length === 0) return <p className="text-xs text-parchment-400">{t('gear.noImbueSlots')}</p>;
   const set = (k: number, c: ImbueChoice | null) => {
     const next = [...value];
@@ -174,6 +176,26 @@ function ImbueEditor({ slot, vocation, item, count, value, onChange }: { slot: S
   );
 }
 
+/** D81: forge tier and imbuements of one owned weapon (its own limits); unset = the default below. */
+function WeaponGearEditor({ owned, weapon, vocation, onChange }: { owned: OwnedWeapon; weapon: Weapon; vocation: Vocation; onChange: (o: OwnedWeapon) => void }) {
+  const t = useT();
+  const g = owned.gear ?? { tier: 0, imbues: [] };
+  const set = (patch: Partial<typeof g>) => onChange({ ...owned, gear: { ...g, ...patch } });
+  const max = weaponMaxTier(weapon);
+  return (
+    <div className="mt-2 flex flex-col gap-1.5 border-t border-ink-700 pt-2">
+      <p className="text-xs text-parchment-400">{owned.gear ? t('gear.weaponOwnSet') : t('gear.weaponOwnDefault')}</p>
+      {max > 0 ? <TierSelect slot="weapon" max={max} value={g.tier} onChange={(tier) => set({ tier })} /> : <p className="text-xs text-parchment-500">{t('gear.noTier')}</p>}
+      <ImbueEditor slot="weapon" vocation={vocation} weapon={weapon} count={weaponImbueSlots(weapon)} value={g.imbues} onChange={(imbues) => set({ imbues })} />
+      {owned.gear && (
+        <button type="button" onClick={() => onChange({ ...owned, gear: undefined })} className="self-start text-xs text-gold-400 hover:underline">
+          {t('gear.weaponReset')}
+        </button>
+      )}
+    </div>
+  );
+}
+
 interface EditorProps {
   slot: Slot;
   vocation: Vocation;
@@ -197,15 +219,20 @@ function SlotEditor({ slot, vocation, gear, weaponName, wornIndex, onGear, melee
     return (
       <div className="flex flex-col gap-3">
         <p className="text-sm text-parchment-200">{weaponName ?? t('gear.weaponAuto')}</p>
-        <p className="text-xs text-parchment-400">{gear.weapon ? t('gear.weaponSet') : t('gear.weaponDefault')}</p>
-        <TierSelect slot="weapon" max={MAX_TIER} value={w.tier} onChange={(tier) => set({ tier })} />
-        <ImbueEditor slot="weapon" vocation={vocation} count={WEAPON_IMBUE_SLOTS} value={w.imbues} onChange={(imbues) => set({ imbues })} />
-        {gear.weapon && (
-          <button type="button" onClick={() => onGear((g) => ({ ...g, weapon: null }))} className="self-start text-xs text-gold-400 hover:underline">
-            {t('gear.weaponReset')}
-          </button>
-        )}
-        <OwnedWeapons vocation={vocation} meleeSkill={meleeSkill} prefs={weapons} onChange={onWeapons} />
+        <OwnedWeapons vocation={vocation} meleeSkill={meleeSkill} prefs={weapons} onChange={onWeapons} gearEditor={(o, wp, change) => <WeaponGearEditor owned={o} weapon={wp} vocation={vocation} onChange={change} />} />
+        <details className="rounded-lg border border-ink-600 p-2" open={weapons.weapons.length === 0}>
+          <summary className="cursor-pointer text-xs text-parchment-300">{t('gear.weaponDefaultTitle')}</summary>
+          <div className="mt-2 flex flex-col gap-2">
+            <p className="text-xs text-parchment-400">{gear.weapon ? t('gear.weaponSet') : t('gear.weaponDefault')}</p>
+            <TierSelect slot="weapon" max={MAX_TIER} value={w.tier} onChange={(tier) => set({ tier })} />
+            <ImbueEditor slot="weapon" vocation={vocation} count={WEAPON_IMBUE_SLOTS} value={w.imbues} onChange={(imbues) => set({ imbues })} />
+            {gear.weapon && (
+              <button type="button" onClick={() => onGear((g) => ({ ...g, weapon: null }))} className="self-start text-xs text-gold-400 hover:underline">
+                {t('gear.weaponReset')}
+              </button>
+            )}
+          </div>
+        </details>
       </div>
     );
   }

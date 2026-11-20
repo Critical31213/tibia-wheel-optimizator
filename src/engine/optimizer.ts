@@ -902,7 +902,7 @@ function rationale(p: Prepared, best: State, stages: number[], revPoints: number
 const pointsOf = (input: Pick<OptimizerInput, 'points'>) =>
   Math.max(0, Math.floor(Number.isFinite(input.points) ? input.points : 0));
 
-type ValuationInput = Pick<OptimizerInput, 'vocation' | 'points' | 'monster' | 'context' | 'character' | 'monsters' | 'equipment' | 'equipmentTwoHanded'> &
+type ValuationInput = Pick<OptimizerInput, 'vocation' | 'points' | 'monster' | 'context' | 'character' | 'monsters' | 'equipment' | 'equipmentTwoHanded' | 'wornPieces' | 'weapons' | 'gear'> &
   Partial<Pick<OptimizerInput, 'rotationId' | 'forcedSpells' | 'customRotation'>>;
 
 /** Level used for valuation: `character.level`, else points + 50. */
@@ -946,9 +946,35 @@ function offhandOf(input: Pick<OptimizerInput, 'equipment'>, shieldPlan: boolean
   return worn ? { offhand: worn.kind, defense: worn.defense } : {};
 }
 
-/** D78: a two-handed weapon takes the shield / spellbook off (its defense, bonuses and imbuements). */
+const armoryCache = new WeakMap<object, Map<string, GearEffects>>();
+
+/**
+ * D78 / D81: equipment with a loadout's weapon: a two-handed weapon takes the shield / spellbook off (its defense,
+ * bonuses and imbuements); an owned weapon brings its own forge tier and imbuements (else `gear.weapon`).
+ */
+function equipmentWith(input: Pick<OptimizerInput, 'vocation' | 'meleeSkill' | 'equipment' | 'equipmentTwoHanded' | 'wornPieces' | 'weapons' | 'gear'>, lo: Loadout): GearEffects | undefined {
+  const two = lo.weapon.hands === 2;
+  const own = input.weapons?.find((w) => w.weaponId === lo.weapon.id)?.gear;
+  const pieces = input.wornPieces;
+  if (!pieces || !own) return two && input.equipmentTwoHanded ? input.equipmentTwoHanded : input.equipment;
+  let cache = armoryCache.get(pieces);
+  if (!cache) armoryCache.set(pieces, (cache = new Map()));
+  const key = `${lo.weapon.id}|${two}`;
+  let fx = cache.get(key);
+  if (!fx) {
+    const kept = { ...pieces };
+    const oh = kept.offhand && getItem(kept.offhand.itemId);
+    if (two && oh && oh.slot !== 'quiver') delete kept.offhand;
+    fx = gearEffects({ pieces: kept, weapon: own }, input.vocation, input.meleeSkill);
+    cache.set(key, fx);
+  }
+  return fx;
+}
+
 function armedWith<T extends ValuationInput>(input: T, loadout: Loadout | undefined): T {
-  return loadout?.weapon.hands === 2 && input.equipmentTwoHanded ? { ...input, equipment: input.equipmentTwoHanded } : input;
+  if (!loadout) return input;
+  const equipment = equipmentWith(input, loadout);
+  return equipment === input.equipment ? input : { ...input, equipment };
 }
 
 // ---------------------------------------------------------------------------
@@ -987,7 +1013,7 @@ function gearScorer(input: OptimizerInput): (fx: GearEffects) => number {
  * D74: the owned items worn on this spot. Per slot the item with the best `gearScorer` value with the other slots
  * fixed, repeated until nothing changes. Items above the character level are skipped.
  */
-export function wearBest(input: OptimizerInput): { gear: GearResult; twoHanded?: GearEffects } | undefined {
+export function wearBest(input: OptimizerInput): { gear: GearResult; wornPieces: WornGear['pieces']; twoHanded?: GearEffects } | undefined {
   const g = input.gear;
   if (!g) return undefined;
   const level = levelFor(input);
@@ -1025,7 +1051,11 @@ export function wearBest(input: OptimizerInput): { gear: GearResult; twoHanded?:
   const oh = GEAR_SLOTS.indexOf('offhand');
   const ohItem = worn[oh] !== undefined ? getItem(g.pieces.offhand![worn[oh]!].itemId) : undefined;
   const twoHanded = ohItem && ohItem.slot !== 'quiver' ? effectsOf(worn.map((x, k) => (k === oh ? undefined : x))) : undefined;
-  return { gear: { worn: out, effects: effectsOf(worn) }, ...(twoHanded ? { twoHanded } : {}) };
+  const wornPieces: WornGear['pieces'] = {};
+  GEAR_SLOTS.forEach((s, k) => {
+    if (worn[k] !== undefined) wornPieces[s] = g.pieces[s]![worn[k]!];
+  });
+  return { gear: { worn: out, effects: effectsOf(worn) }, wornPieces, ...(twoHanded ? { twoHanded } : {}) };
 }
 
 /**
@@ -1840,7 +1870,7 @@ export function pickStances(input: OptimizerInput, preset: RotationPreset | null
 
 export function runOptimizer(raw: OptimizerInput): OptimizerResult {
   const worn = wearBest(raw);
-  const dressed = worn ? { ...raw, equipment: worn.gear.effects, ...(worn.twoHanded ? { equipmentTwoHanded: worn.twoHanded } : {}) } : raw;
+  const dressed = worn ? { ...raw, equipment: worn.gear.effects, wornPieces: worn.wornPieces, ...(worn.twoHanded ? { equipmentTwoHanded: worn.twoHanded } : {}) } : raw;
   const input = dressed.gems?.length ? { ...dressed, gems: withSharedGrades(dressed.gems) } : dressed;
   const { p, plans, main } = bestBuild(input);
   const n = Math.max(0, Math.min(5, Math.floor(input.alternatives ?? DEFAULT_ALTERNATIVES)));
@@ -1851,7 +1881,9 @@ export function runOptimizer(raw: OptimizerInput): OptimizerResult {
   if (weapon) result.weapon = weapon;
   if (worn) {
     const off = !!worn.twoHanded && p.weapon?.weapon.hands === 2;
-    result.gear = off ? { ...worn.gear, effects: worn.twoHanded!, offhandOff: true } : worn.gear;
+    const lo = p.weapon && choiceLoadout(p.weapon);
+    const effects = (lo && equipmentWith(input, lo)) ?? worn.gear.effects;
+    result.gear = { ...worn.gear, effects, ...(off ? { offhandOff: true } : {}) };
   }
   return result;
 }
@@ -2038,14 +2070,19 @@ function loadoutScorer(input: OptimizerInput, spec: Pick<PlanSpec, 'preset' | 'r
 
 /** Unblended `loadoutScorer`. */
 function loadoutValuer(input: OptimizerInput, spec: Pick<PlanSpec, 'preset' | 'reference' | 'stances' | 'preCd'>, v0: ValuationContext, ri: RotationInput = NO_BONUS) {
-  const one = input;
-  const two = input.equipmentTwoHanded ? { ...input, equipment: input.equipmentTwoHanded } : input;
-  const setup = (inp: OptimizerInput) => ({ inp, mi: modelInputs(inp), offhand: offhandOf(inp, v0.model.plan.shield) });
-  const s1 = setup(one);
-  const s2 = two === one ? s1 : setup(two);
+  const setups = new Map<GearEffects | undefined, { inp: OptimizerInput; mi: ReturnType<typeof modelInputs>; offhand: OffhandChoice }>();
+  const setup = (lo: Loadout) => {
+    const equipment = equipmentWith(input, lo);
+    let s = setups.get(equipment);
+    if (!s) {
+      const inp = equipment === input.equipment ? input : { ...input, equipment };
+      setups.set(equipment, (s = { inp, mi: modelInputs(inp), offhand: offhandOf(inp, v0.model.plan.shield) }));
+    }
+    return s;
+  };
   const { preset, reference, stances, preCd } = spec;
   return (lo: Loadout): Parts => {
-    const { inp, mi, offhand } = lo.weapon.hands === 2 ? s2 : s1;
+    const { inp, mi, offhand } = setup(lo);
     const c = stancedCharacter(loadoutCharacter(mi.character, inp.vocation, lo), stances);
     const m0 = stanceBuilder(inp.vocation, mi.context, mi.monsters, stances, preset, lo, preCd, inp.equipment)(c);
     const model: SpellModel = { ...m0, plan: planFor(m0, preset), total: reference };
