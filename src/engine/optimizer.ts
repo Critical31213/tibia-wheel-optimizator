@@ -606,6 +606,11 @@ function statLines(wheel: EngineWheel, alloc: Int32Array, stages: number[], env:
   }
   const flat = stages.reduce((s, st) => s + REVELATION_FLAT_BONUS[st], 0) + vesselSlices;
   const lines: StatLine[] = [];
+  const gemLines = gemStatLines(env, vessels);
+  // D82: gem Hit Points / Mana / Capacity join the wheel's lines.
+  hp += gemLines.pooled['Hit Points'] ?? 0;
+  mana += gemLines.pooled.Mana ?? 0;
+  cap += gemLines.pooled.Capacity ?? 0;
   if (hp > 0) lines.push(stat('stat.hitPoints', `+${fmt(hp)}`, 'defense'));
   if (mana > 0) lines.push(stat('stat.mana', `+${fmt(mana)}`, 'utility'));
   if (cap > 0) lines.push(stat('stat.capacity', `+${fmt(cap)}`, 'utility'));
@@ -618,8 +623,18 @@ function statLines(wheel: EngineWheel, alloc: Int32Array, stages: number[], env:
   for (const name of uniques) lines.push(stat('stat.unique', 'Active', 'offense', { name }));
   const unlocked = vessels.filter((x) => x.unlocked).length;
   if (unlocked) lines.push(stat('stat.vessels', `${unlocked}/8`, 'utility'));
+  lines.push(...gemLines.lines);
+  // D82: grouped by category (offense, defense, utility), order kept within a group.
+  return lines.map((l, i) => ({ l, i })).sort((a, b) => CATEGORY_ORDER[a.l.category] - CATEGORY_ORDER[b.l.category] || a.i - b.i).map((x) => x.l);
+}
 
-  // Owned gem mods active in their vessels.
+const CATEGORY_ORDER: Record<StatLine['category'], number> = { offense: 0, defense: 1, utility: 2 };
+const POOLED = new Set(['Hit Points', 'Mana', 'Capacity']);
+
+/** Owned gem mods active in their vessels; Hit Points / Mana / Capacity are returned as sums (`pooled`). */
+function gemStatLines(env: GemEnv, vessels: OptimizerResult['vessels']): { lines: StatLine[]; pooled: Record<string, number> } {
+  const lines: StatLine[] = [];
+  const pooled: Record<string, number> = {};
   const sums = new Map<string, { value: number; unit: string; category: StatLine['category'] }>();
   for (const vs of vessels) {
     if (vs.source !== 'owned' || !vs.gem) continue;
@@ -633,6 +648,10 @@ function statLines(wheel: EngineWheel, alloc: Int32Array, stages: number[], env:
       }
       const m = env.wheel.basicMods.find((x) => x.id === ref.modId);
       for (const e of m?.effects ?? []) {
+        if (POOLED.has(e.name)) {
+          pooled[e.name] = (pooled[e.name] ?? 0) + (e.values[ref.grade - 1] ?? 0);
+          continue;
+        }
         const unit = /resistance|mitigation/i.test(e.name) ? '%' : '';
         const cur = sums.get(e.name) ?? { value: 0, unit, category: unit ? 'defense' : 'utility' };
         cur.value += e.values[ref.grade - 1] ?? 0;
@@ -643,7 +662,7 @@ function statLines(wheel: EngineWheel, alloc: Int32Array, stages: number[], env:
   for (const [name, s] of [...sums].sort((a, b) => a[0].localeCompare(b[0]))) {
     lines.push(stat('stat.gemMod', `${s.value >= 0 ? '+' : ''}${fmt(s.value, 2)}${s.unit}`, s.category, { name }));
   }
-  return lines;
+  return { lines, pooled };
 }
 
 function namedConvictions(wheel: EngineWheel, alloc: Int32Array, path: number[]): Perk[] {

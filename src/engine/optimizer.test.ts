@@ -142,6 +142,17 @@ describe('behaviour', () => {
     for (const s of res.stats) expect(s.labelMsg?.key).toMatch(/^stat\./);
   });
 
+  it('pools gem hit points into the wheel line and groups stats by category (D82)', () => {
+    const gem = { id: 'hp', quality: 'lesser' as const, basic1: { modId: 31, grade: 1 as const }, basic2: null, supreme: null };
+    const res = optimize({ vocation: 'knight', points: 4000, monster: null, priority: 100, gems: [gem], alternatives: 0 });
+    const keys = res.stats.map((s) => s.labelMsg?.key);
+    expect(keys.filter((k) => k === 'stat.hitPoints')).toHaveLength(1);
+    expect(res.stats.some((s) => s.labelMsg?.key === 'stat.gemMod' && /Hit Points/.test(s.label))).toBe(false);
+    const order = { offense: 0, defense: 1, utility: 2 };
+    const cats = res.stats.map((s) => order[s.category]);
+    expect(cats).toEqual([...cats].sort((a, b) => a - b));
+  });
+
   it('runs fast (warm, incl. RM gem re-optimization and D34 pair tries)', () => {
     const inputs = VOCATIONS.flatMap((vocation) =>
       [100, 1000, 2500, 4000].map((points) => ({ vocation, points, monster: null, priority: 50, context: CONTEXTS[0] })),
