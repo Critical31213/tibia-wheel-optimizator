@@ -85,9 +85,9 @@ weapon can have at most two reshaped slots.
 | life / mana leech | sustain (D29/D31 leech point), mana leech as for convictions |
 
 Rending Inferniarch weapons cannot take the critical hit (Strike) imbuement: their loadout removes the default
-Powerful Strike crit (10 % chance, +50 % extra damage) from spells and auto-attack (D48). Siphoning
+Powerful Strike crit (10 % chance, +50 % extra damage) from spells and auto-attack (D48). Draining
 Inferniarch weapons cannot take the life leech imbuement (−half of `K.LIFE_LEECH_IMBUE`, the weapon's item) and
-Draining ones not the mana leech one (−8 pp, Powerful Void) (D49). With a weapon's own imbuements (D81) the removed value is that
+Siphoning ones not the mana leech one (−8 pp, Powerful Void) (D49, swapped in D87). With a weapon's own imbuements (D81) the removed value is that
 weapon's Strike / leech (none, since the editor blocks them). The predicates (`noCritImbue`, `noLifeLeechImbue`,
 `noManaLeechImbue`) live in `src/data/equipment` and also drive `weaponImbuements` (D86).
 

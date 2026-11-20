@@ -34,13 +34,13 @@ describe('weapon prefs (D47)', () => {
     expect(monk?.imbues.map((x) => x.id)).toEqual(['fist', 'strike', 'vampirism']);
     expect(read('soulkamas', 'monk', undefined)).toBeUndefined();
     expect(read('amber-greataxe', 'knight', { tier: 11, imbues: [] })?.tier).toBe(0);
-    // D86: Inferniarch variants (Rending no Strike, Siphoning no Vampirism, Draining no Void).
+    // D87: Inferniarch variants (Rending no Strike, Siphoning no Void, Draining no Vampirism).
     const melee = [{ id: 'strike', level: 3 }, { id: 'vampirism', level: 3 }, { id: 'void', level: 3 }];
     const one = (id: string) => parseWeaponPrefs(JSON.stringify({ weapons: [{ weaponId: id, level: 0, gear: { tier: 0, imbues: melee } }] }), 'knight').weapons[0].gear?.imbues.map((x) => x.id);
     expect(one('rending-inferniarch-blade')).toEqual(['vampirism']);
     expect(one('siphoning-inferniarch-blade')).toEqual(['strike']);
     expect(one('draining-inferniarch-blade')).toEqual(['strike']);
-    expect(parseWeaponPrefs(JSON.stringify({ weapons: [{ weaponId: 'draining-inferniarch-blade', level: 0, gear: { tier: 0, imbues: melee.slice(2) } }] }), 'knight').weapons[0].gear?.imbues).toEqual([]);
+    expect(parseWeaponPrefs(JSON.stringify({ weapons: [{ weaponId: 'siphoning-inferniarch-blade', level: 0, gear: { tier: 0, imbues: melee.slice(2) } }] }), 'knight').weapons[0].gear?.imbues).toEqual([]);
     // D83: native life leech (Cobra Rod) blocks Vampirism, native crit (Lion Rod) blocks Strike, as on TibiaWiki.
     const mage = [{ id: 'strike', level: 3 }, { id: 'vampirism', level: 3 }, { id: 'void', level: 3 }];
     expect(read('cobra-rod', 'druid', { tier: 0, imbues: mage })?.imbues.map((x) => x.id)).toEqual(['strike', 'void']);

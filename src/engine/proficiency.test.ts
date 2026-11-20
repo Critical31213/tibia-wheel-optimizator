@@ -53,7 +53,7 @@ describe('weapon proficiency model (D45)', () => {
     expect(dmg(plain) / dmg(rending)).toBeCloseTo(1.05, 3);
   });
 
-  it('drops the leech imbuement of Siphoning (life) and Draining (mana) weapons', () => {
+  it('drops the leech imbuement of Draining (life) and Siphoning (mana) weapons', () => {
     const v = { model: knight('boss'), vocation: 'knight', threat: 1, leech: 1 } as unknown as Parameters<typeof loadoutParts>[0];
     const diff = (id: string) => {
       const w = getWeapon(id)!;
@@ -62,8 +62,8 @@ describe('weapon proficiency model (D45)', () => {
       return { off: a.off - b.off, def: a.def - b.def };
     };
     // Life: one of two Powerful Vampirism items (25 pp) × leechPoint 2 (leech 1, threat 1, 50 pp assumed).
-    expect(diff('siphoning-inferniarch-blade')).toEqual({ off: 0, def: -50 });
-    const d = diff('draining-inferniarch-blade');
+    expect(diff('draining-inferniarch-blade')).toEqual({ off: 0, def: -50 });
+    const d = diff('siphoning-inferniarch-blade');
     expect(d.off).toBeCloseTo(-0.8);
     expect(d.def).toBeCloseTo(-0.4);
   });

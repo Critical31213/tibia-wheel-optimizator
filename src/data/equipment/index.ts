@@ -135,12 +135,12 @@ const SKILL_WEAPONS: Partial<Record<ItemSkill, readonly string[]>> = {
 };
 const ELEMENT_DAMAGE_WEAPONS = new Set(['fist', 'club', 'sword', 'axe', 'bow', 'crossbow']);
 /**
- * D48 / D49: Inferniarch variants that cannot take an imbuement: Rending no Strike, Siphoning no Vampirism, Draining no
- * Void (shared by the editor and the engine).
+ * D48 / D87: Inferniarch variants that cannot take an imbuement: Rending no Strike, Siphoning no Void, Draining no
+ * Vampirism (TibiaWiki; shared by the editor and the engine).
  */
 export const noCritImbue = (w: { id: string }) => w.id.startsWith('rending-inferniarch-');
-export const noLifeLeechImbue = (w: { id: string }) => w.id.startsWith('siphoning-inferniarch-');
-export const noManaLeechImbue = (w: { id: string }) => w.id.startsWith('draining-inferniarch-');
+export const noLifeLeechImbue = (w: { id: string }) => w.id.startsWith('draining-inferniarch-');
+export const noManaLeechImbue = (w: { id: string }) => w.id.startsWith('siphoning-inferniarch-');
 
 /** D84: wands and rods below this level cannot take Strike. */
 const STRIKE_MIN_WAND_LEVEL = 150;
