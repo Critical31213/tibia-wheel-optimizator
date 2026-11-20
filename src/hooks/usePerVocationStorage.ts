@@ -3,6 +3,7 @@ import type { OwnedGem, Vocation } from '../types';
 import { gemsStorageKey, parseGems, serializeGems } from '../lib/gems';
 import { gearStorageKey, parseGear, type GearPrefs } from '../lib/gear';
 import { parseWeaponPrefs, serializeWeaponPrefs, weaponsStorageKey, type WeaponPrefs } from '../lib/weapons';
+import { compareStorageKey, parseCompareCode } from '../lib/compare';
 
 export interface VocationStore<T> {
   key: (vocation: Vocation) => string;
@@ -59,3 +60,6 @@ export const usePersistentGems = (vocation: Vocation) => usePerVocationStorage(v
 export const usePersistentWeapons = (vocation: Vocation) => usePerVocationStorage(vocation, WEAPONS);
 /** D74: equipment of the current vocation. */
 export const usePersistentGear = (vocation: Vocation) => usePerVocationStorage(vocation, GEAR);
+const COMPARE: VocationStore<string> = { key: compareStorageKey, parse: parseCompareCode, serialize: (c) => JSON.stringify(c) };
+/** D89: the own wheel's planner code of the current vocation. */
+export const usePersistentCompareCode = (vocation: Vocation) => usePerVocationStorage(vocation, COMPARE);

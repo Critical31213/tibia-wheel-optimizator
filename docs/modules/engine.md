@@ -210,6 +210,17 @@ Optional `input.gear` (owned items per slot, D75): `wearBest` picks the set for 
 
 - **Augment pair look-ahead.** While exactly one copy of an augment is full and the other is affordable, the rank adds stage II × `LOOKAHEAD_WEIGHT` (stage I can be worth 0, e.g. an unusable cooldown).
 
+### Comparison with the player's wheel (D89)
+
+`OptimizerInput.compareWith` (points per slice id, e.g. from a planner code) adds `OptimizerResult.comparison`.
+The own wheel is turned into a search state (`stateOf`: slices placed in unlock order; points on slices that are
+not unlocked or over capacity are dropped and listed in `invalid`) and valued with the build's plan: the same
+rotation, stances, gear and owned gems placed optimally. Wheel values exclude the rotation base
+(`rawTotals(..., false)`): `relative` = own / optimal in %, `score` / `effect` = optimal − own. Verdict: `equal`
+(within 0.5 %), `close` (within 5 %), `worse`, or `better` (the beam missed it). `items` are the differences:
+slices (dedication + conviction), revelation stages and the vessel state, each with its gain, largest first;
+`reasons` name the top gains and losses and a points mismatch.
+
 ## 4. Gems (`gems.ts`)
 
 - **Wheel variant (D88).** `OptimizerInput.wheelVariant` (`'current'` default, `'live'`) selects the wheel

@@ -14,7 +14,7 @@ const QUADRANTS: readonly Domain[] = ['topLeft', 'topRight', 'bottomLeft', 'bott
 
 interface WheelChartProps {
   wheel: WheelDefinition;
-  result: BuildResult | null;
+  result: Pick<BuildResult, 'allocation' | 'pointsUsed' | 'revelations'> | null;
 }
 
 interface SliceShape {

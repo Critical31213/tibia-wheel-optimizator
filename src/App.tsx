@@ -1,4 +1,4 @@
-import { useDeferredValue, useMemo } from 'react';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { useOptimizer } from './hooks/useOptimizer';
 import { CharacterPanel } from './components/CharacterPanel';
 import { EquipmentPanel } from './components/EquipmentPanel';
@@ -11,13 +11,15 @@ import { MonsterSearch } from './components/MonsterSearch';
 import { NotesPanel } from './components/NotesPanel';
 import { Panel } from './components/Panel';
 import { BuildRationale, ResultsPanel } from './components/ResultsPanel';
+import { ComparePanel } from './components/ComparePanel';
+import { parseOwnWheel } from './lib/compare';
 import { SegmentedControl } from './components/SegmentedControl';
 import { RotationPanel } from './components/RotationPanel';
 import { VesselsPanel } from './components/VesselsPanel';
 import { VocationPicker } from './components/VocationPicker';
 import { WeaponResultPanel } from './components/WeaponResultPanel';
 import { WheelChart } from './components/WheelChart';
-import { usePersistentGear, usePersistentGems, usePersistentWeapons } from './hooks/usePerVocationStorage';
+import { usePersistentCompareCode, usePersistentGear, usePersistentGems, usePersistentWeapons } from './hooks/usePerVocationStorage';
 import { gemFromRecommendation, setModGrade, updateGem } from './lib/gems';
 import { usePersistentInputs } from './hooks/usePersistentInputs';
 import { usePersistentSpellPrefs } from './hooks/usePersistentSpellPrefs';
@@ -42,6 +44,11 @@ export default function App() {
   const deferredWeapons = useDeferredValue(weaponPrefs);
   const [gear, setGear] = usePersistentGear(inputs.vocation);
   const deferredGear = useDeferredValue(gear);
+  const [compareCode, setCompareCode] = usePersistentCompareCode(inputs.vocation);
+  const [showOwn, setShowOwn] = useState(false);
+  const own = useMemo(() => parseOwnWheel(compareCode), [compareCode]);
+  const compareWith = own && own.vocation === inputs.vocation && own.variant === inputs.wheel ? own.points : undefined;
+  const deferredCompare = useDeferredValue(compareWith);
   const presets = useMemo(() => getRotationPresets(inputs.vocation), [inputs.vocation]);
   const forceable = useMemo(() => getForceableSpells(inputs.vocation), [inputs.vocation]);
   const customSpells = useMemo(() => getCustomRotationSpells(inputs.vocation), [inputs.vocation]);
@@ -96,9 +103,10 @@ export default function App() {
             suggestWeapons: deferredWeapons.weapons.length && deferredWeapons.suggest ? true : undefined,
             gear: gearRequest,
             wheelVariant: deferred.wheel === 'current' ? undefined : deferred.wheel,
+            compareWith: deferredCompare,
           }
         : null,
-    [deferred.wheel, deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, meleeSkill, rotationId, customRotation, forcedSpells, forcedStage2, forcedRevelations, stance, deferredWeapons, gearRequest],
+    [deferredCompare, deferred.wheel, deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, meleeSkill, rotationId, customRotation, forcedSpells, forcedStage2, forcedRevelations, stance, deferredWeapons, gearRequest],
   );
   const optimized = useOptimizer(request);
   // The shown build may lag the inputs while the worker computes; everything below follows its own vocation.
@@ -160,7 +168,10 @@ export default function App() {
                 <a href="#gems-heading" className="font-medium text-gold-300 underline hover:text-gold-200">{t('app.noGemsLink')}</a>
               </p>
             )}
-            <WheelChart wheel={resultWheel} result={shown} />
+            {showOwn && current && shown?.comparison && (
+              <p className="mb-2 text-center text-xs font-medium text-gold-300">{t('compare.ownWheel')}</p>
+            )}
+            <WheelChart wheel={resultWheel} result={showOwn && current && shown?.comparison ? shown.comparison : shown} />
           </Panel>
           <Panel title={t('rotation.title')} headingId="rotation-heading">
             <RotationPanel
@@ -196,6 +207,21 @@ export default function App() {
               )}
             </div>
           </Panel>
+          {shown && (
+            <Panel title={t('compare.title')} headingId="compare-heading">
+              <ComparePanel
+                code={compareCode}
+                onCode={(c) => setCompareCode(() => c)}
+                own={own}
+                vocation={inputs.vocation}
+                variant={inputs.wheel}
+                onVariant={(wheel) => update({ wheel })}
+                comparison={current && compareWith ? shown.comparison : undefined}
+                showOwn={showOwn}
+                onShowOwn={setShowOwn}
+              />
+            </Panel>
+          )}
           {shown && (
             <Panel title={t('export.title')} headingId="export-heading">
               <ExportPanel key={shown.plannerCode ?? ''} code={shown.plannerCode} />

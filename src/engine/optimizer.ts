@@ -30,6 +30,8 @@ import type {
   SpellUsage,
   StatLine,
   VesselAssignment,
+  WheelComparison,
+  ComparisonItem,
   WeaponPick,
   WeaponReshape,
   WeaponResult,
@@ -1933,6 +1935,7 @@ export function runOptimizer(raw: OptimizerInput): OptimizerResult {
   const count = Number.isFinite(n) ? n : DEFAULT_ALTERNATIVES;
   const result = alternatives(p, plans, main, count);
   result.gemRecommendations = withRmReoptimized(input, p, main, result.gemRecommendations);
+  if (input.compareWith) result.comparison = compareWheel(p, result, input.compareWith);
   const weapon = weaponResult(p, main);
   if (weapon) result.weapon = weapon;
   if (worn) {
@@ -1944,7 +1947,146 @@ export function runOptimizer(raw: OptimizerInput): OptimizerResult {
   return result;
 }
 
+// ---------------------------------------------------------------------------
+// D89: comparison with the player's own wheel
+
+/** State of a fixed allocation (fill order = unlock order); points on slices that are not unlocked are dropped. */
+function stateOf(wheel: EngineWheel, points: Readonly<Record<string, number>>): { st: State; invalid: string[] } {
+  const n = wheel.slices.length;
+  const want = wheel.slices.map((s) => Math.max(0, Math.floor(points[s.slice.id] ?? 0)));
+  const invalid = wheel.slices.filter((s) => want[s.idx] > s.capacity).map((s) => s.slice.id);
+  const alloc = new Int32Array(n);
+  const path: number[] = [];
+  // Full slices first so they unlock their neighbours; a slice is placed once a completely filled neighbour is.
+  const order = [...wheel.slices].sort((a, b) => Number(want[b.idx] >= b.capacity) - Number(want[a.idx] >= a.capacity));
+  for (let changed = true; changed; ) {
+    changed = false;
+    for (const s of order) {
+      if (alloc[s.idx] || !want[s.idx] || invalid.includes(s.slice.id)) continue;
+      if (!s.initiallyUnlocked && !s.unlockedBy.some((j) => isFull(wheel, alloc, j))) continue;
+      alloc[s.idx] = want[s.idx];
+      path.push(s.idx);
+      changed = true;
+    }
+  }
+  for (const s of wheel.slices) if (want[s.idx] && !alloc[s.idx] && !invalid.includes(s.slice.id)) invalid.push(s.slice.id);
+  const domainPts = [0, 0, 0, 0];
+  const rmFull = [0, 0, 0, 0];
+  let key = 0;
+  for (const s of wheel.slices) {
+    domainPts[s.domainIdx] += alloc[s.idx];
+    if (!isFull(wheel, alloc, s.idx)) continue;
+    key += 2 ** s.idx;
+    if (s.kind === 'rm') rmFull[s.domainIdx]++;
+  }
+  const used = domainPts.reduce((a, b) => a + b, 0);
+  const slicesRev = domainPts.map((x, d) => x + RM_SLICE_POINTS * rmFull[d]);
+  return { st: { alloc, used, domainPts, rmFull, slicesRev, vessels: vesselKeyOf(wheel, alloc), score: 0, path, key }, invalid };
+}
+
+/** Value of slice i in a build (dedication + its conviction when full; vessels and revelations are counted apart). */
+function sliceParts(wheel: EngineWheel, t: PartTables, alloc: ArrayLike<number>, i: number): Parts {
+  const sl = wheel.slices[i];
+  let p = add(ZERO, t.dedP[i], alloc[i]);
+  if (!isFull(wheel, alloc, i)) return p;
+  if (sl.kind === 'augment') {
+    const second = sl.twin >= 0 && isFull(wheel, alloc, sl.twin) && sl.twin < i;
+    p = add(p, second ? t.aug2P[i] : t.aug1P[i]);
+  } else if (sl.kind !== 'vessel') p = add(p, t.convP[i]);
+  return p;
+}
+
+/** Verdict bands: difference in % of the optimal wheel's value. */
+const COMPARE_EQUAL = 0.5;
+const COMPARE_CLOSE = 5;
+
+/** The player's wheel valued with the build's rotation, stances, gear and owned gems (placed optimally). */
+function compareWheel(p: Prepared, best: BuildResult, own: Readonly<Record<string, number>>): WheelComparison {
+  const { wheel, parts, blend, v } = p;
+  const b = stateOf(wheel, best.allocation).st;
+  const { st: o, invalid } = stateOf(wheel, own);
+  const stB = gridStages(p, b);
+  const stO = gridStages(p, o);
+  const wB = rawTotals(wheel, parts, b.alloc, stB, false);
+  const wO = rawTotals(wheel, parts, o.alloc, stO, false);
+  const diff = sub(wB, wO);
+  const score = blend(diff);
+  const relative = Math.round((100 * blend(wO)) / Math.max(1e-9, blend(wB)));
+  const share = (100 * score) / Math.max(1e-9, Math.abs(blend(wB)));
+  const verdict: WheelComparison['verdict'] =
+    share < -COMPARE_EQUAL ? 'better' : share <= COMPARE_EQUAL ? 'equal' : share <= COMPARE_CLOSE ? 'close' : 'worse';
+  const item = (kind: ComparisonItem['kind'], id: string, name: string, own: number, bestN: number, d: Parts): ComparisonItem => ({
+    kind,
+    id,
+    name,
+    own,
+    best: bestN,
+    score: blend(d),
+    effect: effectOf(v, d),
+  });
+
+  const items: ComparisonItem[] = [];
+  for (const sl of wheel.slices) {
+    const i = sl.idx;
+    if (b.alloc[i] === o.alloc[i]) continue;
+    items.push(item('slice', sl.slice.id, sl.slice.conviction.name, o.alloc[i], b.alloc[i], sub(sliceParts(wheel, parts, b.alloc, i), sliceParts(wheel, parts, o.alloc, i))));
+  }
+  wheel.revelations.forEach((r, d) => {
+    if (stB[d] !== stO[d]) items.push(item('revelation', r.data.name, r.data.name, stO[d], stB[d], sub(parts.revP[d][stB[d]], parts.revP[d][stO[d]])));
+  });
+  const live = wheel.gemSystem === 'resonance';
+  const vesselCount = (st: State) => {
+    const spots = vesselSpots(wheel, st.vessels);
+    return live ? spots.reduce((a, s) => a + (s.resonance ?? 0), 0) : spots.filter((s) => s.unlocked).length;
+  };
+  if (b.vessels !== o.vessels) {
+    const d = sub(parts.vesselP[b.vessels] ?? ZERO, parts.vesselP[o.vessels] ?? ZERO);
+    items.push(item('vessels', '', live ? 'Vessel Resonance' : 'Gem Vessels', vesselCount(o), vesselCount(b), d));
+  }
+  items.sort((x, y) => Math.abs(y.score) - Math.abs(x.score));
+
+  const out: Msg[] = [text(`compare.${verdict}`, { relative })];
+  if (invalid.length) out.push(text('compare.invalid', { slices: invalid.join(', ') }));
+  if (o.used !== b.used) out.push(text('compare.points', { own: o.used, best: b.used, budget: p.budget }));
+  const named = (xs: ComparisonItem[]) =>
+    xs
+      .slice(0, 3)
+      .map((x) =>
+        x.kind === 'revelation'
+          ? `${x.name} (${ROMAN_STAGE[x.own] || 0} → ${ROMAN_STAGE[x.best] || 0})`
+          : x.kind === 'vessels'
+            ? `${x.name} (${x.own} → ${x.best})`
+            : x.name,
+      )
+      .join(', ');
+  const gains = items.filter((x) => x.score > 1e-6);
+  const losses = items.filter((x) => x.score < -1e-6);
+  if (gains.length) out.push(text('compare.gains', { list: named(gains) }));
+  if (losses.length) out.push(text('compare.losses', { list: named(losses) }));
+  out.push(text('compare.same'));
+
+  const allocation: Record<string, number> = {};
+  wheel.slices.forEach((s, i) => {
+    if (o.alloc[i] > 0) allocation[s.slice.id] = o.alloc[i];
+  });
+  const rm = p.gemRm[o.vessels];
+  return {
+    allocation,
+    pointsUsed: o.used,
+    revelations: wheel.revelations.map((r, d) => ({ perk: r.perk, stage: stO[d], domainPoints: o.slicesRev[d] + rm[d] })),
+    score,
+    effect: effectOf(v, diff),
+    relative,
+    verdict,
+    items,
+    invalid,
+    reasons: out.map((x) => x.text),
+    reasonMsgs: out.map((x) => x.msg),
+  };
+}
+
 const RM_PROBE_ID = 'rm-probe';
+
 
 /** D43: vessels of state `st` holding the owned gems of `p` (as in `assemble`, without the RM re-placement). */
 function vesselsAt(p: Prepared, st: State): { env: GemEnv; vessels: VesselAssignment[] } {

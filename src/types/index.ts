@@ -387,6 +387,8 @@ export interface OptimizerInput {
   vocation: Vocation;
   /** D88: wheel version (default 'current'). */
   wheelVariant?: WheelVariant;
+  /** D89: the player's own wheel (points per slice) to compare with the optimal build. */
+  compareWith?: Record<SliceId, number>;
   /** Available promotion points. */
   points: number;
   /** Selected monster, or null for a generic build. */
@@ -611,6 +613,8 @@ export interface OptimizerResult {
   plannerCode?: string;
   /** D88: wheel version the build was made for (absent = 'current'). */
   wheelVariant?: WheelVariant;
+  /** D89: the player's own wheel valued like the build (only with `compareWith`). */
+  comparison?: WheelComparison;
   /** Alternative builds (e.g. different revelation focus), best first. */
   alternatives?: AlternativeBuild[];
   /** Rotation the damage estimate is based on. */
@@ -633,4 +637,35 @@ export interface AlternativeBuild {
   /** Total objective score relative to the main build (main = 100). */
   relativeScore: number;
   result: Omit<OptimizerResult, 'alternatives'>;
+}
+
+/** D89: a difference between the own and the optimal wheel; `score`/`effect` = optimal minus own. */
+export interface ComparisonItem {
+  kind: 'slice' | 'revelation' | 'vessels';
+  /** Slice id, revelation name or '' for vessels. */
+  id: string;
+  name: string;
+  own: number;
+  best: number;
+  score: number;
+  effect: GainEffect;
+}
+
+/** D89: the player's wheel valued with the same rotation, stances, gear and gems as the optimal build. */
+export interface WheelComparison {
+  allocation: Record<SliceId, number>;
+  pointsUsed: number;
+  revelations: ActivatedRevelation[];
+  /** Optimal minus own wheel value (blended score and % damage / % EHP). */
+  score: number;
+  effect: GainEffect;
+  /** Own wheel value as % of the optimal wheel's. */
+  relative: number;
+  verdict: 'equal' | 'close' | 'worse' | 'better';
+  /** Differences, largest first. */
+  items: ComparisonItem[];
+  /** Slices with points that are not unlocked or over capacity (ignored). */
+  invalid: SliceId[];
+  reasons: string[];
+  reasonMsgs: EngineMessage[];
 }

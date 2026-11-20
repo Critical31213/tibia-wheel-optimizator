@@ -115,6 +115,7 @@ Components never import `src/engine` / `src/data` directly — only `src/lib/api
 | `?r= &fs=` | URL query | rotation preset id (absent = auto), forced spells joined by `,`; a link with `v` but no `r`/`fs` = auto / none |
 | `wheel-optimizer:gems:v1:<vocation>` | localStorage | `OwnedGem[]` JSON, validated by `sanitizeGems` |
 | `wheel-optimizer:weapons:v1:<vocation>` | localStorage | `{ weapons: OwnedWeapon[], suggest }` JSON, validated by `sanitizeWeapon` |
+| `wheel-optimizer:compare:v1:<vocation>` | localStorage | D89: the own wheel's planner code or link (string, max 300 chars) |
 | `wheel-optimizer:lang:v1` | localStorage | `pl` / `en` |
 
 Gems and weapons are deliberately **not** in the URL (too long); a shared link carries every other input.
@@ -133,6 +134,11 @@ Gems and weapons are deliberately **not** in the URL (too long); a shared link c
   "Announced changes" (default) and "Live (tibia.com)"; the request sends `wheelVariant`, the shown wheel, mods
   and revelation reach follow the result's variant. Live vessels show their domain and Vessel Resonance (0–III)
   and the quality-match bonus.
+- **Compare with your wheel (D89)**: `ComparePanel` takes a planner code or link (`parseOwnWheel` in
+  `src/lib/compare.ts`); a code of the selected vocation and wheel variant is sent as `compareWith` (another
+  variant offers a switch). It shows the verdict, the optimal-vs-own gain, the differences where each wheel is
+  better (`Gain` per slice / revelation / vessels) and the reasons; "Show my wheel on the chart" draws the own
+  allocation in `WheelChart`.
 - **Export**: `plannerUrl(code)` = `https://www.test.tibia.com/community/?subtopic=wheelofdestinyplanner&code=<encoded>` (version 0 live codes: the www.tibia.com planner);
   copy result announced in a `role="status"` line; empty state when `plannerCode` is undefined.
 

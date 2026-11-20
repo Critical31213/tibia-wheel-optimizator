@@ -113,6 +113,15 @@ export const ENGINE_MESSAGES = {
   'alt.avatarFocus': 'Avatar focus ({revelation})',
   'alt.defensive': 'More defensive',
   'alt.offensive': 'More offensive',
+  'compare.equal': 'Your wheel is as good as the optimal one ({relative}% of its value).',
+  'compare.close': "Your wheel reaches {relative}% of the optimal wheel's value; the differences are small.",
+  'compare.worse': "Your wheel reaches {relative}% of the optimal wheel's value.",
+  'compare.better': 'Your wheel scores higher than the found build ({relative}%); the search is heuristic, so keep yours.',
+  'compare.invalid': 'Slices that are not unlocked or over capacity are ignored: {slices}.',
+  'compare.points': 'Your wheel uses {own} points, the optimal one {best} (of {budget} available).',
+  'compare.gains': 'The optimal wheel gains most from: {list}.',
+  'compare.losses': 'Your wheel is ahead on: {list}.',
+  'compare.same': 'Both wheels are valued with the same rotation, stances, equipment and your gems placed optimally.',
   'alt.tradeoff': 'Offense {offense}, defense {defense} vs the best build ({score}% of its value); revelations: {revelations}.',
 } as const;
 
