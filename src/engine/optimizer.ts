@@ -902,7 +902,7 @@ function rationale(p: Prepared, best: State, stages: number[], revPoints: number
 const pointsOf = (input: Pick<OptimizerInput, 'points'>) =>
   Math.max(0, Math.floor(Number.isFinite(input.points) ? input.points : 0));
 
-type ValuationInput = Pick<OptimizerInput, 'vocation' | 'points' | 'monster' | 'context' | 'character' | 'monsters' | 'equipment'> &
+type ValuationInput = Pick<OptimizerInput, 'vocation' | 'points' | 'monster' | 'context' | 'character' | 'monsters' | 'equipment' | 'equipmentTwoHanded'> &
   Partial<Pick<OptimizerInput, 'rotationId' | 'forcedSpells' | 'customRotation'>>;
 
 /** Level used for valuation: `character.level`, else points + 50. */
@@ -946,6 +946,11 @@ function offhandOf(input: Pick<OptimizerInput, 'equipment'>, shieldPlan: boolean
   return worn ? { offhand: worn.kind, defense: worn.defense } : {};
 }
 
+/** D78: a two-handed weapon takes the shield / spellbook off (its defense, bonuses and imbuements). */
+function armedWith<T extends ValuationInput>(input: T, loadout: Loadout | undefined): T {
+  return loadout?.weapon.hands === 2 && input.equipmentTwoHanded ? { ...input, equipment: input.equipmentTwoHanded } : input;
+}
+
 // ---------------------------------------------------------------------------
 // Equipment (D74)
 
@@ -982,7 +987,7 @@ function gearScorer(input: OptimizerInput): (fx: GearEffects) => number {
  * D74: the owned items worn on this spot. Per slot the item with the best `gearScorer` value with the other slots
  * fixed, repeated until nothing changes. Items above the character level are skipped.
  */
-export function wearBest(input: OptimizerInput): GearResult | undefined {
+export function wearBest(input: OptimizerInput): { gear: GearResult; twoHanded?: GearEffects } | undefined {
   const g = input.gear;
   if (!g) return undefined;
   const level = levelFor(input);
@@ -1017,7 +1022,10 @@ export function wearBest(input: OptimizerInput): GearResult | undefined {
   GEAR_SLOTS.forEach((s, k) => {
     if (worn[k] !== undefined) out[s] = worn[k];
   });
-  return { worn: out, effects: effectsOf(worn) };
+  const oh = GEAR_SLOTS.indexOf('offhand');
+  const ohItem = worn[oh] !== undefined ? getItem(g.pieces.offhand![worn[oh]!].itemId) : undefined;
+  const twoHanded = ohItem && ohItem.slot !== 'quiver' ? effectsOf(worn.map((x, k) => (k === oh ? undefined : x))) : undefined;
+  return { gear: { worn: out, effects: effectsOf(worn) }, ...(twoHanded ? { twoHanded } : {}) };
 }
 
 /**
@@ -1086,6 +1094,8 @@ export function valuationFor(
   loadout?: Loadout,
   preCd?: ReadonlyMap<string, number>,
 ): ValuationContext {
+  const plain = input;
+  input = armedWith(input, loadout);
   const mi0 = modelInputs(input);
   const { context, level, monsters } = mi0;
   const build = stanceBuilder(input.vocation, context, monsters, stances, preset, loadout, preCd, input.equipment);
@@ -1101,7 +1111,9 @@ export function valuationFor(
   const threat = threatOf(monster);
   const facts = characterFacts(input.vocation, level, character.shielding, offhandOf(input, model.plan.shield));
   // EHP reference without stances and weapon, so Protector's (and the weapon's) shielding counts.
-  facts.mitigationRef = characterFacts(input.vocation, level, mi0.character.shielding, {}, offhandOf(input, false)).mitigationRef;
+  // The reference keeps the worn off-hand, so a two-handed weapon's loss of it counts (D78).
+  const ref = plain === input ? mi0 : modelInputs(plain);
+  facts.mitigationRef = characterFacts(input.vocation, level, ref.character.shielding, {}, offhandOf(plain, false)).mitigationRef;
   const v: ValuationContext = {
     vocation: input.vocation,
     context,
@@ -1827,8 +1839,8 @@ export function pickStances(input: OptimizerInput, preset: RotationPreset | null
 }
 
 export function runOptimizer(raw: OptimizerInput): OptimizerResult {
-  const gear = wearBest(raw);
-  const dressed = gear ? { ...raw, equipment: gear.effects } : raw;
+  const worn = wearBest(raw);
+  const dressed = worn ? { ...raw, equipment: worn.gear.effects, ...(worn.twoHanded ? { equipmentTwoHanded: worn.twoHanded } : {}) } : raw;
   const input = dressed.gems?.length ? { ...dressed, gems: withSharedGrades(dressed.gems) } : dressed;
   const { p, plans, main } = bestBuild(input);
   const n = Math.max(0, Math.min(5, Math.floor(input.alternatives ?? DEFAULT_ALTERNATIVES)));
@@ -1837,7 +1849,10 @@ export function runOptimizer(raw: OptimizerInput): OptimizerResult {
   result.gemRecommendations = withRmReoptimized(input, p, main, result.gemRecommendations);
   const weapon = weaponResult(p, main);
   if (weapon) result.weapon = weapon;
-  if (gear) result.gear = gear;
+  if (worn) {
+    const off = !!worn.twoHanded && p.weapon?.weapon.hands === 2;
+    result.gear = off ? { ...worn.gear, effects: worn.twoHanded!, offhandOff: true } : worn.gear;
+  }
   return result;
 }
 
@@ -2023,12 +2038,16 @@ function loadoutScorer(input: OptimizerInput, spec: Pick<PlanSpec, 'preset' | 'r
 
 /** Unblended `loadoutScorer`. */
 function loadoutValuer(input: OptimizerInput, spec: Pick<PlanSpec, 'preset' | 'reference' | 'stances' | 'preCd'>, v0: ValuationContext, ri: RotationInput = NO_BONUS) {
-  const mi = modelInputs(input);
-  const offhand = offhandOf(input, v0.model.plan.shield);
+  const one = input;
+  const two = input.equipmentTwoHanded ? { ...input, equipment: input.equipmentTwoHanded } : input;
+  const setup = (inp: OptimizerInput) => ({ inp, mi: modelInputs(inp), offhand: offhandOf(inp, v0.model.plan.shield) });
+  const s1 = setup(one);
+  const s2 = two === one ? s1 : setup(two);
   const { preset, reference, stances, preCd } = spec;
   return (lo: Loadout): Parts => {
-    const c = stancedCharacter(loadoutCharacter(mi.character, input.vocation, lo), stances);
-    const m0 = stanceBuilder(input.vocation, mi.context, mi.monsters, stances, preset, lo, preCd, input.equipment)(c);
+    const { inp, mi, offhand } = lo.weapon.hands === 2 ? s2 : s1;
+    const c = stancedCharacter(loadoutCharacter(mi.character, inp.vocation, lo), stances);
+    const m0 = stanceBuilder(inp.vocation, mi.context, mi.monsters, stances, preset, lo, preCd, inp.equipment)(c);
     const model: SpellModel = { ...m0, plan: planFor(m0, preset), total: reference };
     const off = (100 * (rotationTotal(model, ri) - reference)) / reference;
     const mitigation = characterFacts(input.vocation, mi.level, c.shielding, offhand).mitigation;

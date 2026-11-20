@@ -412,6 +412,8 @@ export interface OptimizerInput {
   gear?: GearInput;
   /** D74: effects of the worn equipment (set by the engine from `gear`); undefined = the previous assumptions. */
   equipment?: GearEffects;
+  /** D78: `equipment` without the shield / spellbook, used with a two-handed weapon. */
+  equipmentTwoHanded?: GearEffects;
 }
 
 /** D74: paper-doll slots the player fills (the weapon comes from the owned weapons). */
@@ -447,6 +449,8 @@ export interface GearInput {
 export interface GearResult {
   worn: Partial<Record<GearSlot, number>>;
   effects: GearEffects;
+  /** D78: the chosen weapon is two-handed, so the shield / spellbook is taken off (not in `effects`). */
+  offhandOff?: boolean;
 }
 
 /**

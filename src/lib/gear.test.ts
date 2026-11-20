@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { addPiece, EMPTY_GEAR, gearInput, parseGear, removePiece, sanitizeGear, updatePiece } from './gear';
 import { gearEffects, type WornGear } from '../engine/gear';
 import { optimize } from '../engine';
+import { getWeapon } from '../data/proficiency';
 import { getItem, itemsFor, maxTier, SLOT_ITEMS, tierChance } from '../data/equipment';
 import { valuationFor, wearBest } from '../engine/optimizer';
 import { buildSpellModel } from '../engine/spells';
@@ -108,13 +109,42 @@ describe('wearing the best owned items', () => {
   });
 
   it('picks per slot for the spot', () => {
-    expect(wearBest(input(fire))!.worn).toEqual({ armor: 1, legs: 1 });
-    expect(wearBest(input(death))!.worn).toEqual({ armor: 0, legs: 1 });
+    expect(wearBest(input(fire))!.gear.worn).toEqual({ armor: 1, legs: 1 });
+    expect(wearBest(input(death))!.gear.worn).toEqual({ armor: 0, legs: 1 });
   });
 
   it('skips items above the character level', () => {
     const low = { ...input(fire), character: { level: 100, mainSkill: 80 } };
-    expect(wearBest(low)!.worn).toEqual({ armor: 1, legs: 0 });
+    expect(wearBest(low)!.gear.worn).toEqual({ armor: 1, legs: 0 });
+  });
+
+  it('a two-handed knight weapon takes the shield off', () => {
+    const knight = (weaponId: string): OptimizerInput => ({
+      vocation: 'knight',
+      points: 400,
+      monster: null,
+      priority: 50,
+      meleeSkill: 'axe',
+      character: { level: 400, mainSkill: 110, shielding: 100 },
+      weapons: [{ weaponId, level: 0 }],
+      gear: { pieces: { offhand: [{ itemId: 'prismatic-shield' }] }, weapon: null },
+      alternatives: 0,
+    });
+    const two = optimize(knight('amber-greataxe'));
+    expect(two.gear?.offhandOff).toBe(true);
+    expect(two.gear?.effects.offhand).toBeUndefined();
+    expect(two.gear?.effects.resist.physical).toBeUndefined();
+    const one = optimize(knight('amber-axe'));
+    expect(one.gear?.offhandOff).toBeUndefined();
+    expect(one.gear?.effects.resist.physical).toBe(4);
+    // Without the shield the two-handed weapon pays its mitigation.
+    const v1 = valuationFor({ ...knight('amber-axe'), equipment: one.gear!.effects, equipmentTwoHanded: two.gear!.effects });
+    const lo = (id: string) => ({ weapon: getWeapon(id)!, perks: [] });
+    const v2 = valuationFor({ ...knight('amber-axe'), equipment: one.gear!.effects, equipmentTwoHanded: two.gear!.effects }, null, undefined, [], lo('amber-greataxe'));
+    const w1 = valuationFor({ ...knight('amber-axe'), equipment: one.gear!.effects, equipmentTwoHanded: two.gear!.effects }, null, undefined, [], lo('amber-axe'));
+    expect(v2.mitigation).toBeLessThan(w1.mitigation);
+    expect(v2.mitigationRef).toBeCloseTo(w1.mitigationRef);
+    expect(v1.mitigation).toBeCloseTo(w1.mitigation);
   });
 
   it('reports the worn set with the build', () => {

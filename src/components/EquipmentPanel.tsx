@@ -185,9 +185,11 @@ interface EditorProps {
   meleeSkill: MeleeSkill | null;
   weapons: WeaponPrefs;
   onWeapons: (f: (p: WeaponPrefs) => WeaponPrefs) => void;
+  /** D78: taken off for a two-handed weapon. */
+  off: boolean;
 }
 
-function SlotEditor({ slot, vocation, gear, weaponName, wornIndex, onGear, meleeSkill, weapons, onWeapons }: EditorProps) {
+function SlotEditor({ slot, vocation, gear, weaponName, wornIndex, onGear, meleeSkill, weapons, onWeapons, off }: EditorProps) {
   const t = useT();
   if (slot === 'weapon') {
     const w = gear.weapon ?? { tier: 0, imbues: [] };
@@ -207,7 +209,12 @@ function SlotEditor({ slot, vocation, gear, weaponName, wornIndex, onGear, melee
       </div>
     );
   }
-  return <OwnedPieces slot={slot} vocation={vocation} gear={gear} wornIndex={wornIndex} onGear={onGear} />;
+  return (
+    <>
+      {off && <p className="mb-3 text-xs text-amber-300">{t('gear.offhandOff')}</p>}
+      <OwnedPieces slot={slot} vocation={vocation} gear={gear} wornIndex={wornIndex} onGear={onGear} />
+    </>
+  );
 }
 
 function OwnedPieces({ slot, vocation, gear, wornIndex, onGear }: { slot: GearSlot; vocation: Vocation; gear: GearPrefs; wornIndex: number | undefined; onGear: EditorProps['onGear'] }) {
@@ -312,11 +319,12 @@ interface SlotButtonProps {
   wornIndex: number | undefined;
   /** Owned weapons (weapon slot). */
   weaponCount: number;
+  off: boolean;
   active: boolean;
   onClick: () => void;
 }
 
-function SlotButton({ slot, gear, weaponName, wornIndex, weaponCount, active, onClick }: SlotButtonProps) {
+function SlotButton({ slot, gear, weaponName, wornIndex, weaponCount, off, active, onClick }: SlotButtonProps) {
   const t = useT();
   const list = slot === 'weapon' ? [] : (gear.pieces[slot] ?? []);
   const piece = slot === 'weapon' ? gear.weapon : list[wornIndex ?? 0];
@@ -330,14 +338,15 @@ function SlotButton({ slot, gear, weaponName, wornIndex, weaponCount, active, on
       type="button"
       onClick={onClick}
       aria-expanded={active}
-      aria-label={`${slotName(t, slot)}: ${name ?? t('gear.empty')}`}
+      aria-label={`${slotName(t, slot)}: ${name ?? t('gear.empty')}${off ? ` (${t('gear.offhandOffShort')})` : ''}`}
+      title={off ? t('gear.offhandOff') : undefined}
       className={cx(
         'relative flex aspect-square min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border p-1 text-center',
         active ? 'border-gold-400 bg-gold-700/25' : set ? 'border-gold-700/70 bg-ink-950/70 hover:border-gold-500' : 'border-dashed border-ink-500 bg-ink-950/40 hover:border-gold-600',
       )}
     >
       <span className="text-[10px] uppercase tracking-wide text-parchment-400">{slotName(t, slot)}</span>
-      <span className={cx('line-clamp-2 text-[11px] leading-tight', name ? 'text-parchment-100' : 'text-parchment-500')}>
+      <span className={cx('line-clamp-2 text-[11px] leading-tight', off ? 'text-parchment-500 line-through' : name ? 'text-parchment-100' : 'text-parchment-500')}>
         {name ?? (slot === 'weapon' ? t('gear.weaponAutoShort') : '—')}
       </span>
       {tier > 0 && <span className="absolute right-1 top-1 rounded bg-gold-700/60 px-1 text-[10px] text-parchment-50">T{tier}</span>}
@@ -408,7 +417,7 @@ export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, worn, weapo
         <div className="mx-auto grid w-full max-w-64 grid-cols-3 gap-1.5">
           {DOLL.map((s, k) =>
             s ? (
-              <SlotButton key={s} slot={s} gear={gear} weaponName={weaponName} wornIndex={wornIndex(s)} weaponCount={weapons.weapons.length} active={editing === s} onClick={() => setEditing(editing === s ? null : s)} />
+              <SlotButton key={s} slot={s} gear={gear} weaponName={weaponName} wornIndex={wornIndex(s)} weaponCount={weapons.weapons.length} off={s === 'offhand' && !!worn?.offhandOff} active={editing === s} onClick={() => setEditing(editing === s ? null : s)} />
             ) : (
               <span key={k} aria-hidden="true" className={cx('aspect-square rounded-lg', k !== 9 && k !== 11 && 'border border-ink-700/60 bg-ink-950/20')} />
             ),
@@ -427,6 +436,7 @@ export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, worn, weapo
               meleeSkill={meleeSkill}
               weapons={weapons}
               onWeapons={onWeapons}
+              off={editing === 'offhand' && !!worn?.offhandOff}
             />
           </Modal>
         )}

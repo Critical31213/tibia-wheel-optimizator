@@ -238,6 +238,8 @@ export const en = {
   'gear.search': "Search items",
   'gear.noItems': "No matching items.",
   'gear.add': "Add item",
+  'gear.offhandOff': "Taken off: the chosen weapon is two-handed.",
+  'gear.offhandOffShort': "taken off",
   'gear.worn': "worn",
   'gear.multiHint': "The optimizer wears the best of these items for your spot and priority (items above your level are skipped).",
   'gear.removeAria': "Remove {name}",

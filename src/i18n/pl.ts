@@ -232,6 +232,8 @@ export const pl: Dictionary = {
   'gear.search': "Szukaj itemu",
   'gear.noItems': "Brak pasujących itemów.",
   'gear.add': "Dodaj item",
+  'gear.offhandOff': "Zdjęta: wybrana broń jest dwuręczna.",
+  'gear.offhandOffShort': "zdjęta",
   'gear.worn': "założony",
   'gear.multiHint': "Optymalizator zakłada najlepszy z tych itemów na Twój spot i priorytet (itemy powyżej Twojego poziomu są pomijane).",
   'gear.removeAria': "Usuń {name}",

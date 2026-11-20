@@ -38,6 +38,11 @@ plain character) and EHP: mitigation (shielding, off-hand), resistances against 
 (`leechEhp`) and Ruse as dodge. It ignores the wheel. The worn set's `gearEffects` become `input.equipment`;
 `result.gear` = `{ worn: slot → index, effects }`.
 
+Two-handed weapons (D78): when a shield or spellbook is worn, `wearBest` also returns the effects without it
+(`input.equipmentTwoHanded`). Valuations with a two-handed loadout (`armedWith`) use them; the EHP reference keeps the
+off-hand, so the lost mitigation counts against two-handed weapons. When the chosen weapon is two-handed,
+`result.gear.effects` is that set and `offhandOff` is set (the panel strikes the off-hand through). Quivers stay.
+
 ## Effects (`src/engine/gear.ts`)
 
 - `gearEffects(worn, vocation, meleeSkill)` → `GearEffects`.
