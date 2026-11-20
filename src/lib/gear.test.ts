@@ -213,9 +213,10 @@ describe('engine with equipment', () => {
     expect(imbuementsFor('armor', 'knight', getItem('lavos-armor')).some((x) => x.id === 'dragon-hide')).toBe(false);
   });
 
-  it('blocks imbuements of a native skill or protection; Lich Shroud is 2 / 5 / 10 %', () => {
+  it('allows own-skill imbuements; Lich Shroud is 2 / 5 / 10 %', () => {
     const hat = getItem('ethereal-coned-hat')!;
-    expect(imbuementsFor('helmet', 'monk', hat).some((x) => x.id === 'fist')).toBe(false);
+    // D85: a helmet takes the imbuement of its own skill.
+    expect(imbuementsFor('helmet', 'monk', hat).some((x) => x.id === 'fist')).toBe(true);
     expect(imbuementsFor('helmet', 'monk').some((x) => x.id === 'fist')).toBe(true);
     expect(getImbuement('lich-shroud')!.values).toEqual([2, 5, 10]);
   });

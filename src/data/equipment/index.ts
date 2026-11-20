@@ -92,8 +92,9 @@ export const IMBUE_LEVELS = [1, 2, 3] as const;
 export type ImbueLevel = (typeof IMBUE_LEVELS)[number];
 
 /**
- * Imbuements for a slot; skill imbuements only for the vocation's skills. An item with a native skill, element
- * protection, critical hit, life or mana leech cannot take the imbuement of the same kind (D83).
+ * Imbuements for a slot; skill imbuements only for the vocation's skills (also when the item already raises the skill,
+ * D85). An item with a native element protection, critical hit, life or mana leech cannot take the imbuement of the
+ * same kind (D83).
  */
 export function imbuementsFor(slot: ImbueSlot, vocation: Vocation, item?: EquipmentItem): ImbueDef[] {
   const skills = VOCATION_SKILLS[vocation];
@@ -103,7 +104,6 @@ export function imbuementsFor(slot: ImbueSlot, vocation: Vocation, item?: Equipm
       x.slots.includes(slot) &&
       (!x.skill || skills.includes(x.skill)) &&
       !(x.group === 'damage' && MAGE.has(vocation)) &&
-      !(x.skill && own?.skills?.[x.skill]) &&
       // D84: Epiphany only on mage-exclusive helmets.
       !(x.skill === 'magic' && slot === 'helmet' && item && !item.vocations?.every((v) => MAGE.has(v))) &&
       !(x.group === 'protection' && x.element && own?.resist?.[x.element as keyof typeof own.resist]) &&
