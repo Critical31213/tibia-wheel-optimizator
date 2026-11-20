@@ -1,6 +1,8 @@
 // Extracts Wheel of Destiny facts from the official planner (WASM) into src/data/wheel/wheel-data.json.
 // Inputs (gitignored, downloaded manually): scripts/.cache/wod/*, scripts/.cache/hunt-data/*.
-// Usage: npm run extract:wheel
+// Usage: npm run extract:wheel (npm run extract:wheel-live for --live)
+// D88: `--live` reads the live planner (www.tibia.com, Vessel Resonance) from scripts/.cache/wod-live/ and writes
+// src/data/wheel/wheel-data-live.json.
 import { createRequire } from 'node:module';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -8,9 +10,10 @@ import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const WOD = join(ROOT, 'scripts/.cache/wod');
+const LIVE = process.argv.includes('--live');
+const WOD = join(ROOT, LIVE ? 'scripts/.cache/wod-live' : 'scripts/.cache/wod');
 const PAL = join(ROOT, 'scripts/.cache/hunt-data');
-const OUT = join(ROOT, 'src/data/wheel/wheel-data.json');
+const OUT = join(ROOT, LIVE ? 'src/data/wheel/wheel-data-live.json' : 'src/data/wheel/wheel-data.json');
 
 const STR = JSON.parse(readFileSync(join(WOD, 'SkillwheelStringsJsonLibrary.json'), 'utf8'));
 const TEMPLATES = JSON.parse(readFileSync(join(PAL, 'wheelTemplatesData.json'), 'utf8'));
@@ -22,7 +25,9 @@ const QUARTERS = ['TL', 'TR', 'BL', 'BR'];
 const DOMAINS = { TL: 'topLeft', TR: 'topRight', BL: 'bottomLeft', BR: 'bottomRight' };
 const RING_BY_CAP = { 50: 1, 75: 2, 100: 3, 150: 4, 200: 5 };
 const QUALITY = ['lesser', 'regular', 'greater'];
-const MEDIUM_CAT = ['unique', 'skillBonus', 'leech', 'augmentation', 'gemVessel', 'revelationMastery', 'other'];
+const MEDIUM_CAT = LIVE
+  ? ['unique', 'skillBonus', 'leech', 'augmentation', 'gemVessel', 'other']
+  : ['unique', 'skillBonus', 'leech', 'augmentation', 'gemVessel', 'revelationMastery', 'other'];
 const SUPREME_CAT = ['effect', 'augCrit', 'augCooldown', 'augHealing', 'augDamage', 'augOther', 'revelationMastery'];
 const SMALL_NAMES = { 2: 'Hit Points and Mana' };
 const GROUP_AUGMENTS = {
@@ -61,17 +66,23 @@ function planner(voc) {
   const p = new M.SkillwheelPlanner(M.EActiveVocation[VOC_ENUM[voc]]);
   return {
     p,
-    tiles: () => arr(p.getSkillParameters()).map((t) => ({ ...t, id: t.id.value, q: t.quarter.value, cat: t.mediumPerkCategory.value })),
+    // The live planner has no tile quarter; the enum name (QTL0, …) carries it.
+    tiles: () => arr(p.getSkillParameters()).map((t) => ({ ...t, id: t.id.value, q: t.quarter?.value ?? QUARTERS.indexOf(tileName(t.id.value).slice(1, 3)), cat: t.mediumPerkCategory.value })),
     corners: () => arr(p.getCornerParameters()).map((c) => ({ ...c, id: c.id.value })),
     med: () => arr(p.getMediumPerksSummary()).map((m) => ({ ...m, category: m.category.value })),
     small: () => Object.fromEntries(arr(p.getSmallPerksSummary()).map((s) => [s.id, s.value])),
-    vessels: () => arr(p.getVesselParameters()).map((v) => ({ ...v, valueBasicMod1: arr(v.valueBasicMod1), valueBasicMod2: arr(v.valueBasicMod2) })),
+    vessels: () => (LIVE ? arr(p.getCornerParameters()).map((c) => ({ ...c, id: c.id.value })) : arr(p.getVesselParameters())).map((v) => ({ ...v, valueBasicMod1: arr(v.valueBasicMod1), valueBasicMod2: arr(v.valueBasicMod2) })),
     fill: (id) => p.fillSkill(tileEnum(id)),
     add: (id, n) => p.addToSkill(tileEnum(id), n),
     clear: (id) => p.clearSkill(tileEnum(id)),
     unlocked: (id) => arr(p.getSkillParameters())[id].unlocked,
     done: () => p.delete(),
   };
+}
+
+/** Fills every slice (repeated passes follow the unlock order). */
+function fillAll(h) {
+  for (let k = 0; k < 40; k++) for (const t of h.tiles()) if (t.unlocked && t.currentSkillPoints < t.maxSkillPoints) h.fill(t.id);
 }
 
 function rng(seed) { let s = seed >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 2 ** 32); }
@@ -164,6 +175,50 @@ function verifyVesselsAndBonuses(voc, bonusPerStage, seeds) {
   return results;
 }
 
+/** D88 live: vessel resonance of a domain = its completely filled Gem Vessel slices. */
+function verifyResonanceFill(voc, bonusPerStage, seeds) {
+  for (const seed of seeds) {
+    const h = planner(voc); const t0 = h.tiles(); const full = new Set();
+    randomFullFill(h, seed, (t) => {
+      full.add(t.id);
+      for (const c of h.corners()) {
+        const vr = t0.filter((x) => x.cat === 4 && x.q === c.id && full.has(x.id)).length;
+        assert(c.vesselLevel === vr, `${voc} VR of quarter ${c.id} = filled vessel slices (seed ${seed})`);
+      }
+      assert(h.p.getVesselsDamageAndHealingBonus() === 0, `${voc} no vessel bonus without gems`);
+      const expected = h.corners().reduce((s, c) => s + bonusPerStage[c.level], 0);
+      assert(h.p.getGridDamageAndHealingBonus() === expected, `${voc} grid bonus = sum of stage bonuses`);
+    });
+    h.done();
+  }
+}
+
+/**
+ * D88 live: a gem in a domain with resonance n uses its first n mod slots; when n equals its slot count it adds +1
+ * damage & healing (+2 for a greater gem). Checked for every resonance and gem quality.
+ */
+function verifyResonanceGems(voc) {
+  const out = [];
+  const q0 = Object.values(M.EQuarter).find((e) => e && e.value === 0);
+  for (let n = 0; n <= 3; n++) for (let q = 0; q <= 2; q++) {
+    const h = planner(voc);
+    fillAll(h);
+    const vt = h.tiles().filter((t) => t.cat === 4 && t.q === 0).map((t) => t.id);
+    for (const id of vt.slice(n)) h.p.removeFromSkill(tileEnum(id), 1);
+    const b1 = arr(h.p.getAvailableBasicModsPos1())[0].id; const b2 = arr(h.p.getAvailableBasicModsPos2()).find((m) => m.id !== b1).id;
+    const s = arr(h.p.getAvailableSupremeMods())[0];
+    h.p.onModChange(1, b1, q0); if (q >= 1) h.p.onModChange(2, b2, q0); if (q >= 2) h.p.onModChange(3, s, q0);
+    const active = arr(h.p.getGemsBasicModEffectSummary()).length + arr(h.p.getGemsSupremeModSummary()).length;
+    const bonus = h.p.getVesselsDamageAndHealingBonus();
+    assert(h.corners()[0].vesselLevel === n, `${voc} VR ${n}`);
+    assert(active >= Math.min(n, q + 1) && (n > q || active <= n), `${voc} VR ${n} gem ${q}: ${active} active mods`);
+    assert(bonus === (n === q + 1 ? (q === 2 ? 2 : 1) : 0), `${voc} VR ${n} gem ${q}: bonus ${bonus}`);
+    out.push({ resonance: n, quality: QUALITY[q], bonus });
+    h.done();
+  }
+  return out;
+}
+
 function deriveDedication(voc) {
   const h = planner(voc); const perPoint = {}; const totals = {};
   const t0 = h.tiles(); let prev = h.small();
@@ -193,12 +248,16 @@ function verifyAugmentStacking(voc) {
 }
 
 function supremeCategories(voc, keys) {
-  const h = planner(voc); for (const id of [14, 21, 15, 20, 9]) h.fill(id);
+  const h = planner(voc);
+  // Live: the gem sits in quarter 0's vessel, which needs resonance III (whole wheel).
+  const at = LIVE ? Object.values(M.EQuarter).find((e) => e && e.value === 0) : 2;
+  if (LIVE) fillAll(h);
+  else for (const id of [14, 21, 15, 20, 9]) h.fill(id);
   const b1 = arr(h.p.getAvailableBasicModsPos1())[0].id; const b2 = arr(h.p.getAvailableBasicModsPos2())[0].id;
-  h.p.onModChange(1, b1, 2); h.p.onModChange(2, b2, 2);
+  h.p.onModChange(1, b1, at); h.p.onModChange(2, b2, at);
   const out = {};
   for (const k of keys) {
-    h.p.onModChange(3, k, 2);
+    h.p.onModChange(3, k, at);
     const s = arr(h.p.getGemsSupremeModSummary()).map((x) => ({ id: x.id, value: x.value, category: x.category.value }));
     const e = s.find((x) => x.id === k);
     out[k] = { category: SUPREME_CAT[e.category], maxGradeValue: e.value, momentumAtMaxGrade: h.p.getVesselsMomentumBonus() };
@@ -356,13 +415,21 @@ for (const voc of VOCS) {
 
   const revelations = corners.map((c) => ({ quarter: QUARTERS[c.id], domain: DOMAINS[QUARTERS[c.id]], ...revelationInfo(c.largePerkId) }));
   const revNames = revelations.map((r) => r.name);
-  const rmPerTile = tiles.find((t) => t.cat === 5).mediumPerkValue;
-  const rm = verifyRevelationMastery(voc, rmPerTile);
+  const rmPerTile = LIVE ? 0 : tiles.find((t) => t.cat === 5).mediumPerkValue;
+  const rm = LIVE ? { convictionOk: true, gemBonusAtMaxGrade: null } : verifyRevelationMastery(voc, rmPerTile);
   assert(rm.convictionOk, `${voc} RM conviction adds ${rmPerTile} to its quarter`);
 
   const gemVesselTiles = tiles.filter((t) => t.cat === 4).map((t) => t.id);
-  const orders = verifyVesselsAndBonuses(voc, rev.knight.bonusPerStage, [1, 2, 3]);
-  const vd = vesselsRaw.map((v) => ({ id: v.id, vesselLevel: v.vesselLevel, quality: QUALITY[v.vesselLevel], unlockOrder: v.id + 1, gemName: STR.VesselInfos.GemNames[v.vesselLevel][voc] }));
+  let orders = null; let resonance = null;
+  if (LIVE) {
+    verifyResonanceFill(voc, rev.knight.bonusPerStage, [1, 2, 3]);
+    resonance = verifyResonanceGems(voc);
+    for (let q = 0; q < 4; q++) assert(tiles.filter((t) => t.cat === 4 && t.q === q).length === 3, `${voc} 3 vessel slices in quarter ${q}`);
+  } else orders = verifyVesselsAndBonuses(voc, rev.knight.bonusPerStage, [1, 2, 3]);
+  // Live: one vessel per domain (id = quarter); its quality follows the resonance, listed as the highest.
+  const vd = LIVE
+    ? vesselsRaw.map((v) => ({ id: v.id, vesselLevel: 2, quality: 'greater', unlockOrder: 3, domain: DOMAINS[QUARTERS[v.id]], gemName: STR.VesselInfos.GemNames[2][voc] }))
+    : vesselsRaw.map((v) => ({ id: v.id, vesselLevel: v.vesselLevel, quality: QUALITY[v.vesselLevel], unlockOrder: v.id + 1, gemName: STR.VesselInfos.GemNames[v.vesselLevel][voc] }));
   if (!vesselDefs) vesselDefs = vd.map(({ gemName: _g, ...x }) => x);
   assert(same(vesselDefs, vd.map(({ gemName: _g, ...x }) => x)), `${voc} vessel levels equal`);
 
@@ -381,7 +448,7 @@ for (const voc of VOCS) {
 
   const cats = supremeCategories(voc, supKeys);
   const rmGem = cats[5]?.maxGradeValue;
-  assert(rm.gemBonusAtMaxGrade === rmGem, `${voc} RM gem adds ${rmGem}`);
+  if (!LIVE) assert(rm.gemBonusAtMaxGrade === rmGem, `${voc} RM gem adds ${rmGem}`);
 
   vocations[voc] = {
     vocation: voc,
@@ -397,13 +464,15 @@ for (const voc of VOCS) {
     gemVesselTiles,
     mods: { basic: basicMods(voc, pos1, pos2), supreme: supremeMods(voc, supKeys, cats, revNames) },
     referenceBuilds: referenceBuilds(voc),
-    verification: { revelationMasteryGemAtMaxGrade: rm.gemBonusAtMaxGrade, gemVesselFillOrdersTested: orders, augmentStacking: stacking, dedicationTotalsFullWheel: ded.final },
+    verification: LIVE
+      ? { resonance, augmentStacking: stacking, dedicationTotalsFullWheel: ded.final }
+      : { revelationMasteryGemAtMaxGrade: rm.gemBonusAtMaxGrade, gemVesselFillOrdersTested: orders, augmentStacking: stacking, dedicationTotalsFullWheel: ded.final },
   };
 }
 
 const data = {
   meta: {
-    source: 'Official Wheel of Destiny planner (test.tibia.com), WASM module run in Node + SkillwheelStringsJsonLibrary.json; reference builds and target counts from community data.',
+    source: `Official Wheel of Destiny planner (${LIVE ? 'www.tibia.com, live servers' : 'test.tibia.com'}), WASM module run in Node + SkillwheelStringsJsonLibrary.json; reference builds and target counts from community data.`,
     generatedAt: new Date().toISOString().slice(0, 10),
     totalCapacity: 4000,
     note: 'Facts derived by running the planner; no CipSoft code is included.',
@@ -418,7 +487,7 @@ const data = {
   },
   revelationMastery: {
     mediumPerkId: 46,
-    pointsPerConvictionSlice: vocations.knight.tiles.find((t) => t.conviction.category === 'revelationMastery').conviction.revelationPoints,
+    pointsPerConvictionSlice: vocations.knight.tiles.find((t) => t.conviction.category === 'revelationMastery')?.conviction.revelationPoints ?? 0,
     rule: 'Each filled Revelation Mastery slice adds its points to the revelation of its own domain. Supreme RM mods add their grade value to the named revelation (planner shows grade IV = +225). Both count toward thresholds only, not toward grid capacity.',
   },
   augmentStacking: {
@@ -426,10 +495,15 @@ const data = {
     rule: 'Each augmentation conviction exists on two slices. Filling one copy grants stage I, the second copy adds stage II (cumulative), independent of fill order.',
   },
   vessels: {
+    system: LIVE ? 'resonance' : 'global',
     list: vesselDefs,
-    rule: 'Vessel n (0-based) unlocks when n+1 Gem Vessel slices are completely filled, regardless of which ones. Each filled Gem Vessel slice also gives +1 flat damage & healing.',
+    rule: LIVE
+      ? 'One vessel per domain. Its Vessel Resonance (0-3) = completely filled Gem Vessel slices of that domain. A gem of the domain uses its first n mod slots at resonance n; resonance equal to its slot count adds +1 damage & healing (+2 for a greater gem).'
+      : 'Vessel n (0-based) unlocks when n+1 Gem Vessel slices are completely filled, regardless of which ones. Each filled Gem Vessel slice also gives +1 flat damage & healing.',
     gemQualityMods: { lesser: 1, regular: 2, greater: 3 },
-    vesselModsByQuality: 'Lesser vessel activates basic mod 1; regular vessel basic 1+2; greater vessel basic 1+2+supreme.',
+    vesselModsByQuality: LIVE
+      ? 'Resonance I activates basic mod 1, II basic 1+2, III basic 1+2+supreme (limited by the gem quality).'
+      : 'Lesser vessel activates basic mod 1; regular vessel basic 1+2; greater vessel basic 1+2+supreme.',
     gemNames: STR.VesselInfos.GemNames,
   },
   momentum: {

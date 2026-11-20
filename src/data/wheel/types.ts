@@ -114,6 +114,8 @@ export interface WheelVessel {
   /** Number of completely filled Gem Vessel slices needed. */
   unlockOrder: number;
   gemName?: string;
+  /** D88 live wheel: one vessel per domain. */
+  domain?: Domain;
 }
 
 export interface BasicModEffect {
@@ -194,6 +196,8 @@ export interface WheelDataFile {
   revelationMastery: { mediumPerkId: number; pointsPerConvictionSlice: number; rule: string };
   augmentStacking: { copiesPerAugment: number; rule: string };
   vessels: {
+    /** D88: 'global' = vessels unlock by Gem Vessel slices anywhere; 'resonance' = live, one vessel per domain. */
+    system: 'global' | 'resonance';
     list: WheelVessel[];
     rule: string;
     gemQualityMods: Record<GemQuality, number>;

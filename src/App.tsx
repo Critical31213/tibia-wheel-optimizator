@@ -11,6 +11,7 @@ import { MonsterSearch } from './components/MonsterSearch';
 import { NotesPanel } from './components/NotesPanel';
 import { Panel } from './components/Panel';
 import { BuildRationale, ResultsPanel } from './components/ResultsPanel';
+import { SegmentedControl } from './components/SegmentedControl';
 import { RotationPanel } from './components/RotationPanel';
 import { VesselsPanel } from './components/VesselsPanel';
 import { VocationPicker } from './components/VocationPicker';
@@ -21,7 +22,7 @@ import { gemFromRecommendation, setModGrade, updateGem } from './lib/gems';
 import { usePersistentInputs } from './hooks/usePersistentInputs';
 import { usePersistentSpellPrefs } from './hooks/usePersistentSpellPrefs';
 import { useT } from './i18n';
-import { CUSTOM_ROTATION_ID } from './types';
+import { CUSTOM_ROTATION_ID, WHEEL_VARIANTS } from './types';
 import { getCustomRotationSpells, getWeapon, getForceableSpells, getMonsterById, getRotationPresets, getStanceOptions, getWheel, revelationOptions, useMonsterData } from './lib/api';
 import { stanceNames } from './lib/spellPrefs';
 import type { BuildResult } from './lib/api';
@@ -49,7 +50,7 @@ export default function App() {
   const deferred = useDeferredValue(inputs);
   const deferredGems = useDeferredValue(gems);
 
-  const wheel = useMemo(() => getWheel(inputs.vocation), [inputs.vocation]);
+  const wheel = useMemo(() => getWheel(inputs.vocation, inputs.wheel), [inputs.vocation, inputs.wheel]);
   const maxPoints = wheel.totalCapacity;
   const spot = useMemo(
     () => (monstersReady ? resolveMonsters(inputs.monsters, getMonsterById) : []),
@@ -66,8 +67,8 @@ export default function App() {
   const { mode } = deferred;
   const { rotationId, forcedSpells, forcedStage2, forcedRevelations, stance, customRotation } = deferredPrefs;
   const revelationReach = useMemo(
-    () => revelationOptions({ vocation: deferred.vocation, points, gems: deferredGems, character }),
-    [deferred.vocation, points, deferredGems, character],
+    () => revelationOptions({ vocation: deferred.vocation, points, gems: deferredGems, character, wheelVariant: deferred.wheel }),
+    [deferred.vocation, points, deferredGems, character, deferred.wheel],
   );
   const meleeSkill = deferred.vocation === 'knight' ? deferred.meleeSkill : null;
   const gearRequest = useMemo(() => gearInput(deferredGear), [deferredGear]);
@@ -94,15 +95,17 @@ export default function App() {
             weapons: deferredWeapons.weapons.length ? deferredWeapons.weapons : undefined,
             suggestWeapons: deferredWeapons.weapons.length && deferredWeapons.suggest ? true : undefined,
             gear: gearRequest,
+            wheelVariant: deferred.wheel === 'current' ? undefined : deferred.wheel,
           }
         : null,
-    [deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, meleeSkill, rotationId, customRotation, forcedSpells, forcedStage2, forcedRevelations, stance, deferredWeapons, gearRequest],
+    [deferred.wheel, deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, meleeSkill, rotationId, customRotation, forcedSpells, forcedStage2, forcedRevelations, stance, deferredWeapons, gearRequest],
   );
   const optimized = useOptimizer(request);
   // The shown build may lag the inputs while the worker computes; everything below follows its own vocation.
   const resultVocation = optimized.input?.vocation ?? deferred.vocation;
-  const current = resultVocation === inputs.vocation;
-  const resultWheel = useMemo(() => getWheel(resultVocation), [resultVocation]);
+  const resultVariant = optimized.input ? (optimized.input.wheelVariant ?? 'current') : deferred.wheel;
+  const current = resultVocation === inputs.vocation && resultVariant === inputs.wheel;
+  const resultWheel = useMemo(() => getWheel(resultVocation, resultVariant), [resultVocation, resultVariant]);
   const shown: BuildResult | null = request ? optimized.result : null;
   const weaponName = (current && shown?.weapon && getWeapon(shown.weapon.best.weaponId)?.name) || null;
   const emptyVessels = useMemo(() => (shown && current ? emptyUnlockedByQuality(shown.vessels) : null), [shown, current]);
@@ -137,7 +140,20 @@ export default function App() {
         </div>
 
         <div className="flex flex-col gap-3">
-          <Panel title={t('app.wheelTitle', { vocation: VOCATION_LABELS[resultVocation] })} headingId="wheel-heading">
+          <Panel
+            title={t('app.wheelTitle', { vocation: VOCATION_LABELS[resultVocation] })}
+            headingId="wheel-heading"
+            aside={
+              <SegmentedControl
+                size="sm"
+                label={t('wheelVariant.label')}
+                className="w-56 shrink-0"
+                options={WHEEL_VARIANTS.map((v) => ({ value: v, label: t(`wheelVariant.${v}`), title: t(`wheelVariant.${v}Hint`) }))}
+                value={inputs.wheel}
+                onChange={(wheel) => update({ wheel })}
+              />
+            }
+          >
             {gems.length === 0 && (
               <p role="note" className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
                 {t('app.noGems')}{' '}

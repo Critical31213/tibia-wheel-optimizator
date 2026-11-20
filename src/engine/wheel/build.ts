@@ -4,6 +4,7 @@
  */
 import type {
   Domain,
+  GemQuality,
   ModDefinition,
   PerkCategory,
   RevelationPerk,
@@ -11,11 +12,13 @@ import type {
   VesselDefinition,
   Vocation,
   WheelDefinition,
+  WheelVariant,
 } from '../../types';
 import {
   getSpell,
   getWheelData,
   WHEEL_DATA,
+  wheelDataFile,
   type WheelBasicMod,
   type WheelRevelation,
   type WheelSupremeMod,
@@ -57,6 +60,14 @@ export interface EngineRevelation {
 
 export interface EngineWheel {
   vocation: Vocation;
+  variant: WheelVariant;
+  /**
+   * D88: 'global' = vessel k unlocks with k+1 filled Gem Vessel slices anywhere (+1 damage & healing each);
+   * 'resonance' (live) = one vessel per domain whose resonance is its filled Gem Vessel slices (see `vesselSpots`).
+   */
+  gemSystem: 'global' | 'resonance';
+  /** Number of vessel states (`vesselKeyOf`): 9 (global) or 4^4 (resonance). */
+  vesselStates: number;
   slices: EngineSlice[];
   /** Indexed like DOMAIN_ORDER. */
   revelations: EngineRevelation[];
@@ -112,10 +123,10 @@ function convictionCategory(t: WheelTile, kind: ConvictionKind): PerkCategory {
   }
 }
 
-function convictionDescription(t: WheelTile, kind: ConvictionKind): string {
+function convictionDescription(t: WheelTile, kind: ConvictionKind, resonance: boolean): string {
   const c = t.conviction;
   if (kind === 'augment' && c.augment) return `I: ${c.augment.stage1}\nII: ${c.augment.stage2}`;
-  if (kind === 'vessel') return c.description || 'Unlocks the next gem vessel; +1 damage and healing.';
+  if (kind === 'vessel') return c.description || (resonance ? 'Raises the Vessel Resonance of this domain.' : 'Unlocks the next gem vessel; +1 damage and healing.');
   if (kind === 'rm') return `+${RM_SLICE_POINTS} points towards the ${c.name.replace('Revelation Mastery ', '')} revelation.`;
   if (c.description) return c.description;
   return c.displayValue ? `${c.name} ${c.displayValue}` : c.name;
@@ -153,9 +164,11 @@ function basicCategory(m: WheelBasicMod): PerkCategory {
   return m.effects.every((e) => e.effectId === 11 || e.effectId === 12) ? 'utility' : 'defense';
 }
 
-function build(vocation: Vocation): EngineWheel {
-  const data = getWheelData(vocation);
-  const graph = WHEEL_DATA.unlockGraph;
+function build(vocation: Vocation, variant: WheelVariant): EngineWheel {
+  const file = wheelDataFile(variant);
+  const data = getWheelData(vocation, variant);
+  const graph = file.unlockGraph;
+  const gemSystem = file.vessels.system ?? 'global';
   const tiles = [...data.tiles].sort((a, b) => a.gridId - b.gridId);
   const n = tiles.length;
 
@@ -198,7 +211,7 @@ function build(vocation: Vocation): EngineWheel {
       conviction: {
         id: `${vocation}-${t.tileName}`,
         name: t.conviction.name,
-        description: convictionDescription(t, kind),
+        description: convictionDescription(t, kind, gemSystem === 'resonance'),
         category: convictionCategory(t, kind),
       },
       dedicationLabel: dedicationLabel(t),
@@ -236,6 +249,7 @@ function build(vocation: Vocation): EngineWheel {
     id: v.id,
     quality: v.quality,
     unlockOrder: v.unlockOrder,
+    ...(v.domain ? { domain: v.domain } : {}),
   }));
 
   const basicMods = data.mods.basic;
@@ -275,6 +289,9 @@ function build(vocation: Vocation): EngineWheel {
   };
   return {
     vocation,
+    variant,
+    gemSystem,
+    vesselStates: gemSystem === 'resonance' ? 4 ** 4 : vessels.length + 1,
     slices,
     revelations,
     basicMods,
@@ -284,16 +301,59 @@ function build(vocation: Vocation): EngineWheel {
   };
 }
 
-const cache = new Map<Vocation, EngineWheel>();
+const cache = new Map<string, EngineWheel>();
 
-export function getEngineWheel(vocation: Vocation): EngineWheel {
-  let w = cache.get(vocation);
+export function getEngineWheel(vocation: Vocation, variant: WheelVariant = 'current'): EngineWheel {
+  const key = `${variant}:${vocation}`;
+  let w = cache.get(key);
   if (!w) {
-    w = build(vocation);
-    cache.set(vocation, w);
+    w = build(vocation, variant);
+    cache.set(key, w);
   }
   return w;
 }
+
+// ---------------------------------------------------------------------------
+// D88: vessel states
+
+/** Resonance of engine domain d in a resonance key (base-4 digit). */
+export const resonanceOf = (key: number, d: number) => Math.floor(key / 4 ** d) % 4;
+
+/** Vessel state after completely filling a Gem Vessel slice of engine domain `domainIdx`. */
+export function nextVesselKey(w: EngineWheel, key: number, domainIdx: number): number {
+  if (w.gemSystem === 'resonance') return resonanceOf(key, domainIdx) < 3 ? key + 4 ** domainIdx : key;
+  return Math.min(key + 1, w.vesselStates - 1);
+}
+
+/** Vessel state of an allocation: unlocked vessel count (global) or per-domain resonance digits. */
+export function vesselKeyOf(w: EngineWheel, alloc: ArrayLike<number>): number {
+  let key = 0;
+  for (const i of w.vesselTiles) if (alloc[i] >= w.slices[i].capacity) key = nextVesselKey(w, key, w.slices[i].domainIdx);
+  return key;
+}
+
+export interface VesselSpot {
+  vessel: VesselDefinition;
+  /** Gem quality whose mods are all active (live: from the resonance). */
+  quality: GemQuality;
+  unlocked: boolean;
+  /** Live: Vessel Resonance 0..3. */
+  resonance?: number;
+}
+
+const RESONANCE_QUALITY: readonly GemQuality[] = ['lesser', 'lesser', 'regular', 'greater'];
+
+/** Vessels of a state: global = the first `key` vessels unlocked; resonance = each domain's vessel at its resonance. */
+export function vesselSpots(w: EngineWheel, key: number): VesselSpot[] {
+  return w.definition.vessels.map((vessel, i) => {
+    if (w.gemSystem !== 'resonance') return { vessel, quality: vessel.quality, unlocked: i < key };
+    const r = resonanceOf(key, DOMAIN_ORDER.indexOf(vessel.domain!));
+    return { vessel, quality: RESONANCE_QUALITY[r], unlocked: r > 0, resonance: r };
+  });
+}
+
+/** Flat damage & healing per filled Gem Vessel slice (live: none, the gem match bonus instead). */
+export const vesselSliceFlat = (w: EngineWheel) => (w.gemSystem === 'resonance' ? 0 : 1);
 
 /** Directed unlock rule: initially unlocked, or a completely filled slice unlocks it. */
 export function isAvailable(w: EngineWheel, alloc: ArrayLike<number>, i: number): boolean {

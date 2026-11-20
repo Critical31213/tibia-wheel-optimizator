@@ -48,7 +48,10 @@ describe('inputState', () => {
   it('ignores invalid values and clamps ranges', () => {
     expect(fromQuery('?p=abc&prio=500')).toEqual({ priority: 100 });
     expect(fromQuery('?v=wizard').vocation).toBeUndefined();
-    expect(fromQuery('?v=knight')).toEqual({ vocation: 'knight', level: null, scrolls: 0, mainSkill: null, shielding: null, magicLevel: null, meleeSkill: null, monsters: [] });
+    expect(fromQuery('?v=knight')).toEqual({ vocation: 'knight', level: null, scrolls: 0, mainSkill: null, shielding: null, magicLevel: null, meleeSkill: null, monsters: [], wheel: 'current' });
+    expect(fromQuery(toQuery({ ...DEFAULT_INPUTS, wheel: 'live' })).wheel).toBe('live');
+    expect(toQuery(DEFAULT_INPUTS)).not.toContain('w=');
+    expect(fromQuery('?w=old').wheel).toBeUndefined();
     expect(sanitize({ points: -5, monsterId: '  ' })).toEqual({ points: 0 });
     expect(fromQuery('?lv=0&sk=999&sc=1500')).toEqual({ level: null, mainSkill: 200, scrolls: 1000 });
     expect(sanitize({ level: null, shielding: 'x' })).toEqual({ level: null });

@@ -2,14 +2,14 @@
  * Engine public API. Signatures `getWheel`, `optimize`, `pointsForLevel` are
  * the contract the UI relies on. See docs/modules/engine.md.
  */
-import type { OptimizerInput, OptimizerResult, Vocation, WheelDefinition } from '../types';
+import type { OptimizerInput, OptimizerResult, Vocation, WheelDefinition, WheelVariant } from '../types';
 import { runOptimizer } from './optimizer';
 export { revelationOptions } from './optimizer';
 import { getEngineWheel } from './wheel/build';
 
-/** Wheel definition for a vocation (cached; treat as read-only). */
-export function getWheel(vocation: Vocation): WheelDefinition {
-  return getEngineWheel(vocation).definition;
+/** Wheel definition for a vocation and variant (cached; treat as read-only). */
+export function getWheel(vocation: Vocation, variant: WheelVariant = 'current'): WheelDefinition {
+  return getEngineWheel(vocation, variant).definition;
 }
 
 export function optimize(input: OptimizerInput): OptimizerResult {

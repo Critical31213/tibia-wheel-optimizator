@@ -4,6 +4,9 @@
  *
  * Vessel rule (D28): a gem fits only a vessel of its own quality (lesser → lesser, regular → regular,
  * greater → greater) and then all its mods are active. Vessel ids are 0-based.
+ * D88 live wheel (Vessel Resonance): any gem fits a domain's vessel and uses its first n mod slots at resonance n
+ * (vessel quality lesser / regular / greater = resonance I / II / III); a matching quality adds +1 damage & healing
+ * (+2 for a greater gem).
  * D23: vessels hold only owned gems; recommendations are advice and never fill a vessel.
  */
 import type {
@@ -25,6 +28,7 @@ import { text } from './messages';
 import {
   add,
   basicModParts,
+  flatParts,
   type BuildFacts,
   EFFECT_HP,
   EFFECT_MITIGATION,
@@ -37,7 +41,7 @@ import {
   type ValuationContext,
   ZERO,
 } from './values';
-import { type EngineWheel, REVELATION_THRESHOLDS, stageFor } from './wheel/build';
+import { type EngineWheel, REVELATION_THRESHOLDS, stageFor, type VesselSpot } from './wheel/build';
 
 export type GemSlot = 'basic1' | 'basic2' | 'supreme';
 export const SLOTS_BY_QUALITY: Record<GemQuality, GemSlot[]> = {
@@ -86,13 +90,20 @@ export function withSharedGrades(gems: readonly OwnedGem[]): OwnedGem[] {
   });
 }
 
-/** D28: a gem fits only a vessel of the same quality. */
-export const fits = (gem: GemQuality, vessel: GemQuality) => gem === vessel;
+/** D28: a gem fits only a vessel of the same quality (D88 live: any vessel). */
+export const fits = (gem: GemQuality, vessel: GemQuality, resonance = false) => resonance || gem === vessel;
 
-/** Slots of `gem` active in a vessel of quality `vessel` (none when it does not fit). */
-export function activeSlots(gem: GemQuality, vessel: GemQuality): GemSlot[] {
+/** Slots of `gem` active in a vessel of quality `vessel` (none when it does not fit; live: the first n at resonance n). */
+export function activeSlots(gem: GemQuality, vessel: GemQuality, resonance = false): GemSlot[] {
+  if (resonance) return SLOTS_BY_QUALITY[gem].slice(0, QUALITY_RANK[vessel] + 1);
   return fits(gem, vessel) ? SLOTS_BY_QUALITY[gem] : [];
 }
+
+/** D88 live: damage & healing of a gem whose quality matches the vessel resonance (+2 for greater). */
+export const matchBonus = (gem: GemQuality, vessel: GemQuality, resonance: boolean) =>
+  resonance && gem === vessel ? (gem === 'greater' ? 2 : 1) : 0;
+
+const isRes = (env: GemEnv) => env.wheel.gemSystem === 'resonance';
 
 const findBasic = (w: EngineWheel, id: number) => w.basicMods.find((m) => m.id === id);
 const findSupreme = (w: EngineWheel, id: number) => w.supremeMods.find((m) => m.id === id);
@@ -108,11 +119,12 @@ export function modParts(env: GemEnv, slot: GemSlot, modId: number, grade: numbe
 
 export function gemParts(env: GemEnv, gem: OwnedGem, vessel: GemQuality): Parts {
   let p = ZERO;
-  for (const slot of activeSlots(gem.quality, vessel)) {
+  for (const slot of activeSlots(gem.quality, vessel, isRes(env))) {
     const ref = gem[slot];
     if (ref) p = add(p, modParts(env, slot, ref.modId, ref.grade));
   }
-  return p;
+  const flat = matchBonus(gem.quality, vessel, isRes(env));
+  return flat ? add(p, flatParts(env.v, flat)) : p;
 }
 
 // ---------------------------------------------------------------------------
@@ -171,13 +183,14 @@ export function assign(weights: number[][]): number[] {
   return res.map((c, i) => (c >= 0 && c < weights[i].length && (weights[i][c] ?? 0) > 1e-9 ? c : -1));
 }
 
-/** Places owned gems into the first `unlocked` vessels maximising the blended value. */
-export function placeGems(env: GemEnv, gems: OwnedGem[], unlocked: number): (OwnedGem | null)[] {
-  const vessels = env.wheel.definition.vessels.slice(0, unlocked);
+/** Places owned gems into the unlocked vessels (`spots`, see `vesselSpots`) maximising the blended value. */
+export function placeGems(env: GemEnv, gems: OwnedGem[], spots: readonly VesselSpot[]): (OwnedGem | null)[] {
   // +ε: an owned gem worth 0 here (e.g. a resistance the spot does not need) still beats an empty vessel.
-  const w = vessels.map((vs) => gems.map((g) => (fits(g.quality, vs.quality) ? env.blend(gemParts(env, g, vs.quality)) + 1e-6 : 0)));
+  const w = spots.map((vs) =>
+    gems.map((g) => (vs.unlocked && fits(g.quality, vs.quality, isRes(env)) ? env.blend(gemParts(env, g, vs.quality)) + 1e-6 : 0)),
+  );
   const cols = assign(w);
-  return vessels.map((_, i) => (cols[i] >= 0 ? gems[cols[i]] : null));
+  return spots.map((_, i) => (cols[i] >= 0 ? gems[cols[i]] : null));
 }
 
 // ---------------------------------------------------------------------------
@@ -388,16 +401,27 @@ export function withRoom(env: GemEnv, vessels: readonly VesselAssignment[], recs
 /** D23: a vessel holds only a gem the player owns; unlocked vessels without one stay empty. */
 export function vesselAssignments(
   env: GemEnv,
-  unlocked: number,
+  spots: readonly VesselSpot[],
   placed: (OwnedGem | null)[],
 ): VesselAssignment[] {
-  return env.wheel.definition.vessels.map((vs, i) => {
-    const own = i < unlocked ? placed[i] : null;
+  return spots.map((vs, i) => {
+    const own = vs.unlocked ? placed[i] : null;
+    const live = vs.resonance === undefined ? {} : { domain: vs.vessel.domain, resonance: vs.resonance };
     if (own) {
       const idle = idleMods(env, own, vs.quality);
-      return { vesselId: vs.id, quality: vs.quality, unlocked: true, gem: own, source: 'owned', ...(idle.length ? { idle } : {}) };
+      const bonus = matchBonus(own.quality, vs.quality, isRes(env));
+      return {
+        vesselId: vs.vessel.id,
+        quality: vs.quality,
+        unlocked: true,
+        gem: own,
+        source: 'owned',
+        ...live,
+        ...(bonus ? { matchBonus: bonus } : {}),
+        ...(idle.length ? { idle } : {}),
+      };
     }
-    return { vesselId: vs.id, quality: vs.quality, unlocked: i < unlocked, gem: null, source: 'empty' };
+    return { vesselId: vs.vessel.id, quality: vs.quality, unlocked: vs.unlocked, gem: null, source: 'empty', ...live };
   });
 }
 
@@ -405,7 +429,7 @@ export function vesselAssignments(
 function idleMods(env: GemEnv, gem: OwnedGem, vessel: GemQuality): NonNullable<VesselAssignment['idle']> {
   const base = withoutOwnRm(env, gem, vessel);
   const out: NonNullable<VesselAssignment['idle']> = [];
-  for (const slot of activeSlots(gem.quality, vessel)) {
+  for (const slot of activeSlots(gem.quality, vessel, isRes(env))) {
     const ref = gem[slot];
     if (!ref || Math.abs(env.blend(modParts(base, slot, ref.modId, ref.grade))) > 1e-3) continue;
     const r = idleReason(base, slot, ref.modId, ref.grade);
@@ -446,7 +470,7 @@ export function upgrades(env: GemEnv, vessels: VesselAssignment[]): UpgradeRecom
   for (const vs of vessels) {
     const gem = vs.gem;
     if (vs.source !== 'owned' || !gem) continue;
-    for (const slot of activeSlots(gem.quality, vs.quality)) {
+    for (const slot of activeSlots(gem.quality, vs.quality, isRes(env))) {
       const ref = gem[slot];
       if (!ref) continue;
       const key = modKey(kindOf(slot), ref.modId);
@@ -489,7 +513,7 @@ export function upgrades(env: GemEnv, vessels: VesselAssignment[]): UpgradeRecom
 /** Env without the revelation points of `gem`'s own RM mod (D43), so its supreme slot is valued as with vs without. */
 function withoutOwnRm(env: GemEnv, gem: OwnedGem, vessel: GemQuality): GemEnv {
   const ref = gem.supreme;
-  const m = ref && activeSlots(gem.quality, vessel).includes('supreme') ? findSupreme(env.wheel, ref.modId) : undefined;
+  const m = ref && activeSlots(gem.quality, vessel, isRes(env)).includes('supreme') ? findSupreme(env.wheel, ref.modId) : undefined;
   const d = m?.category === 'revelationMastery' ? revelationIndex(env.wheel.revelations, m.revelation) : -1;
   if (!m || !ref || d < 0) return env;
   const x = m.values[ref.grade - 1] ?? 0;
@@ -508,7 +532,7 @@ export function modSwaps(env: GemEnv, vessels: readonly VesselAssignment[]): Mod
     const base = withoutOwnRm(env, gem, vs.quality);
     const beforeParts = gemParts(base, gem, vs.quality);
     const before = base.blend(beforeParts);
-    for (const slot of activeSlots(gem.quality, vs.quality)) {
+    for (const slot of activeSlots(gem.quality, vs.quality, isRes(env))) {
       const ref = gem[slot];
       // D72: supreme swaps are expensive; a better supreme comes as a replacement gem (recommendations).
       if (!ref || slot === 'supreme') continue;
@@ -541,7 +565,7 @@ export function modSwaps(env: GemEnv, vessels: readonly VesselAssignment[]): Mod
 export function placedRmPoints(env: GemEnv, vessels: VesselAssignment[]): number[] {
   const pts = [0, 0, 0, 0];
   for (const vs of vessels) {
-    if (vs.source !== 'owned' || !vs.gem?.supreme || !activeSlots(vs.gem.quality, vs.quality).includes('supreme')) continue;
+    if (vs.source !== 'owned' || !vs.gem?.supreme || !activeSlots(vs.gem.quality, vs.quality, isRes(env)).includes('supreme')) continue;
     const m = findSupreme(env.wheel, vs.gem.supreme.modId);
     if (m?.category !== 'revelationMastery') continue;
     const d = revelationIndex(env.wheel.revelations, m.revelation);

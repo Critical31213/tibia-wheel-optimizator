@@ -3,7 +3,7 @@ import { type GemQuality, type OwnedGem, VOCATIONS } from '../types';
 import { optimize } from './index';
 import { activeSlots, assign, bestGems, type GemEnv, gemParts, placeGems, toOwnedGem, upgrades } from './gems';
 import { blendWith, valuationFor, weightsFor } from './optimizer';
-import { getEngineWheel } from './wheel/build';
+import { getEngineWheel, vesselSpots } from './wheel/build';
 import { mitigationGain, mitigationParts } from './values';
 
 function env(vocation: (typeof VOCATIONS)[number] = 'knight', points = 2000): GemEnv {
@@ -57,7 +57,7 @@ describe('gem placement', () => {
     const greater = toOwnedGem('g', g, 4);
     const lesser = toOwnedGem('l', bestGems(e, 'lesser', 1)[0], 1);
     const unlocked = vq.indexOf('greater') + 1;
-    const placed = placeGems(e, [lesser, greater], unlocked);
+    const placed = placeGems(e, [lesser, greater], vesselSpots(e.wheel, unlocked));
     expect(vq[placed.indexOf(greater)]).toBe('greater');
     expect(placed.filter(Boolean)).toHaveLength(2);
   });
@@ -73,7 +73,7 @@ describe('gem placement', () => {
       const n = 5;
       const vs = e.wheel.definition.vessels.slice(0, n);
       const value = (p: (OwnedGem | null)[]) => p.reduce((s, g, i) => s + (g ? e.blend(gemParts(e, g, vs[i].quality)) : 0), 0);
-      const placed = placeGems(e, gems, n);
+      const placed = placeGems(e, gems, vesselSpots(e.wheel, n));
       const best = Math.max(...permutations(gems.length, n).map((p) => value(p.map((c) => (c >= 0 ? gems[c] : null)))));
       expect(value(placed)).toBeCloseTo(best, 9);
     }

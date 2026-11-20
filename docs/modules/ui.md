@@ -110,7 +110,7 @@ Components never import `src/engine` / `src/data` directly — only `src/lib/api
 | Key | Where | Content |
 |-----|-------|---------|
 | `wheel-optimizer:inputs:v1` | localStorage | the whole `InputState` (legacy `monsterId` migrated) |
-| `?v= &p= &lv= &sc= &sk= &sh= &ml= &ms= &m= &prio= &f=` | URL query | same inputs (`lv` level, `sc` scrolls, `sk` main skill, `sh` shielding, `ml` magic level, `ms` knight's melee skill sword/axe/club; `m` = `id[*weight]` joined by `_`, weight 1 omitted; `f` = hunt/boss; legacy `h` ignored); empty optional keys omitted |
+| `?v= &p= &lv= &sc= &sk= &sh= &ml= &ms= &m= &prio= &f= &w=` | URL query | same inputs (`w=live` = live wheel, omitted for the default; `lv` level, `sc` scrolls, `sk` main skill, `sh` shielding, `ml` magic level, `ms` knight's melee skill sword/axe/club; `m` = `id[*weight]` joined by `_`, weight 1 omitted; `f` = hunt/boss; legacy `h` ignored); empty optional keys omitted |
 | `wheel-optimizer:spells:v1:<vocation>` | localStorage | `{ rotationId, forcedSpells }` JSON, validated against the vocation's presets / forceable spells (max 8) |
 | `?r= &fs=` | URL query | rotation preset id (absent = auto), forced spells joined by `,`; a link with `v` but no `r`/`fs` = auto / none |
 | `wheel-optimizer:gems:v1:<vocation>` | localStorage | `OwnedGem[]` JSON, validated by `sanitizeGems` |
@@ -129,7 +129,11 @@ Gems and weapons are deliberately **not** in the URL (too long); a shared link c
   several → weighted-average element chips (`combinedModifiers`) and damage types ordered by weight. Hunt mode shows
   "Single-target spells are ignored in hunt mode" (D16).
 - **Alternatives**: not shown (D36); the app asks the engine for none.
-- **Export**: `plannerUrl(code)` = `https://www.test.tibia.com/community/?subtopic=wheelofdestinyplanner&code=<encoded>`;
+- **Wheel variant (D88)**: a `SegmentedControl` in the wheel panel header switches `InputState.wheel` between
+  "Announced changes" (default) and "Live (tibia.com)"; the request sends `wheelVariant`, the shown wheel, mods
+  and revelation reach follow the result's variant. Live vessels show their domain and Vessel Resonance (0–III)
+  and the quality-match bonus.
+- **Export**: `plannerUrl(code)` = `https://www.test.tibia.com/community/?subtopic=wheelofdestinyplanner&code=<encoded>` (version 0 live codes: the www.tibia.com planner);
   copy result announced in a `role="status"` line; empty state when `plannerCode` is undefined.
 
 ## Gem editor

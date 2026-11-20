@@ -32,6 +32,14 @@ Dependency: `fflate` (inflate only, for decoding). Encoding uses a built-in defl
     are the planner's mod keys, **identical to `mods.basic[].id` / `mods.supreme[].id` in `wheel-data.json`**
     (no mapping needed). No grade is stored (the planner always uses grade IV).
 - Version 0 payload: 36 tile bytes + 12 vessel bytes; the current planner ignores those 12 bytes entirely.
+  D88: this is the live planner's format (www.tibia.com): 4 domain vessels × `[basic1, basic2, supreme]` in quarter
+  order TL, TR, BL, BR. Any gem may sit in any vessel; mods fill the slots in order (basic1, then basic2, then
+  supreme). `encodePlannerCode({ variant: 'live', … })` writes version 0, `decodePlannerCode` returns
+  `variant: 'live'` and `plannerUrl` opens the live planner for it. Same compression; 300 random builds matched the
+  live planner's codes byte for byte during development. For some repetitive 48-byte payloads zlib-ng picks a
+  dynamic-Huffman block, so the planner's own string differs while the payload is the same; the planner loads both.
+  `src/engine/live.test.ts` (WASM-gated) checks that the live planner loads optimizer codes with the same payload,
+  resonance, gems and damage & healing.
 
 ### Compression
 

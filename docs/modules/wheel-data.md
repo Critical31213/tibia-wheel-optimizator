@@ -14,11 +14,12 @@ rules, plus spell metadata used by the engine to value augments in a fight conte
 | `scripts/.cache/wod/` (gitignored) | `skillgrid.cjs` (planner WASM module), `SkillwheelStringsJsonLibrary.json` (texts), `wheelofdestinyplanner.min.js` (UI reference only). |
 | `scripts/.cache/hunt-data/` (gitignored) | `spellAverageHitsData.json`, `rotationPresetsData.json`, `wheelTemplatesData.json` from community data. |
 | `src/data/wheel/wheel-data.json` | Generated dataset (committed; facts only, no CipSoft code). |
+| `src/data/wheel/wheel-data-live.json` | D88: the live wheel (`npm run extract:wheel-live`, inputs in gitignored `scripts/.cache/wod-live/` from the www.tibia.com planner). Same schema; no `applyWheelUpdate`. |
 | `src/data/wheel/wheel-data.d.json.ts` | Types the JSON import as `WheelDataFile`. |
 | `src/data/wheel/types.ts` | Internal types (`WheelTile`, `WheelRevelation`, `WheelBasicMod`, `WheelSupremeMod`, `SpellMeta`, …). |
 | `src/data/wheel/spells.ts` | Hand-curated spell metadata table (`SPELLS`). |
 | `src/data/wheel/update.ts` | D73: announced changes applied on top of the extracted JSON (`applyWheelUpdate`): Revelation Mastery ↔ ring 2 leech slot swap per quarter, new supreme grade values, chain augments. Remove or adjust once the extraction reflects the update. |
-| `src/data/wheel/index.ts` | Public API: `WHEEL_DATA`, `getWheelData(vocation)`, `SPELLS`, `getSpell(name)`, `getWheelSpellNames(vocation)`. |
+| `src/data/wheel/index.ts` | Public API: `WHEEL_DATA`, `WHEEL_DATA_LIVE`, `getWheelData(vocation, variant)`, `SPELLS`, `getSpell(name)`, `getWheelSpellNames(vocation, variant)`. |
 | `src/data/wheel/wheel.test.ts` | Vitest checks. |
 
 `src/data/wheel` is imported directly (`import { getWheelData } from '../data/wheel'`), independently of the
@@ -114,6 +115,21 @@ templates). Wheel facts: official Tibia Wheel of Destiny planner (CipSoft). The 
 - community builds predate the new layout (`legacyCode`).
 - D73 quadrant layout: Revelation Mastery takes the ring 2 leech slot, the leech takes the central ring 3 slot; spell augments stay. Chain range (+0/1/2/2, capped at double the base) is not modelled; chain targets add to hunt targets, total capped at 12. Lightning is single-target in the spell data, so its chain mod is valued 0 until its chain behaviour is known.
 - The planner export keeps the slice ids; on the live planner the perks of moved slots differ until the update ships.
+
+## Live variant (D88)
+
+Two wheels are supported (`WheelVariant`): `current` = the wheel with the developer-announced changes (D73) and
+`live` = the wheel on the live servers (www.tibia.com planner). The live extraction (`--live`) runs the same
+assertions where they apply and adds:
+
+- No Revelation Mastery slices; medium perk categories `unique, skillBonus, leech, augmentation, gemVessel, other`.
+- `vessels.system: 'resonance'`, one vessel per domain (`vessels[4]`, id = quarter TL, TR, BL, BR, with `domain`).
+  Vessel Resonance of a domain = its completely filled Gem Vessel slices (3 per domain, max III). A gem uses its
+  first `min(resonance, slots)` mods; a gem whose quality matches the resonance (lesser I, regular II, greater III)
+  adds +1 damage & healing (+2 for greater). The slices themselves give no flat bonus. Verified in the planner
+  (`verifyResonanceFill`, `verifyResonanceGems`).
+- Unlock graph, revelations, augment texts and spells are identical to the current variant.
+- TibiaWiki: a gem has a domain affinity (changeable for gold). The engine assumes any owned gem can go to any domain.
 
 ## Planner export code
 

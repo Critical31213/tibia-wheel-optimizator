@@ -13,6 +13,7 @@
     "test": "vitest run",
     "scrape:monsters": "tsx scripts/scrape-monsters.ts",
     "extract:wheel": "node scripts/extract-wheel.mjs",
+    "extract:wheel-live": "node scripts/extract-wheel.mjs --live",
     "datamine:damage": "node scripts/datamine-damage.mjs",
     "check:planner": "node scripts/check-live-planner.mjs",
     "import:proficiency": "node scripts/import-proficiency.mjs",

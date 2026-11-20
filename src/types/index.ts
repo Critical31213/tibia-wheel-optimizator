@@ -255,9 +255,15 @@ export interface VesselDefinition {
   id: number;
   /** Highest gem quality whose mods are all active in this vessel. */
   quality: GemQuality;
-  /** Number of filled Gem Vessel slices required to unlock it (1..8). */
+  /** Number of filled Gem Vessel slices required to unlock it (1..8; live: 3 of its domain). */
   unlockOrder: number;
+  /** D88 live wheel: the domain the vessel belongs to. */
+  domain?: Domain;
 }
+
+/** D88: wheel version: 'current' (announced update) or 'live' (live servers, Vessel Resonance). */
+export type WheelVariant = 'current' | 'live';
+export const WHEEL_VARIANTS: readonly WheelVariant[] = ['current', 'live'];
 
 export interface VesselAssignment {
   vesselId: number;
@@ -265,6 +271,11 @@ export interface VesselAssignment {
   unlocked: boolean;
   gem: OwnedGem | null;
   source: 'owned' | 'recommended' | 'empty';
+  /** D88 live wheel: domain of the vessel and its Vessel Resonance (0..3); `quality` follows the resonance. */
+  domain?: Domain;
+  resonance?: number;
+  /** D88 live wheel: +damage & healing of a gem whose quality matches the resonance. */
+  matchBonus?: number;
   /** D72: active mods of the placed gem worth nothing in this build, with why. */
   idle?: { slot: 'basic1' | 'basic2' | 'supreme'; reason: string; reasonMsg?: EngineMessage }[];
 }
@@ -374,6 +385,8 @@ export interface WeightedMonster {
 
 export interface OptimizerInput {
   vocation: Vocation;
+  /** D88: wheel version (default 'current'). */
+  wheelVariant?: WheelVariant;
   /** Available promotion points. */
   points: number;
   /** Selected monster, or null for a generic build. */
@@ -596,6 +609,8 @@ export interface OptimizerResult {
   spells: SpellUsage[];
   /** Export code for the official Wheel of Destiny planner (incl. gems). */
   plannerCode?: string;
+  /** D88: wheel version the build was made for (absent = 'current'). */
+  wheelVariant?: WheelVariant;
   /** Alternative builds (e.g. different revelation focus), best first. */
   alternatives?: AlternativeBuild[];
   /** Rotation the damage estimate is based on. */

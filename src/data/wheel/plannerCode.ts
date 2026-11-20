@@ -1,18 +1,23 @@
 /**
  * Official Wheel of Destiny planner export code (test.tibia.com), reverse-engineered from the planner WASM.
+ * D88: the live planner (www.tibia.com) reads version 0 codes with 4 domain vessels.
  * Format spec: docs/modules/planner-code.md.
  */
 import { inflateSync } from 'fflate';
-import type { GemQuality, Vocation } from '../../types';
+import type { GemQuality, Vocation, WheelVariant } from '../../types';
 import { getWheelData, WHEEL_DATA } from './index';
 
-/** Official planner on tibia.com; still the old wheel (Vessel Resonance), so codes target the test server for now (D38). */
+/** Official planner on tibia.com; still the old wheel (Vessel Resonance): reads the live variant's codes (D88). */
 export const LIVE_PLANNER_URL = 'https://www.tibia.com/community/?subtopic=wheelofdestinyplanner';
 /** Planner that reads our codes. Switch to LIVE_PLANNER_URL when `npm run check:planner` reports the new wheel. */
 export const PLANNER_URL = 'https://www.test.tibia.com/community/?subtopic=wheelofdestinyplanner';
 export const PLANNER_CODE_VERSION = 1;
 export const GRID_SIZE = 36;
 export const VESSEL_COUNT = 8;
+/** D88: live planner: code version 0, one vessel per domain (id = quarter TL, TR, BL, BR). */
+export const LIVE_CODE_VERSION = 0;
+export const LIVE_VESSEL_COUNT = 4;
+const vesselCount = (variant: WheelVariant = 'current') => (variant === 'live' ? LIVE_VESSEL_COUNT : VESSEL_COUNT);
 /** Byte meaning "no mod" in a vessel slot. */
 export const NO_MOD = 0xff;
 
@@ -33,6 +38,8 @@ export interface PlannerVessel {
 
 export interface PlannerBuild {
   vocation: Vocation;
+  /** D88: target planner (default 'current' = the announced wheel). */
+  variant?: WheelVariant;
   /** gridId (0..35) -> promotion points. */
   points: Record<number, number>;
   vessels?: PlannerVessel[];
@@ -40,7 +47,7 @@ export interface PlannerBuild {
 
 export interface DecodedPlannerCode extends PlannerBuild {
   version: number;
-  /** Version 0 (older planner): 12 trailing vessel bytes the current planner ignores; `vessels` is empty. */
+  /** Version 0: the live planner's format (4 domain vessels); the test-server planner reads only its tiles. */
   legacy: boolean;
   vessels: PlannerVessel[];
 }
@@ -70,8 +77,8 @@ export function vesselQuality(vesselId: number): GemQuality {
 }
 
 /** Reasons the planner would drop (or not show) the given gems; empty when all are valid. */
-export function plannerVesselIssues(vocation: Vocation, vessels: PlannerVessel[] = []): string[] {
-  const { basic, supreme } = getWheelData(vocation).mods;
+export function plannerVesselIssues(vocation: Vocation, vessels: PlannerVessel[] = [], variant: WheelVariant = 'current'): string[] {
+  const { basic, supreme } = getWheelData(vocation, variant).mods;
   const slot1 = new Set(basic.filter((m) => m.slots.includes(1)).map((m) => m.id));
   const slot2 = new Set(basic.filter((m) => m.slots.includes(2)).map((m) => m.id));
   const sup = new Set(supreme.map((m) => m.id));
@@ -79,16 +86,21 @@ export function plannerVesselIssues(vocation: Vocation, vessels: PlannerVessel[]
   const seen = new Set<number>();
   for (const g of vessels) {
     const at = `vessel ${g.vesselId}`;
-    if (!Number.isInteger(g.vesselId) || g.vesselId < 0 || g.vesselId >= VESSEL_COUNT) {
+    if (!Number.isInteger(g.vesselId) || g.vesselId < 0 || g.vesselId >= vesselCount(variant)) {
       issues.push(`${at}: invalid vessel id`);
       continue;
     }
     if (seen.has(g.vesselId)) issues.push(`${at}: duplicate`);
     seen.add(g.vesselId);
-    const q = vesselQuality(g.vesselId);
-    const want = q === 'lesser' ? [true, false, false] : q === 'regular' ? [true, true, false] : [true, true, true];
     const has = [g.basic1, g.basic2, g.supreme].map((m) => m !== undefined && m >= 0);
-    if (has.some((h, i) => h !== want[i])) issues.push(`${at}: a ${q} gem needs exactly ${['basic1', 'basic2', 'supreme'].filter((_, i) => want[i]).join(' + ')}`);
+    if (variant === 'live') {
+      // Live: any gem quality in any vessel; its mods fill the slots in order.
+      if (!has[0] || (has[2] && !has[1])) issues.push(`${at}: a gem needs basic1, then basic2, then supreme`);
+    } else {
+      const q = vesselQuality(g.vesselId);
+      const want = q === 'lesser' ? [true, false, false] : q === 'regular' ? [true, true, false] : [true, true, true];
+      if (has.some((h, i) => h !== want[i])) issues.push(`${at}: a ${q} gem needs exactly ${['basic1', 'basic2', 'supreme'].filter((_, i) => want[i]).join(' + ')}`);
+    }
     if (has[0] && !slot1.has(g.basic1!)) issues.push(`${at}: basic mod ${g.basic1} not allowed in slot 1`);
     if (has[1] && !slot2.has(g.basic2!)) issues.push(`${at}: basic mod ${g.basic2} not allowed in slot 2`);
     if (has[2] && !sup.has(g.supreme!)) issues.push(`${at}: supreme mod ${g.supreme} not available to ${vocation}`);
@@ -97,7 +109,8 @@ export function plannerVesselIssues(vocation: Vocation, vessels: PlannerVessel[]
 }
 
 export function encodePlannerPayload(build: PlannerBuild): Uint8Array {
-  const out = new Uint8Array(GRID_SIZE + VESSEL_COUNT * 3).fill(0);
+  const count = vesselCount(build.variant);
+  const out = new Uint8Array(GRID_SIZE + count * 3).fill(0);
   out.fill(NO_MOD, GRID_SIZE);
   for (const [k, v] of Object.entries(build.points)) {
     const id = Number(k);
@@ -106,7 +119,7 @@ export function encodePlannerPayload(build: PlannerBuild): Uint8Array {
     out[id] = v;
   }
   for (const g of build.vessels ?? []) {
-    if (!Number.isInteger(g.vesselId) || g.vesselId < 0 || g.vesselId >= VESSEL_COUNT)
+    if (!Number.isInteger(g.vesselId) || g.vesselId < 0 || g.vesselId >= count)
       throw new RangeError(`Invalid vessel id ${g.vesselId}`);
     [g.basic1, g.basic2, g.supreme].forEach((m, i) => {
       if (m === undefined || m < 0) return;
@@ -126,10 +139,11 @@ export function encodePlannerCode(build: PlannerBuild, { strict = true }: { stri
   const letter = LETTER[build.vocation];
   if (!letter) throw new RangeError(`Invalid vocation ${build.vocation}`);
   if (strict) {
-    const issues = plannerVesselIssues(build.vocation, build.vessels);
+    const issues = plannerVesselIssues(build.vocation, build.vessels, build.variant);
     if (issues.length) throw new Error(`Invalid gems: ${issues.join('; ')}`);
   }
-  return letter + PLANNER_CODE_VERSION + toBase64Url(deflatePlanner(encodePlannerPayload(build)));
+  const version = build.variant === 'live' ? LIVE_CODE_VERSION : PLANNER_CODE_VERSION;
+  return letter + version + toBase64Url(deflatePlanner(encodePlannerPayload(build)));
 }
 
 export function decodePlannerCode(code: string): DecodedPlannerCode {
@@ -138,27 +152,28 @@ export function decodePlannerCode(code: string): DecodedPlannerCode {
   const version = Number(c[1]);
   if (!vocation || !(version === 0 || version === 1)) throw new Error(`Unknown planner code header "${c.slice(0, 2)}"`);
   const raw = inflateSync(fromBase64Url(c.slice(2)));
-  const expected = GRID_SIZE + (version === 1 ? VESSEL_COUNT * 3 : 12);
+  const count = version === 1 ? VESSEL_COUNT : LIVE_VESSEL_COUNT;
+  const expected = GRID_SIZE + count * 3;
   if (raw.length !== expected) throw new Error(`Planner code payload has ${raw.length} bytes, expected ${expected}`);
   const points: Record<number, number> = {};
   for (let i = 0; i < GRID_SIZE; i++) if (raw[i]) points[i] = raw[i];
   const vessels: PlannerVessel[] = [];
-  if (version === 1) {
-    for (let v = 0; v < VESSEL_COUNT; v++) {
-      const [b1, b2, s] = raw.subarray(GRID_SIZE + v * 3, GRID_SIZE + v * 3 + 3);
-      if (b1 === NO_MOD && b2 === NO_MOD && s === NO_MOD) continue;
-      const g: PlannerVessel = { vesselId: v };
-      if (b1 !== NO_MOD) g.basic1 = b1;
-      if (b2 !== NO_MOD) g.basic2 = b2;
-      if (s !== NO_MOD) g.supreme = s;
-      vessels.push(g);
-    }
+  for (let v = 0; v < count; v++) {
+    const [b1, b2, s] = raw.subarray(GRID_SIZE + v * 3, GRID_SIZE + v * 3 + 3);
+    if (b1 === NO_MOD && b2 === NO_MOD && s === NO_MOD) continue;
+    const g: PlannerVessel = { vesselId: v };
+    if (b1 !== NO_MOD) g.basic1 = b1;
+    if (b2 !== NO_MOD) g.basic2 = b2;
+    if (s !== NO_MOD) g.supreme = s;
+    vessels.push(g);
   }
-  return { vocation, version, legacy: version === 0, points, vessels };
+  return { vocation, variant: version === 0 ? 'live' : 'current', version, legacy: version === 0, points, vessels };
 }
 
+/** Planner URL for a code; version 0 codes (live variant, D88) open the live planner. */
 export function plannerUrl(code: string): string {
-  return `${PLANNER_URL}&code=${encodeURIComponent(code.trim())}`;
+  const c = code.trim();
+  return `${c[1] === String(LIVE_CODE_VERSION) ? LIVE_PLANNER_URL : PLANNER_URL}&code=${encodeURIComponent(c)}`;
 }
 
 // ---------------------------------------------------------------------------

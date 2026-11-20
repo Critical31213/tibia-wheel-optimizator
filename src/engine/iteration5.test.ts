@@ -5,7 +5,7 @@ import { optimize } from './index';
 import { bestGems, type GemEnv, gemParts, placeGems, toOwnedGem } from './gems';
 import { blendWith, valuationFor, vesselTable, weightsFor } from './optimizer';
 import { flatParts } from './values';
-import { getEngineWheel } from './wheel/build';
+import { getEngineWheel, vesselSpots } from './wheel/build';
 
 const HUNT = { mode: 'hunt' } as const;
 const BOSS = { mode: 'boss' } as const;
@@ -55,7 +55,11 @@ describe('D23: vessels hold only owned gems', () => {
     for (const vocation of VOCATIONS) {
       const e = env(vocation);
       const flat = flatParts(e.v, 1);
-      for (const p of vesselTable(e, [])) expect(p).toEqual(flat);
+      // D88: totals per state; each unlocked vessel adds only its slice's flat bonus.
+      vesselTable(e, []).forEach((p, k) => {
+        expect(p.off).toBeCloseTo(flat.off * k, 9);
+        expect(p.def).toBeCloseTo(flat.def * k, 9);
+      });
     }
   });
 
@@ -67,14 +71,16 @@ describe('D23: vessels hold only owned gems', () => {
     const vessels = e.wheel.definition.vessels;
     let prev = 0;
     vessels.forEach((_, k) => {
-      const placed = placeGems(e, gems, k + 1);
+      const placed = placeGems(e, gems, vesselSpots(e.wheel, k + 1));
       const total = placed.reduce((s, g, i) => s + (g ? e.blend(gemParts(e, g, vessels[i].quality)) : 0), 0);
-      expect(e.blend(table[k]) - e.blend(flat)).toBeCloseTo(total - prev, 9);
+      // D88: the table holds totals per vessel state (here: unlocked vessel count).
+      expect(e.blend(table[k + 1]) - e.blend(table[k]) - e.blend(flat)).toBeCloseTo(total - prev, 9);
       prev = total;
     });
     expect(prev).toBeGreaterThan(0);
     // Once every owned gem is placed, further vessels add only the flat bonus.
-    expect(table[vessels.length - 1]).toEqual(flat);
+    const last = vessels.length;
+    expect(e.blend(table[last]) - e.blend(table[last - 1])).toBeCloseTo(e.blend(flat), 9);
   });
 
   it('owned gems are placed in the optimized build and change its value', () => {

@@ -97,9 +97,11 @@ export function VesselsPanel({ vocation, result, mods, onAddGem, onUpgrade, onSw
               <div className="flex items-center gap-2 text-xs">
                 <GemIcon quality={v.quality} dim={!v.unlocked} />
                 <span className="font-medium text-parchment-100">
-                  {t('vessels.vesselN', { n: v.vesselId + 1 })}
+                  {v.domain ? t('vessels.domainVessel', { domain: t(`domain.${v.domain}`) }) : t('vessels.vesselN', { n: v.vesselId + 1 })}
                 </span>
-                <span className="text-parchment-400">{t(`quality.${v.quality}`)}</span>
+                <span className="text-parchment-400">
+                  {v.resonance === undefined ? t(`quality.${v.quality}`) : t('vessels.resonance', { level: v.resonance ? ROMAN[v.resonance as ModGrade] : '0' })}
+                </span>
                 <span className={cx('ml-auto', v.unlocked ? 'text-weak' : 'text-parchment-400')}>
                   {v.unlocked ? t('vessels.unlocked') : t('vessels.locked')}
                 </span>
@@ -111,6 +113,7 @@ export function VesselsPanel({ vocation, result, mods, onAddGem, onUpgrade, onSw
                     <span className="shrink-0 rounded-full bg-weak/15 px-1.5 py-0.5 text-[10px] text-weak uppercase">{t('vessels.owned')}</span>
                   </div>
                   <GemMods gem={v.gem} mods={mods} idle={v.idle} />
+                  {v.matchBonus ? <p className="mt-1 text-[11px] text-weak">{t('vessels.matchBonus', { n: v.matchBonus })}</p> : null}
                 </div>
               ) : (
                 <p className={cx('mt-1.5 text-xs', v.unlocked ? 'text-amber-300' : 'text-parchment-400')}>

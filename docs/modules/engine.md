@@ -212,6 +212,15 @@ Optional `input.gear` (owned items per slot, D75): `wearBest` picks the set for 
 
 ## 4. Gems (`gems.ts`)
 
+- **Wheel variant (D88).** `OptimizerInput.wheelVariant` (`'current'` default, `'live'`) selects the wheel
+  (`getEngineWheel(vocation, variant)`, cached per variant). `gemSystem` is `global` (8 vessels unlocked by the
+  count of filled Gem Vessel slices) or `resonance` (live: one vessel per domain, resonance = filled vessel slices of
+  that domain). The search tracks a vessel state key (global: 0..8; resonance: one base-4 digit per domain, 256
+  states) via `nextVesselKey` / `vesselKeyOf`; `vesselTable` holds the gem value per state and `vesselSpots`
+  turns a key into the vessels' effective quality. Live: any gem fits, it uses its first n slots at resonance n,
+  and a quality match adds `matchBonus` damage & healing. Results carry `domain`, `resonance`, `matchBonus`, the
+  rationale `rationale.resonance` and a version 0 planner code.
+
 - **Placement rule.** Maximise Σ blend(gem value in vessel) over a one-to-one assignment (Hungarian algorithm), using only each vessel's active slots.
   - Because active slots follow `min(gem, vessel)` quality, strong supreme gems end up in greater vessels and basic-only gems fill the lower vessels.
   - D23: a vessel holds only a gem the player owns. Unlocked vessels without an owned gem have `gem: null` and `source: 'empty'`; the engine never emits `source: 'recommended'`.

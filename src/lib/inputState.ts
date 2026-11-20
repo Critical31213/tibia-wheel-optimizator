@@ -1,6 +1,6 @@
 /** Serialisation of the user's inputs (URL query string + localStorage). Pure. */
-import { MELEE_SKILLS, VOCATIONS } from '../types';
-import type { CharacterStats, FightContext, FightMode, MeleeSkill, Vocation } from '../types';
+import { MELEE_SKILLS, VOCATIONS, WHEEL_VARIANTS } from '../types';
+import type { CharacterStats, FightContext, FightMode, MeleeSkill, Vocation, WheelVariant } from '../types';
 import { clamp } from './labels';
 
 export interface MonsterEntry {
@@ -26,6 +26,8 @@ export interface InputState {
   monsters: MonsterEntry[];
   priority: number;
   mode: FightMode;
+  /** D88: wheel variant ('current' = announced changes, 'live' = www.tibia.com). */
+  wheel: WheelVariant;
 }
 
 export const FIGHT_MODES: readonly FightMode[] = ['hunt', 'boss'];
@@ -42,6 +44,7 @@ export const DEFAULT_INPUTS: InputState = {
   monsters: [],
   priority: 50,
   mode: 'hunt',
+  wheel: 'current',
 };
 
 export const contextOf = (s: Pick<InputState, 'mode'>): FightContext => ({ mode: s.mode });
@@ -126,6 +129,7 @@ export function sanitize(raw: Record<string, unknown>): Partial<InputState> {
   else if (typeof raw.monsterId === 'string' && MONSTER_ID.test(raw.monsterId.trim()))
     out.monsters = [{ id: raw.monsterId.trim(), weight: 1 }];
   if (FIGHT_MODES.includes(raw.mode as FightMode)) out.mode = raw.mode as FightMode;
+  if (WHEEL_VARIANTS.includes(raw.wheel as WheelVariant)) out.wheel = raw.wheel as WheelVariant;
   return out;
 }
 
@@ -159,6 +163,7 @@ const KEYS = {
   monsters: 'm',
   priority: 'prio',
   mode: 'f',
+  wheel: 'w',
 } as const;
 
 /** Removed keys (hunt style, D20): ignored on read, dropped on write. */
@@ -183,6 +188,7 @@ export function fromQuery(search: string): Partial<InputState> {
     priority: get('priority'),
     monsters: m === undefined ? undefined : decodeMonsters(m),
     mode: get('mode'),
+    wheel: get('wheel') ?? (empty === null ? 'current' : undefined),
   });
 }
 
@@ -210,6 +216,7 @@ export function toQuery(state: InputState, search = ''): string {
   opt('meleeSkill', state.vocation === 'knight' ? state.meleeSkill : null);
   q.set(KEYS.priority, String(state.priority));
   q.set(KEYS.mode, state.mode);
+  opt('wheel', state.wheel === 'current' ? null : state.wheel);
   for (const k of LEGACY_KEYS) q.delete(k);
   opt('monsters', encodeMonsters(state.monsters));
   return `?${q.toString()}`;

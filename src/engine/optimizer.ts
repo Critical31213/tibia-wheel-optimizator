@@ -38,6 +38,7 @@ import { CUSTOM_ROTATION_ID } from '../types';
 import { ammoFor, shapedPerk, shapingId, shapingOptions, weaponsFor, type Ammo, type Perk as ProfPerk, type Weapon } from '../data/proficiency';
 import { choosePerks, loadoutCharacter, loadoutOf, loadoutParts, ownedOptions, type Loadout } from './proficiency';
 import { encodePlannerCode, gridForSliceId, plannerVesselIssues, type PlannerVessel } from '../data/wheel/plannerCode';
+import type { WheelVariant } from '../types';
 import { resolveCharacterStats } from '../data/character';
 import { GEAR_SLOTS, getItem } from '../data/equipment';
 import { gearEffects, type WornGear } from './gear';
@@ -47,7 +48,9 @@ import { getStance, stanceCombos, type StanceDef } from '../data/damage/stances'
 import { stanceBuilder, stanceDefense, stancedCharacter } from './stances';
 import {
   activeSlots,
+  assign,
   effectOf,
+  fits,
   type GemEnv,
   gemParts,
   modGrades,
@@ -59,6 +62,7 @@ import {
   recommendations,
   withRoom,
   round1,
+  SLOTS_BY_QUALITY,
   upgrades,
   modSwaps,
   vesselAssignments,
@@ -120,8 +124,12 @@ import {
   isAvailable,
   REVELATION_FLAT_BONUS,
   REVELATION_THRESHOLDS,
+  nextVesselKey,
   RM_SLICE_POINTS,
   stageFor,
+  vesselKeyOf,
+  vesselSliceFlat,
+  vesselSpots,
 } from './wheel/build';
 
 export const BEAM_WIDTH = 24;
@@ -172,7 +180,7 @@ interface PartTables {
   aug1P: Parts[];
   aug2P: Parts[];
   revP: Parts[][];
-  /** Value of unlocking vessel k (incl. its +1 flat bonus). */
+  /** D88: value of vessel state k (`vesselKeyOf`): placed owned gems plus the slices' flat bonus. */
   vesselP: Parts[];
   /** Constant of the rotation plan vs the reference rotation (damage of its T0, EHP of its offhand). */
   baseP: Parts;
@@ -195,6 +203,7 @@ interface State {
   rmFull: number[];
   /** Revelation points from slices per domain: domainPts + full RM slices. */
   slicesRev: number[];
+  /** D88: vessel state key (`vesselKeyOf`). */
   vessels: number;
   score: number;
   path: number[];
@@ -206,7 +215,7 @@ interface Search {
   t: Tables;
   budget: number;
   density: number;
-  /** Revelation points of owned RM gems active with `vessels` unlocked vessels: [vessels][domain]. */
+  /** Revelation points of owned RM gems active in vessel state k: [k][domain]. */
   gemRm: number[][];
   /** Augment slice pairs (same conviction): stage II needs both copies. */
   pairs: [number, number][];
@@ -221,7 +230,7 @@ const revPts = (s: Search, st: State, d: number, vessels: number) => st.slicesRe
 function rankOf(s: Search, st: State, i: number, pts: number, delta: number): number {
   const sl = s.wheel.slices[i];
   const fills = st.alloc[i] + pts >= sl.capacity;
-  const vessels = fills && sl.kind === 'vessel' ? Math.min(st.vessels + 1, s.gemRm.length - 1) : st.vessels;
+  const vessels = fills && sl.kind === 'vessel' ? nextVesselKey(s.wheel, st.vessels, sl.domainIdx) : st.vessels;
   const remaining = s.budget - st.used - pts;
   let shaping = 0;
   for (let d = 0; d < 4; d++) {
@@ -254,7 +263,7 @@ function convGain(s: Search, st: State, i: number): number {
     case 'augment':
       return sl.twin >= 0 && isFull(s.wheel, st.alloc, sl.twin) ? s.t.aug2[i] : s.t.aug1[i];
     case 'vessel':
-      return st.vessels < s.t.vessel.length ? s.t.vessel[st.vessels] : 0;
+      return s.t.vessel[nextVesselKey(s.wheel, st.vessels, sl.domainIdx)] - s.t.vessel[st.vessels];
     case 'rm':
       return 0;
     default:
@@ -266,7 +275,7 @@ function convGain(s: Search, st: State, i: number): number {
 function gainOf(s: Search, st: State, i: number, pts: number): number {
   const sl = s.wheel.slices[i];
   const fills = st.alloc[i] + pts >= sl.capacity;
-  const nextVessels = fills && sl.kind === 'vessel' ? Math.min(st.vessels + 1, s.gemRm.length - 1) : st.vessels;
+  const nextVessels = fills && sl.kind === 'vessel' ? nextVesselKey(s.wheel, st.vessels, sl.domainIdx) : st.vessels;
   let rev = 0;
   for (let d = 0; d < 4; d++) {
     if (d !== sl.domainIdx && nextVessels === st.vessels) continue;
@@ -295,7 +304,7 @@ function extend(s: Search, st: State, i: number, pts: number, delta = gainOf(s, 
     domainPts,
     rmFull,
     slicesRev,
-    vessels: fills && sl.kind === 'vessel' ? Math.min(st.vessels + 1, s.gemRm.length - 1) : st.vessels,
+    vessels: fills && sl.kind === 'vessel' ? nextVesselKey(s.wheel, st.vessels, sl.domainIdx) : st.vessels,
     score: 0,
     path: st.path.includes(i) ? st.path : [...st.path, i],
     key: fills ? st.key + 2 ** i : st.key,
@@ -389,7 +398,13 @@ function search(wheel: EngineWheel, t: Tables, budget: number, gemRm: number[][]
   let density = 0;
   wheel.slices.forEach((sl, i) => {
     const conv =
-      sl.kind === 'augment' ? (t.aug1[i] + t.aug2[i]) / 2 : sl.kind === 'vessel' ? t.vessel[0] : sl.kind === 'rm' ? 0 : t.conv[i];
+      sl.kind === 'augment'
+        ? (t.aug1[i] + t.aug2[i]) / 2
+        : sl.kind === 'vessel'
+          ? t.vessel[nextVesselKey(wheel, 0, sl.domainIdx)] - t.vessel[0]
+          : sl.kind === 'rm'
+            ? 0
+            : t.conv[i];
     density += Math.max(0, t.ded[i] + conv / sl.capacity);
   });
   density /= n;
@@ -461,23 +476,31 @@ function factsFor(revPoints: number[], wheelEffects: Map<string, SpellEffect[]>,
 }
 
 /**
- * Value of vessels 0..7 when unlocked one by one (D23): the slice's own flat bonus plus the owned gems the
- * newly unlocked vessel lets the optimal placement use. Recommended (hypothetical) gems are never assumed.
+ * D88: value of every vessel state (`vesselKeyOf`; D23): the owned gems the optimal placement uses there plus the
+ * Gem Vessel slices' own flat bonus (global system: one per unlocked vessel). Recommended gems are never assumed.
  */
 export function vesselTable(env: GemEnv, gems: OwnedGem[]): Parts[] {
-  const vessels = env.wheel.definition.vessels;
-  const prefix: Parts[] = [ZERO];
-  for (let c = 1; c <= vessels.length; c++) {
-    const placed = gems.length ? placeGems(env, gems, c) : [];
-    let total = ZERO;
-    for (let i = 0; i < c; i++) {
-      const g = placed[i];
-      if (g) total = add(total, gemParts(env, g, vessels[i].quality));
-    }
-    prefix.push(total);
-  }
-  const flat = flatParts(env.v, 1);
-  return vessels.map((_, k) => add(add(prefix[k + 1], prefix[k], -1), flat));
+  const w = env.wheel;
+  const res = w.gemSystem === 'resonance';
+  // A gem's value depends only on the vessel quality: 3 evaluations per gem for all states.
+  const memo = new Map<string, Parts>();
+  const partsOf = (k: number, q: OwnedGem['quality']) => {
+    const key = `${k}:${q}`;
+    let p = memo.get(key);
+    if (!p) memo.set(key, (p = gemParts(env, gems[k], q)));
+    return p;
+  };
+  return Array.from({ length: w.vesselStates }, (_, key) => {
+    const spots = vesselSpots(w, key);
+    let total = res ? ZERO : flatParts(env.v, key * vesselSliceFlat(w));
+    if (!gems.length) return total;
+    // +ε as in placeGems: an owned gem worth 0 still beats an empty vessel.
+    const cols = assign(spots.map((vs) => gems.map((g, k) => (vs.unlocked && fits(g.quality, vs.quality, res) ? env.blend(partsOf(k, vs.quality)) + 1e-6 : 0))));
+    cols.forEach((k, i) => {
+      if (k >= 0) total = add(total, partsOf(k, spots[i].quality));
+    });
+    return total;
+  });
 }
 
 /**
@@ -521,8 +544,7 @@ function blendTables(p: PartTables, blend: (p: Parts) => number, revScale: numbe
 
 /** Raw (unblended) value of a build. */
 function rawTotals(wheel: EngineWheel, t: PartTables, alloc: ArrayLike<number>, stages: number[], withBase = true): Parts {
-  let total = withBase ? t.baseP : ZERO;
-  let vessels = 0;
+  let total = add(withBase ? t.baseP : ZERO, t.vesselP[vesselKeyOf(wheel, alloc)] ?? ZERO);
   for (const sl of wheel.slices) {
     const i = sl.idx;
     if (alloc[i] <= 0) continue;
@@ -531,17 +553,14 @@ function rawTotals(wheel: EngineWheel, t: PartTables, alloc: ArrayLike<number>, 
     if (sl.kind === 'augment') {
       const second = sl.twin >= 0 && isFull(wheel, alloc, sl.twin) && sl.twin < i;
       total = add(total, second ? t.aug2P[i] : t.aug1P[i]);
-    } else if (sl.kind === 'vessel') total = add(total, t.vesselP[vessels++] ?? ZERO);
-    else total = add(total, t.convP[i]);
+    } else if (sl.kind !== 'vessel') total = add(total, t.convP[i]);
   }
   stages.forEach((st, d) => (total = add(total, t.revP[d][st])));
   return total;
 }
 
-/** Owned Revelation Mastery gems → revelation points per domain for 0..8 unlocked vessels (greater vessels in order). */
+/** Owned Revelation Mastery gems → revelation points per domain in every vessel state (unlocked greater vessels in order). */
 function ownedRmOffsets(wheel: EngineWheel, gems: OwnedGem[]): number[][] {
-  const vessels = wheel.definition.vessels;
-  const greater = vessels.map((v, i) => (v.quality === 'greater' ? i : -1)).filter((i) => i >= 0);
   const rm = gems
     .filter((g) => g.quality === 'greater' && g.supreme)
     .map((g) => {
@@ -553,10 +572,11 @@ function ownedRmOffsets(wheel: EngineWheel, gems: OwnedGem[]): number[][] {
     .filter((x): x is { d: number; pts: number; id: string } => !!x)
     // D59: ties by domain, not gem id, so a recommendation probe and the gem the player adds land the same way.
     .sort((a, b) => b.pts - a.pts || a.d - b.d || a.id.localeCompare(b.id));
-  return Array.from({ length: vessels.length + 1 }, (_, c) => {
+  return Array.from({ length: wheel.vesselStates }, (_, key) => {
     const out = [0, 0, 0, 0];
+    const greater = vesselSpots(wheel, key).filter((s) => s.unlocked && s.quality === 'greater').length;
     rm.forEach((g, k) => {
-      if (k < greater.length && greater[k] < c) out[g.d] += g.pts;
+      if (k < greater) out[g.d] += g.pts;
     });
     return out;
   });
@@ -604,7 +624,7 @@ function statLines(wheel: EngineWheel, alloc: Int32Array, stages: number[], env:
     else if (sl.kind === 'augment') augments.set(c.name, (augments.get(c.name) ?? 0) + 1);
     else if (sl.kind === 'unique') uniques.push(c.name);
   }
-  const flat = stages.reduce((s, st) => s + REVELATION_FLAT_BONUS[st], 0) + vesselSlices;
+  const flat = stages.reduce((s, st) => s + REVELATION_FLAT_BONUS[st], 0) + vesselFlat(wheel, vesselSlices, vessels);
   const lines: StatLine[] = [];
   const gemLines = gemStatLines(env, vessels);
   // D82: gem Hit Points / Mana / Capacity join the wheel's lines.
@@ -622,13 +642,17 @@ function statLines(wheel: EngineWheel, alloc: Int32Array, stages: number[], env:
   for (const [name, n] of augments) lines.push(stat('stat.augment', n >= 2 ? 'I + II' : 'I', 'offense', { name }));
   for (const name of uniques) lines.push(stat('stat.unique', 'Active', 'offense', { name }));
   const unlocked = vessels.filter((x) => x.unlocked).length;
-  if (unlocked) lines.push(stat('stat.vessels', `${unlocked}/8`, 'utility'));
+  if (unlocked) lines.push(stat('stat.vessels', `${unlocked}/${vessels.length}`, 'utility'));
   lines.push(...gemLines.lines);
   // D82: grouped by category (offense, defense, utility), order kept within a group.
   return lines.map((l, i) => ({ l, i })).sort((a, b) => CATEGORY_ORDER[a.l.category] - CATEGORY_ORDER[b.l.category] || a.i - b.i).map((x) => x.l);
 }
 
 const CATEGORY_ORDER: Record<StatLine['category'], number> = { offense: 0, defense: 1, utility: 2 };
+
+/** Flat damage & healing from vessels: filled Gem Vessel slices (global) or matching gems (live, D88). */
+const vesselFlat = (wheel: EngineWheel, vesselSlices: number, vessels: readonly VesselAssignment[]) =>
+  vesselSlices * vesselSliceFlat(wheel) + vessels.reduce((s, x) => s + (x.matchBonus ?? 0), 0);
 const POOLED = new Set(['Hit Points', 'Mana', 'Capacity']);
 
 /** Owned gem mods active in their vessels; Hit Points / Mana / Capacity are returned as sums (`pooled`). */
@@ -638,7 +662,7 @@ function gemStatLines(env: GemEnv, vessels: OptimizerResult['vessels']): { lines
   const sums = new Map<string, { value: number; unit: string; category: StatLine['category'] }>();
   for (const vs of vessels) {
     if (vs.source !== 'owned' || !vs.gem) continue;
-    for (const slot of activeSlots(vs.gem.quality, vs.quality)) {
+    for (const slot of activeSlots(vs.gem.quality, vs.quality, env.wheel.gemSystem === 'resonance')) {
       const ref = vs.gem[slot];
       if (!ref) continue;
       if (slot === 'supreme') {
@@ -745,12 +769,12 @@ const PER_MINUTE = 60 / TURN_SECONDS;
 /** D67: damage window shown under the rotation (s). */
 const DAMAGE_WINDOW = 30;
 
-function rotationUsage(p: Prepared, stages: number[], alloc: ArrayLike<number>): RotationUsage {
+function rotationUsage(p: Prepared, stages: number[], alloc: ArrayLike<number>, vessels: readonly VesselAssignment[]): RotationUsage {
   const { v, wheel } = p;
   const augments = wheel.slices.filter((s) => s.kind === 'augment' && isFull(wheel, alloc, s.idx)).map((s) => s.tile);
   const mods = augmentMods(v, augments);
   const vesselSlices = wheel.vesselTiles.filter((i) => isFull(wheel, alloc, i)).length;
-  const flat = stages.reduce((a, st) => a + REVELATION_FLAT_BONUS[st], 0) + vesselSlices;
+  const flat = stages.reduce((a, st) => a + REVELATION_FLAT_BONUS[st], 0) + vesselFlat(wheel, vesselSlices, vessels);
   const rot = rotation(v.model, { stages, mods, flat });
   const turns = DAMAGE_WINDOW / TURN_SECONDS;
   const spells: RotationUsage['spells'] = [];
@@ -792,7 +816,7 @@ const UNIQUE_REASON: Partial<Record<string, EngineMessageKey>> = {
   Sanctuary: 'rationale.uniqueSanctuary',
 };
 
-function rationale(p: Prepared, best: State, stages: number[], revPoints: number[], vesselsUnlocked: number, vesselSlices: number): Msg[] {
+function rationale(p: Prepared, best: State, stages: number[], revPoints: number[], vessels: readonly VesselAssignment[], vesselSlices: number): Msg[] {
   const { input, wheel, v } = p;
   const ctx = v.context;
   const model = v.model;
@@ -904,7 +928,11 @@ function rationale(p: Prepared, best: State, stages: number[], revPoints: number
     .map((x) => `${x.name} stage ${x.st} (${x.pts} pts)`);
   if (revs.length) out.push(text('rationale.revelations', { list: revs.join(', ') }));
   else if (best.used < 250) out.push(text('rationale.noRevelation'));
-  if (vesselSlices > 0) out.push(text('rationale.vessels', { filled: vesselSlices, unlocked: vesselsUnlocked }));
+  if (vesselSlices > 0 && wheel.gemSystem === 'resonance') {
+    const list = vessels.filter((x) => x.resonance).map((x) => `${wheel.revelations.find((r) => r.perk.domain === x.domain)?.data.name ?? x.domain} ${ROMAN_STAGE[x.resonance ?? 0]}`);
+    out.push(text('rationale.resonance', { filled: vesselSlices, list: list.join(', ') }));
+  } else if (vesselSlices > 0)
+    out.push(text('rationale.vessels', { filled: vesselSlices, unlocked: vessels.filter((x) => x.unlocked).length, total: vessels.length }));
 
   const total = wheel.definition.totalCapacity;
   const partial = best.path.find((i) => !isFull(wheel, best.alloc, i));
@@ -1412,8 +1440,8 @@ function vesselFills(wheel: EngineWheel, d: number): { alloc: Int32Array; cost: 
 }
 
 /** D35: reach of every revelation stage for the input's budget and owned gems. */
-export function revelationOptions(input: Pick<OptimizerInput, 'vocation' | 'points' | 'gems' | 'character'>): RevelationOption[] {
-  const wheel = getEngineWheel(input.vocation);
+export function revelationOptions(input: Pick<OptimizerInput, 'vocation' | 'points' | 'gems' | 'character' | 'wheelVariant'>): RevelationOption[] {
+  const wheel = getEngineWheel(input.vocation, input.wheelVariant);
   const budget = Math.min(wheel.definition.totalCapacity, pointsOf(input as OptimizerInput));
   const owned = input.gems ?? [];
   return wheel.revelations.map((r) => {
@@ -1421,18 +1449,18 @@ export function revelationOptions(input: Pick<OptimizerInput, 'vocation' | 'poin
     const mod = wheel.supremeMods.find((m) => m.category === 'revelationMastery' && m.revelation === r.data.name);
     const gem = owned.find((g) => g.quality === 'greater' && g.supreme?.modId === mod?.id);
     const fills = vesselFills(wheel, d);
-    // Reachable when some vessel count c (RM gems placed by ownedRmOffsets) plus the domain points fit the budget.
-    const fits = (gems: OwnedGem[], t: number) => {
+    // Reachable when some vessel fill (RM gems placed by ownedRmOffsets) plus the domain points fit the budget.
+    const reach = (gems: OwnedGem[], t: number) => {
       const offsets = ownedRmOffsets(wheel, gems);
-      return fills.some((f) => f.some((x, c) => x.cost + domainCost(wheel, d, t - offsets[Math.min(c, offsets.length - 1)][d], x.alloc) <= budget));
+      return fills.some((f) => f.some((x) => x.cost + domainCost(wheel, d, t - offsets[vesselKeyOf(wheel, x.alloc)][d], x.alloc) <= budget));
     };
     const others = owned.filter((g) => g !== gem);
     const withGrade = (g: number): OwnedGem[] => [...others, { id: 'reach-probe', quality: 'greater', basic1: null, basic2: null, supreme: { modId: mod!.id, grade: g as ModGrade } }];
     const stages = REVELATION_THRESHOLDS.map((t): RevelationReach => {
-      if (fits(owned, t)) return { status: 'ok' };
+      if (reach(owned, t)) return { status: 'ok' };
       if (mod) {
         for (let g = gem ? gem.supreme!.grade + 1 : 1; g <= 4; g++) {
-          if (fits(withGrade(g), t)) return { status: gem ? 'upgrade' : 'gem', grade: g as 1 | 2 | 3 | 4 };
+          if (reach(withGrade(g), t)) return { status: gem ? 'upgrade' : 'gem', grade: g as 1 | 2 | 3 | 4 };
         }
       }
       return { status: 'impossible' };
@@ -1504,7 +1532,7 @@ interface PlanSpec {
 }
 
 function prepare(input: OptimizerInput, priority = input.priority, base?: Prepared, spec?: PlanSpec): Prepared {
-  const wheel = getEngineWheel(input.vocation);
+  const wheel = getEngineWheel(input.vocation, input.wheelVariant);
   const v = base?.v ?? spec?.v ?? valuationFor(input, spec?.preset ?? null, spec?.reference, spec?.stances, spec?.weapon && choiceLoadout(spec.weapon), spec?.preCd);
   const budget = Math.min(wheel.definition.totalCapacity, pointsOf(input));
   const gems = input.gems ?? [];
@@ -1609,17 +1637,17 @@ type BuildResult = Omit<OptimizerResult, 'alternatives'>;
 function assemble(p: Prepared, best: State): BuildResult {
   const { input, wheel, v, blend, gems } = p;
   const vesselSlices = wheel.vesselTiles.filter((i) => isFull(wheel, best.alloc, i)).length;
-  const unlocked = Math.min(wheel.definition.vessels.length, vesselSlices);
+  const spots = vesselSpots(wheel, vesselKeyOf(wheel, best.alloc));
   const gridRev = DOMAIN_ORDER.map((_, d) => best.domainPts[d] + RM_SLICE_POINTS * best.rmFull[d]);
   const wheelEffects = wheelEffectsFor(wheel, best.alloc);
   let env: GemEnv = { v, wheel, blend, facts: factsFor(gridRev, wheelEffects), grades: modGrades(p.gems) };
-  const placed = placeGems(env, gems, unlocked);
-  let vessels = vesselAssignments(env, unlocked, placed);
+  const placed = placeGems(env, gems, spots);
+  let vessels = vesselAssignments(env, spots, placed);
   const rmGem = placedRmPoints(env, vessels);
   const finalRev = gridRev.map((x, d) => x + rmGem[d]);
   if (rmGem.some((x) => x > 0)) {
     env = { ...env, facts: factsFor(finalRev, wheelEffects) };
-    vessels = vesselAssignments(env, unlocked, placed);
+    vessels = vesselAssignments(env, spots, placed);
   }
   const stages = env.facts.stages;
 
@@ -1634,7 +1662,7 @@ function assemble(p: Prepared, best: State): BuildResult {
   const got = rawTotals(wheel, p.parts, best.alloc, stages, false);
   const max = rawTotals(wheel, p.parts, wheel.slices.map((s) => s.capacity), [3, 3, 3, 3], false);
   const norm = (a: number, b: number) => (b > 0 ? Math.max(0, Math.min(100, Math.round((a / b) * 100))) : 0);
-  const why = rationale(p, best, stages, finalRev, unlocked, vesselSlices);
+  const why = rationale(p, best, stages, finalRev, vessels, vesselSlices);
 
   return {
     allocation,
@@ -1656,8 +1684,9 @@ function assemble(p: Prepared, best: State): BuildResult {
     upgradeRecommendations: vessels.every((vs) => !vs.unlocked || vs.gem) ? upgrades(env, vessels) : [],
     modSwaps: modSwaps(env, vessels),
     spells: spellUsages(v, stages, wheel),
-    plannerCode: plannerCodeFor(input.vocation, allocation, vessels),
-    rotation: rotationUsage(p, stages, best.alloc),
+    plannerCode: plannerCodeFor(input.vocation, allocation, vessels, wheel.variant),
+    rotation: rotationUsage(p, stages, best.alloc, vessels),
+    ...(wheel.variant !== 'current' ? { wheelVariant: wheel.variant } : {}),
     stances: v.model.stances ?? [],
   };
 }
@@ -1665,22 +1694,30 @@ function assemble(p: Prepared, best: State): BuildResult {
 // ---------------------------------------------------------------------------
 // Planner export
 
-/** Gem as the planner stores it: exactly the slots of the vessel quality (else the planner drops it). */
+/**
+ * Gem as the planner stores it: exactly the slots of the vessel quality (else the planner drops it); live (D88): the
+ * gem's own slots, whatever the resonance.
+ */
 function plannerVessel(v: VesselAssignment): PlannerVessel | null {
   const g = v.gem;
   if (!v.unlocked || !g) return null;
-  const slots = activeSlots(v.quality, v.quality);
+  const slots = v.resonance !== undefined ? SLOTS_BY_QUALITY[g.quality] : activeSlots(v.quality, v.quality);
   if (slots.some((s) => !g[s])) return null;
   const pv: PlannerVessel = { vesselId: v.vesselId };
   for (const s of slots) pv[s] = g[s]!.modId;
   return pv;
 }
 
-export function plannerCodeFor(vocation: OptimizerInput['vocation'], allocation: Record<string, number>, vessels: VesselAssignment[]): string {
+export function plannerCodeFor(
+  vocation: OptimizerInput['vocation'],
+  allocation: Record<string, number>,
+  vessels: VesselAssignment[],
+  variant: WheelVariant = 'current',
+): string {
   const points: Record<number, number> = {};
   for (const [id, pts] of Object.entries(allocation)) points[gridForSliceId(id, vocation)] = pts;
-  const pv = vessels.map(plannerVessel).filter((x): x is PlannerVessel => !!x && plannerVesselIssues(vocation, [x]).length === 0);
-  return encodePlannerCode({ vocation, points, vessels: pv });
+  const pv = vessels.map(plannerVessel).filter((x): x is PlannerVessel => !!x && plannerVesselIssues(vocation, [x], variant).length === 0);
+  return encodePlannerCode({ vocation, points, vessels: pv, variant });
 }
 
 // ---------------------------------------------------------------------------
@@ -1837,7 +1874,7 @@ export function planSpecs(input: OptimizerInput): PlanSpec[] {
   const base = mi.model;
   // Same reference in manual and auto mode, so offense values stay comparable.
   const reference = Math.max(1, ...autoPlans.filter((x) => !x?.requires?.revelation).map((x) => planTotal(base, x)));
-  const wheel = getEngineWheel(input.vocation);
+  const wheel = getEngineWheel(input.vocation, input.wheelVariant);
   const budget = Math.min(wheel.definition.totalCapacity, pointsOf(input));
   const blend = blendWith(weightsFor(input.priority, leechEhp(base, threatOf(spotMonster(mi.monsters)))));
   const owned = ownedChoices(input);
@@ -1912,11 +1949,11 @@ const RM_PROBE_ID = 'rm-probe';
 /** D43: vessels of state `st` holding the owned gems of `p` (as in `assemble`, without the RM re-placement). */
 function vesselsAt(p: Prepared, st: State): { env: GemEnv; vessels: VesselAssignment[] } {
   const { wheel, v, blend, gems } = p;
-  const unlocked = Math.min(wheel.definition.vessels.length, wheel.vesselTiles.filter((i) => isFull(wheel, st.alloc, i)).length);
+  const spots = vesselSpots(wheel, vesselKeyOf(wheel, st.alloc));
   const gridRev = DOMAIN_ORDER.map((_, d) => st.domainPts[d] + RM_SLICE_POINTS * st.rmFull[d]);
   const effects = wheelEffectsFor(wheel, st.alloc);
   const env: GemEnv = { v, wheel, blend, facts: factsFor(gridRev, effects), grades: modGrades(gems) };
-  const vessels = vesselAssignments(env, unlocked, placeGems(env, gems, unlocked));
+  const vessels = vesselAssignments(env, spots, placeGems(env, gems, spots));
   // Same facts as the shown build: placed RM gems' points included (placedValue subtracts them per gem).
   const rm = placedRmPoints(env, vessels);
   return { env: { ...env, facts: factsFor(gridRev.map((x, d) => x + rm[d]), effects) }, vessels };

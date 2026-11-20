@@ -1,7 +1,7 @@
 {
  "meta": {
   "source": "Official Wheel of Destiny planner (test.tibia.com), WASM module run in Node + SkillwheelStringsJsonLibrary.json; reference builds and target counts from community data.",
-  "generatedAt": "2026-11-18",
+  "generatedAt": "2026-11-20",
   "totalCapacity": 4000,
   "note": "Facts derived by running the planner; no CipSoft code is included."
  },
@@ -257,6 +257,7 @@
   "rule": "Each augmentation conviction exists on two slices. Filling one copy grants stage I, the second copy adds stage II (cumulative), independent of fill order."
  },
  "vessels": {
+  "system": "global",
   "list": [
    {
     "id": 0,

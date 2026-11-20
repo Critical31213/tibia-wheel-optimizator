@@ -11,7 +11,7 @@ import {
   type PlannerBuild,
   type PlannerVessel,
 } from './plannerCode';
-import { PLANNER_CODE_FIXTURES } from './plannerCode.fixtures';
+import { LIVE_PLANNER_CODE_FIXTURES, PLANNER_CODE_FIXTURES } from './plannerCode.fixtures';
 
 const norm = (b: PlannerBuild) => ({
   vocation: b.vocation,
@@ -30,6 +30,20 @@ describe('planner code (committed fixtures)', () => {
   it('decodes legacy (version 0) codes: tiles only', () => {
     const d = decodePlannerCode('K0Y2BABkYoFAz8RwIA');
     expect(d).toMatchObject({ vocation: 'knight', version: 0, legacy: true, points: { 14: 50, 21: 50 }, vessels: [] });
+  });
+
+  it.each(LIVE_PLANNER_CODE_FIXTURES.map((f) => [`live ${f.vocation}: ${f.note}`, f] as const))('D88 %s', (_, f) => {
+    expect(encodePlannerCode(f)).toBe(f.code);
+    const d = decodePlannerCode(f.code);
+    expect(d).toMatchObject({ version: 0, variant: 'live' });
+    expect(norm(d)).toEqual(norm(f));
+    expect(plannerUrl(f.code)).toBe(`https://www.tibia.com/community/?subtopic=wheelofdestinyplanner&code=${f.code}`);
+  });
+
+  it('D88: live gems fill their slots in order, in any of the 4 domain vessels', () => {
+    expect(plannerVesselIssues('knight', [{ vesselId: 3, basic1: 4, basic2: 5, supreme: 1 }], 'live')).toEqual([]);
+    expect(plannerVesselIssues('knight', [{ vesselId: 0, basic1: 4, supreme: 1 }], 'live')).toHaveLength(1);
+    expect(plannerVesselIssues('knight', [{ vesselId: 4, basic1: 4 }], 'live')).toHaveLength(1);
   });
 
   it('rejects malformed codes', () => {

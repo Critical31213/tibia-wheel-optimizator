@@ -9,8 +9,8 @@ license texts of all bundled packages as `third-party-licenses.txt`.
 
 Tibia is a registered trademark of CipSoft GmbH. Game names, texts and the Wheel of Destiny layout are
 © CipSoft GmbH. This is an unofficial, non-commercial fan project, not affiliated with or endorsed by CipSoft.
-The wheel data is extracted offline from the official planner (test.tibia.com; tibia.com is only checked for
-the planner version); no CipSoft code is committed or shipped, only the derived facts needed to compute builds.
+The wheel data is extracted offline from the official planners (test.tibia.com for the announced wheel,
+www.tibia.com for the live wheel); no CipSoft code is committed or shipped, only the derived facts needed to compute builds.
 
 The only CipSoft graphics shipped are the weapon proficiency perk icons in `public/proficiency/` (© CipSoft GmbH),
 taken unmodified from the copies in the TibiaPal repository (see below), which mirror TibiaWiki, and the gem mod
