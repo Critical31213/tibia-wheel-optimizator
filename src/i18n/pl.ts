@@ -179,7 +179,6 @@ export const pl: Dictionary = {
   'priority.defense': 'Bardziej obrona',
   'priority.maxSurvival': 'Maks. przeżywalność',
   'priority.stepTitle': '{label}: DPS {dps}%, przeżywalność {defense}%',
-  'priority.weights': 'DPS – przeżywalność (%)',
 
   'gems.title': 'Moje gemy',
   'gems.import': "Importuj ze screenów",
