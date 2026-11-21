@@ -721,7 +721,10 @@ function spellUsages(v: ValuationContext, stages: number[], wheel: EngineWheel):
     let share = 0;
     let targets = s.targets;
     let r: { msg: EngineMessage; text: string };
-    if (s.avatar) {
+    if (model.excluded?.has(name)) {
+      useful = false;
+      r = text('spell.excluded');
+    } else if (s.avatar) {
       useful = model.context.mode === 'boss';
       targets = 1;
       r = text(useful ? 'spell.avatarBoss' : 'spell.avatarHunt');
@@ -845,6 +848,7 @@ function rationale(p: Prepared, best: State, stages: number[], revPoints: number
   out.push(text(p.auto ? 'rationale.rotationAuto' : 'rationale.rotationManual', { rotation: rotName }));
   if (!p.auto && plan.requires && !planValid(p, stages)) out.push(text('rationale.rotationRequires', { revelation: plan.requires }));
   out.push(model.stances?.length ? text('rationale.stances', { stances: model.stances.join(' + ') }) : text('rationale.noStance'));
+  if (model.excluded?.size) out.push(text('rationale.excluded', { spells: [...model.excluded].sort().join(', ') }));
   const f = p.forced;
   if (f.taken.length) out.push(text('rationale.forced', { spells: f.taken.join(', ') }));
   if (f.impossible.length) out.push(text('rationale.forcedImpossible', { spells: f.impossible.join(', ') }));
@@ -952,7 +956,7 @@ const pointsOf = (input: Pick<OptimizerInput, 'points'>) =>
   Math.max(0, Math.floor(Number.isFinite(input.points) ? input.points : 0));
 
 type ValuationInput = Pick<OptimizerInput, 'vocation' | 'points' | 'monster' | 'context' | 'character' | 'monsters' | 'equipment' | 'equipmentTwoHanded' | 'wornPieces' | 'weapons' | 'gear'> &
-  Partial<Pick<OptimizerInput, 'rotationId' | 'forcedSpells' | 'customRotation'>>;
+  Partial<Pick<OptimizerInput, 'rotationId' | 'forcedSpells' | 'customRotation' | 'excludedSpells'>>;
 
 /** Level used for valuation: `character.level`, else points + 50. */
 export function levelFor(input: Pick<OptimizerInput, 'points' | 'character'>): number {
@@ -981,7 +985,7 @@ function modelInputs(input: ValuationInput) {
     shielding: plus(clean(input.character?.shielding), gear?.shielding),
   });
   const monsters = normaliseMonsters(input.monsters, input.monster ?? null);
-  const model = buildSpellModel(input.vocation, context, monsters, character, {}, undefined, input.equipment);
+  const model = buildSpellModel(input.vocation, context, monsters, character, {}, undefined, input.equipment, input.excludedSpells);
   return { context, level, character, monsters, model };
 }
 
@@ -1177,7 +1181,7 @@ export function valuationFor(
   input = armedWith(input, loadout);
   const mi0 = modelInputs(input);
   const { context, level, monsters } = mi0;
-  const build = stanceBuilder(input.vocation, context, monsters, stances, preset, loadout, preCd, input.equipment);
+  const build = stanceBuilder(input.vocation, context, monsters, stances, preset, loadout, preCd, input.equipment, input.excludedSpells);
   const armed = loadout ? loadoutCharacter(mi0.character, input.vocation, loadout) : mi0.character;
   const character = stancedCharacter(armed, stances);
   const mi = stances.length || loadout || preCd ? { ...mi0, character, model: build(character) } : mi0;
@@ -2282,7 +2286,7 @@ function loadoutValuer(input: OptimizerInput, spec: Pick<PlanSpec, 'preset' | 'r
   return (lo: Loadout): Parts => {
     const { inp, mi, offhand } = setup(lo);
     const c = stancedCharacter(loadoutCharacter(mi.character, inp.vocation, lo), stances);
-    const m0 = stanceBuilder(inp.vocation, mi.context, mi.monsters, stances, preset, lo, preCd, inp.equipment)(c);
+    const m0 = stanceBuilder(inp.vocation, mi.context, mi.monsters, stances, preset, lo, preCd, inp.equipment, inp.excludedSpells)(c);
     const model: SpellModel = { ...m0, plan: planFor(m0, preset), total: reference };
     const off = (100 * (rotationTotal(model, ri) - reference)) / reference;
     const mitigation = characterFacts(input.vocation, mi.level, c.shielding, offhand).mitigation;

@@ -8,7 +8,7 @@ import {
   spellPrefsStorageKey,
   spellPrefsToQuery,
 } from './spellPrefs';
-import { getForceableSpells, getRevelationNames, getRotationPresets, getCustomRotationSpells, getStanceOptions } from './api';
+import { getExcludableSpells, getForceableSpells, getRevelationNames, getRotationPresets, getCustomRotationSpells, getStanceOptions } from './api';
 
 const IDS = ['ms-gfw-echo', 'ms-gfw-geb'];
 const SPELLS = ["Hell's Core", 'Great Fire Wave', 'Ultimate Healing'];
@@ -22,6 +22,7 @@ describe('spell prefs', () => {
       forcedRevelations: [],
       stance: null,
       customRotation: [],
+      excludedSpells: [],
     });
     const many = Array.from({ length: 20 }, (_, i) => `s${i}`);
     expect(sanitizeSpellPrefs({ forcedSpells: many }, IDS, many).forcedSpells).toHaveLength(MAX_FORCED_SPELLS);
@@ -37,14 +38,18 @@ describe('spell prefs', () => {
       forcedRevelations: [{ name: 'Beam Mastery', stage: 2 as const }],
       stance: 'Master of Flames+Aura of Exposed Weakness',
       customRotation: [{ name: 'Great Fire Wave', ratio: 3 }, { name: 'Energy Wave', ratio: 1 }],
+      excludedSpells: ['Great Energy Beam', "Hell's Core"],
     };
+    const XS = getExcludableSpells('sorcerer');
     const ST = getStanceOptions('sorcerer');
     const RV = getRevelationNames('sorcerer');
     const CS = getCustomRotationSpells('sorcerer');
     const search = spellPrefsToQuery(prefs, '?v=sorcerer&p=100');
     expect(new URLSearchParams(search).get('v')).toBe('sorcerer');
-    expect(spellPrefsFromQuery(search, IDS, SPELLS, ST, RV, CS)).toEqual(prefs);
-    expect(parseSpellPrefs(JSON.stringify(prefs), IDS, SPELLS, ST, RV, CS)).toEqual(prefs);
+    expect(spellPrefsFromQuery(search, IDS, SPELLS, ST, RV, CS, XS)).toEqual(prefs);
+    expect(parseSpellPrefs(JSON.stringify(prefs), IDS, SPELLS, ST, RV, CS, XS)).toEqual(prefs);
+    // D92: excluded spells: known only, canonical casing, unique.
+    expect(spellPrefsFromQuery('?xs=great+energy+beam,Nope,Great+Energy+Beam', IDS, SPELLS, ST, RV, CS, XS)?.excludedSpells).toEqual(['Great Energy Beam']);
     // Custom rotation: unknown / duplicate spells dropped, casts rounded and clamped.
     expect(spellPrefsFromQuery('?cr=great+fire+wave:2.6,Nope:3,Great+Fire+Wave:1,Energy+Wave:99,Energy+Beam:0', IDS, SPELLS, ST, RV, CS)?.customRotation).toEqual([
       { name: 'Great Fire Wave', ratio: 3 },

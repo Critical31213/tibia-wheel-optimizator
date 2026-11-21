@@ -177,6 +177,10 @@ export const en = {
   'rotation.revImpossible': 'out of reach',
   'rotation.forcedRevHint': 'The build reaches at least this stage. Locked stages need more points or a Revelation Mastery gem.',
   'rotation.forcedHint': 'The build will take the wheel augment of these spells (e.g. utility spells).',
+  'rotation.excluded': 'Excluded spells',
+  'rotation.excludedAdd': 'Exclude a spell…',
+  'rotation.excludedRemove': 'Restore {name}',
+  'rotation.excludedHint': "Spells you don't cast (e.g. at a spot where you never stand still): the engine leaves them out of the rotation, their augments, gems and revelations.",
 
   'priority.title': 'Priority',
   'priority.maxDps': 'Max DPS',

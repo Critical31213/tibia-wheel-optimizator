@@ -14,6 +14,8 @@ interface RotationPanelProps {
   customSpells: string[];
   /** Spells whose augment can be forced. */
   spells: string[];
+  /** D92: spells that can be excluded. */
+  excludable: string[];
   /** Selectable stance set keys (D32). */
   stanceOptions: string[];
   /** D35: revelations and how reachable each stage is. */
@@ -30,7 +32,7 @@ interface RotationPanelProps {
 const AUTO = '*';
 
 /** Rotation choice (auto / preset), the rotation the viewed build is based on, and forced spell augments. */
-export function RotationPanel({ presets, customSpells, spells, stanceOptions, revelations, value, onChange, usage, stances }: RotationPanelProps) {
+export function RotationPanel({ presets, customSpells, spells, excludable, stanceOptions, revelations, value, onChange, usage, stances }: RotationPanelProps) {
   const t = useT();
   const id = useId();
   const selected = presets.find((p) => p.id === value.rotationId);
@@ -43,7 +45,17 @@ export function RotationPanel({ presets, customSpells, spells, stanceOptions, re
   const reachNote = (r: RevelationReach) =>
     r.status === 'ok' ? '' : r.status === 'impossible' ? t('rotation.revImpossible') : t(r.status === 'gem' ? 'rotation.revGem' : 'rotation.revUpgrade', { grade: ROMAN[r.grade] });
   const stanceLabel = (k: string) => (k ? stanceNames(k).join(' + ') : t('rotation.noStance'));
-  const addable = spells.filter((s) => !value.forcedSpells.includes(s));
+  const excluded = value.excludedSpells;
+  const addable = spells.filter((s) => !value.forcedSpells.includes(s) && !excluded.includes(s));
+  const excludeAddable = excludable.filter((s) => !excluded.includes(s));
+  // D92: an excluded spell leaves the forced list and the custom rotation.
+  const exclude = (s: string) =>
+    onChange({
+      excludedSpells: [...excluded, s],
+      forcedSpells: value.forcedSpells.filter((x) => x !== s),
+      forcedStage2: value.forcedStage2.filter((x) => x !== s),
+      customRotation: value.customRotation.filter((x) => x.name !== s),
+    });
 
   return (
     <div className="text-sm">
@@ -64,7 +76,7 @@ export function RotationPanel({ presets, customSpells, spells, stanceOptions, re
         ))}
         <option value={CUSTOM_ROTATION_ID}>{t('rotation.custom')}</option>
       </select>
-      {value.rotationId === CUSTOM_ROTATION_ID && <CustomRotationEditor spells={customSpells} value={value.customRotation} onChange={(customRotation) => onChange({ customRotation })} />}
+      {value.rotationId === CUSTOM_ROTATION_ID && <CustomRotationEditor spells={customSpells.filter((s) => !excluded.includes(s))} value={value.customRotation} onChange={(customRotation) => onChange({ customRotation })} />}
       {selected && (selected.note || selected.requires) && (
         <p className="mt-1 text-xs text-parchment-400">{[selected.note, ...requires(selected)].filter(Boolean).join(' · ')}</p>
       )}
@@ -89,6 +101,44 @@ export function RotationPanel({ presets, customSpells, spells, stanceOptions, re
           </select>
         </>
       )}
+
+      <div className="mt-3">
+        <label htmlFor={`${id}-xs`} className="block text-xs text-parchment-300">
+          {t('rotation.excluded')}
+        </label>
+        <select
+          id={`${id}-xs`}
+          value=""
+          disabled={excludeAddable.length === 0}
+          onChange={(e) => e.target.value && exclude(e.target.value)}
+          className="field mt-1 w-full py-1.5 text-sm"
+        >
+          <option value="">{t('rotation.excludedAdd')}</option>
+          {excludeAddable.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
+          ))}
+        </select>
+        {excluded.length > 0 && (
+          <ul className="mt-2 flex flex-wrap gap-1.5">
+            {excluded.map((s) => (
+              <li key={s} className="flex items-center gap-1.5 rounded-md border border-ink-600 px-2 py-0.5 text-xs text-parchment-200">
+                <span className="line-through decoration-parchment-400">{s}</span>
+                <button
+                  type="button"
+                  aria-label={t('rotation.excludedRemove', { name: s })}
+                  onClick={() => onChange({ excludedSpells: excluded.filter((x) => x !== s) })}
+                  className="text-parchment-400 hover:text-parchment-50"
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+        <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.excludedHint')}</p>
+      </div>
 
       {usage && (
         <div className="mt-3" aria-live="polite">

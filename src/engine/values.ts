@@ -357,7 +357,7 @@ export function spellBundleParts(
   others?: ReadonlyMap<string, SpellEffect[]>,
 ): Parts {
   const s = v.model.spells.get(spell);
-  if (!s) return ZERO;
+  if (!s || v.model.excluded?.has(spell)) return ZERO;
   const stage = s.stageDomain >= 0 ? stages[s.stageDomain] : 3;
   if (s.avatar) return avatarParts(v, stage, effects.filter((e) => e.kind === 'cd').reduce((a, e) => a + e.amount, 0));
   if (s.revelation >= 0 && stage < 1) return ZERO;
@@ -498,13 +498,15 @@ export function revelationParts(v: ValuationContext, r: EngineRevelation, stage:
   if (stage < 1) return ZERO;
   const flat = flatParts(v, REVELATION_FLAT_BONUS[stage]);
   const d = r.data;
+  // D92: a revelation whose spell is not cast keeps only its flat bonus (its damage spell drops out of the rotation).
+  const dropped = d.spells.some((s) => v.model.excluded?.has(s));
   let p: Parts;
-  if (d.isAvatar) p = avatarParts(v, stage);
+  if (d.isAvatar) p = dropped ? ZERO : avatarParts(v, stage);
   else {
     const stages = [...NO_STAGES];
     stages[r.domainIdx] = stage;
     const off = deltaOff(v.model, { stages }, { stages: NO_STAGES });
-    p = add({ off, def: 0, util: 0 }, passiveRevelation(v, d.name, stage));
+    p = add({ off, def: 0, util: 0 }, dropped ? ZERO : passiveRevelation(v, d.name, stage));
   }
   return add(p, flat);
 }

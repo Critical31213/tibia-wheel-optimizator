@@ -302,6 +302,7 @@ function supremeReason(env: GemEnv, m: WheelSupremeMod) {
   }
   const spell = m.spell ?? '';
   const s = v.model.spells.get(spell);
+  if (v.model.excluded?.has(spell)) return text('gem.excluded', { spell });
   if (m.category === 'augCooldown') {
     if (s?.avatar) return text('gem.avatar', { spell });
     return text('gem.cooldown', { spell });

@@ -9,7 +9,8 @@
  */
 import { useEffect, useSyncExternalStore } from 'react';
 import type { Monster, OptimizerResult, Vocation } from '../types';
-import { getWheelData } from '../data/wheel';
+import { getWheelData, getWheelSpellNames } from '../data/wheel';
+import { getCustomRotationSpells } from '../data/damage/rotations';
 export { wheelVariants } from '../data/wheel';
 import { stanceCombos } from '../data/damage/stances';
 import { STANCE_SEP } from './spellPrefs';
@@ -28,6 +29,11 @@ export { getCustomRotationSpells, getRotationPresets } from '../data/damage/rota
 /** D32: selectable stance sets of the vocation, as keys ('' = none, names joined by STANCE_SEP). */
 export function getStanceOptions(vocation: Vocation): string[] {
   return stanceCombos(vocation).map((c) => c.map((s) => s.name).join(STANCE_SEP));
+}
+
+/** D92: spells the player can exclude: wheel spells (augments, revelations) and rotation spells, sorted. */
+export function getExcludableSpells(vocation: Vocation): string[] {
+  return [...new Set([...getWheelSpellNames(vocation), ...getCustomRotationSpells(vocation)])].sort((a, b) => a.localeCompare(b));
 }
 
 /** Spells whose augment can be forced (D21): augment slices + supreme-mod spells of the vocation, sorted. */

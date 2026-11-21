@@ -415,6 +415,8 @@ export interface OptimizerInput {
   forcedStage2?: string[];
   /** D35: revelations that must reach at least this stage. */
   forcedRevelations?: ForcedRevelation[];
+  /** D92: spells the player does not cast (e.g. no time to stand still at the spot); never in the rotation, no value. */
+  excludedSpells?: string[];
   /** D32: stance names chosen by the user ([] = none); undefined = engine picks per plan. */
   stances?: string[];
   /** D51: knight's trained melee skill; weapons of the other types are skipped (undefined = all). */

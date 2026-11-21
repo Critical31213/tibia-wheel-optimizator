@@ -134,6 +134,7 @@ Gems and weapons are deliberately **not** in the URL (too long); a shared link c
   "Announced changes" (default) and "Live (tibia.com)"; the request sends `wheelVariant`, the shown wheel, mods
   and revelation reach follow the result's variant. Live vessels show their domain and Vessel Resonance (0–III)
   and the quality-match bonus.
+- **Excluded spells (D92)**: in the rotation panel, a select of `getExcludableSpells` (wheel + rotation spells) with removable chips; excluding a spell drops it from the forced list and the custom rotation. Stored with the spell prefs, URL key `xs`.
 - **Release switch (D90)**: with `WHEEL_UPDATE_RELEASED` the toggle is hidden (`wheelVariants()` has one entry), a
   stored or linked `w=live` becomes `current`, and an old-wheel code in the compare panel shows
   `compare.retiredVariant`.

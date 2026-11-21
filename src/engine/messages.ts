@@ -21,6 +21,7 @@ export const ENGINE_MESSAGES = {
   'rationale.stances': 'Stance: {stances} (picked by its damage / survivability value at your priority).',
   'rationale.noStance': 'No stance: none adds value at your priority.',
   'rationale.forced': 'Augments taken because you forced them: {spells}.',
+  'rationale.excluded': 'Not cast (excluded by you): {spells}; their augments and revelation effects are not valued.',
   'rationale.forcedImpossible': 'Not enough points to reach the augment of {spells}.',
   'rationale.forcedNoAugment': '{spells}: no wheel augment; only gem mods can boost it.',
   'rationale.rotationCooldown': 'Augments taken because the rotation needs their shorter cooldown: {spells}.',
@@ -70,10 +71,12 @@ export const ENGINE_MESSAGES = {
   'spell.support': 'Support spell: valued for its effect and cooldown.',
   'spell.notInRotation': 'Not in the used rotation: its augments have no value here.',
   'spell.forced': 'Forced by you: augment taken for its utility.',
+  'spell.excluded': 'Excluded by you: not cast, its augments have no value.',
 
   // Gems
   'gem.spell': 'Boosts {spell} (~{targets} targets, {share}% of your damage).',
   'gem.singleTargetHunt': 'Boosts {spell}, a single-target spell (useful in boss fights only).',
+  'gem.excluded': 'Boosts {spell}, which you excluded (not cast): no value.',
   'gem.healing': 'Boosts {spell} healing.',
   'gem.cooldown': 'Shorter {spell} cooldown (Momentum from grade II).',
   'gem.avatar': 'Shorter {spell} cooldown: more Avatar windows in boss fights.',

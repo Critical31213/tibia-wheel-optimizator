@@ -208,6 +208,8 @@ export interface SpellModel {
   autoTargets?: number;
   /** D74: equipment the model includes (crit shift vs the defaults, Onslaught multiplier, elemental imbuement). */
   gear?: GearModel;
+  /** D92: spells the player does not cast (never in the rotation, their augments / revelation effects worth 0). */
+  excluded?: ReadonlySet<string>;
 }
 
 /** D74: equipment effects inside the damage model. */
@@ -293,9 +295,9 @@ const modelCache = new Map<string, SpellModel>();
 /** D24: extra magic level for spells of some elements (stances). */
 export type ElementMagicLevel = Partial<Record<Element, number>>;
 
-function cacheKey(vocation: Vocation, ctx: FightContext, monsters: { monster: Monster; weight: number }[], c: Required<CharacterStats>, eml: ElementMagicLevel, attack?: number, gear?: GearModel) {
+function cacheKey(vocation: Vocation, ctx: FightContext, monsters: { monster: Monster; weight: number }[], c: Required<CharacterStats>, eml: ElementMagicLevel, attack?: number, gear?: GearModel, excluded: readonly string[] = []) {
   const m = monsters.map((x) => `${x.monster.id}:${x.weight.toFixed(6)}`).join(',');
-  return `${vocation}|${ctx.mode}|${m}|${c.level}|${c.mainSkill}|${c.magicLevel}|${c.shielding}|${JSON.stringify(eml)}|${attack ?? ''}|${gear ? JSON.stringify(gear) : ''}`;
+  return `${vocation}|${ctx.mode}|${m}|${c.level}|${c.mainSkill}|${c.magicLevel}|${c.shielding}|${JSON.stringify(eml)}|${attack ?? ''}|${gear ? JSON.stringify(gear) : ''}|${[...excluded].sort().join(',')}`;
 }
 
 export function buildSpellModel(
@@ -308,6 +310,8 @@ export function buildSpellModel(
   weaponAttack?: number,
   /** D74: equipment (its element magic levels are added to `elementMl`). */
   equipment?: GearEffects,
+  /** D92: spells the player does not cast. */
+  excludedSpells: readonly string[] = [],
 ): SpellModel {
   const spot = Array.isArray(monsters) ? monsters : monsters ? [{ monster: monsters, weight: 1 }] : [];
   const char = resolveCharacterStats(vocation, character ?? { level: 600 });
@@ -317,7 +321,8 @@ export function buildSpellModel(
     for (const [e, x] of Object.entries(equipment.elementMl) as [Element, number][]) merged[e] = (merged[e] ?? 0) + x;
     elementMl = merged;
   }
-  const key = cacheKey(vocation, context, spot, char, elementMl, weaponAttack, gear);
+  const key = cacheKey(vocation, context, spot, char, elementMl, weaponAttack, gear, excludedSpells);
+  const excluded = new Set(excludedSpells);
   const cached = modelCache.get(key);
   if (cached && cached.monsters.every((m, i) => m.monster === spot[i].monster)) return cached;
 
@@ -377,7 +382,7 @@ export function buildSpellModel(
       revelation,
       stageDomain: stageOf.get(name) ?? -1,
       avatar: meta?.isAvatar ?? false,
-      usable: kind === 'damage' && !!dmg && !isRune && !(context.mode === 'hunt' && singleTarget),
+      usable: kind === 'damage' && !!dmg && !isRune && !(context.mode === 'hunt' && singleTarget) && !excluded.has(name),
       hits,
     });
   }
@@ -404,6 +409,7 @@ export function buildSpellModel(
     flatOffPerPoint: 0,
     flatHealPerPoint: 0,
     ...(gear ? { gear } : {}),
+    ...(excluded.size ? { excluded } : {}),
   };
   model.total = Math.max(1, rotationTotal(model, NO_BONUS));
   model.flatOffPerPoint = (100 * (rotationTotal(model, { ...NO_BONUS, flat: 1 }) - model.total)) / model.total;
@@ -678,13 +684,13 @@ export function planFor(model: SpellModel, preset: RotationPreset | null): Rotat
   const at3: RotationInput = { stages: [3, 3, 3, 3] };
   const dmg = (n: string) => {
     const s = model.spells.get(n);
-    return s ? castDamage(model, s, at3) : -1;
+    return s && !model.excluded?.has(n) ? castDamage(model, s, at3) : -1;
   };
   const entries: RotationPlan['entries'] = [];
   for (const e of preset.spells) {
     const opts = [e.name, ...(e.or ?? [])];
     const best = opts.reduce((a, b) => (dmg(b) > dmg(a) ? b : a));
-    if (revelationSpell(best) || !model.spells.has(best)) continue;
+    if (revelationSpell(best) || !model.spells.has(best) || model.excluded?.has(best)) continue;
     const prev = entries.find((x) => x.name === best);
     if (prev) prev.ratio += e.ratio;
     else entries.push({ name: best, ratio: e.ratio, ...(e.slot ? { slot: e.slot } : {}) });
@@ -744,7 +750,7 @@ function healFlatPerPoint(model: SpellModel): number {
   let pct = 0;
   let weight = 0;
   for (const s of model.spells.values()) {
-    if (s.kind !== 'healing') continue;
+    if (s.kind !== 'healing' || model.excluded?.has(s.name)) continue;
     const h = healPerCast(model, s.name);
     if (h <= 0) continue;
     const w = HEAL_SHARE[s.name] ?? 0.2;
