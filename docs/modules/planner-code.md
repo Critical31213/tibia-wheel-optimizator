@@ -3,7 +3,7 @@
 ## Purpose
 
 Export a build as the code / URL of the official Wheel of Destiny planner
-(`https://www.test.tibia.com/community/?subtopic=wheelofdestinyplanner&code=…`), including gems (D15). The test-server planner is used until tibia.com has the new wheel (D39, `npm run check:planner`). Pure TS,
+(`https://www.test.tibia.com/community/?subtopic=wheelofdestinyplanner&code=…`), including gems (D15). The test-server planner is used until tibia.com has the new wheel; then `WHEEL_UPDATE_RELEASED` (D90) switches `PLANNER_URL` to www.tibia.com (D39, `npm run check:planner`). Pure TS,
 no WASM at runtime. Codes are **byte-identical** to the planner's own `getCode()`.
 
 ## Files

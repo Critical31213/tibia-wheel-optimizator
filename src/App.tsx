@@ -24,8 +24,8 @@ import { gemFromRecommendation, setModGrade, updateGem } from './lib/gems';
 import { usePersistentInputs } from './hooks/usePersistentInputs';
 import { usePersistentSpellPrefs } from './hooks/usePersistentSpellPrefs';
 import { useT } from './i18n';
-import { CUSTOM_ROTATION_ID, WHEEL_VARIANTS } from './types';
-import { getCustomRotationSpells, getWeapon, getForceableSpells, getMonsterById, getRotationPresets, getStanceOptions, getWheel, revelationOptions, useMonsterData } from './lib/api';
+import { CUSTOM_ROTATION_ID } from './types';
+import { wheelVariants, getCustomRotationSpells, getWeapon, getForceableSpells, getMonsterById, getRotationPresets, getStanceOptions, getWheel, revelationOptions, useMonsterData } from './lib/api';
 import { stanceNames } from './lib/spellPrefs';
 import type { BuildResult } from './lib/api';
 import { characterOf, contextOf } from './lib/inputState';
@@ -152,14 +152,16 @@ export default function App() {
             title={t('app.wheelTitle', { vocation: VOCATION_LABELS[resultVocation] })}
             headingId="wheel-heading"
             aside={
+              wheelVariants().length > 1 && (
               <SegmentedControl
                 size="sm"
                 label={t('wheelVariant.label')}
                 className="w-56 shrink-0"
-                options={WHEEL_VARIANTS.map((v) => ({ value: v, label: t(`wheelVariant.${v}`), title: t(`wheelVariant.${v}Hint`) }))}
+                options={wheelVariants().map((v) => ({ value: v, label: t(`wheelVariant.${v}`), title: t(`wheelVariant.${v}Hint`) }))}
                 value={inputs.wheel}
                 onChange={(wheel) => update({ wheel })}
               />
+              )
             }
           >
             {gems.length === 0 && (

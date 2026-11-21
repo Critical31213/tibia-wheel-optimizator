@@ -6,11 +6,13 @@
 import { inflateSync } from 'fflate';
 import type { GemQuality, Vocation, WheelVariant } from '../../types';
 import { getWheelData, WHEEL_DATA } from './index';
+import { WHEEL_UPDATE_RELEASED } from './release';
 
 /** Official planner on tibia.com; still the old wheel (Vessel Resonance): reads the live variant's codes (D88). */
 export const LIVE_PLANNER_URL = 'https://www.tibia.com/community/?subtopic=wheelofdestinyplanner';
-/** Planner that reads our codes. Switch to LIVE_PLANNER_URL when `npm run check:planner` reports the new wheel. */
-export const PLANNER_URL = 'https://www.test.tibia.com/community/?subtopic=wheelofdestinyplanner';
+export const TEST_PLANNER_URL = 'https://www.test.tibia.com/community/?subtopic=wheelofdestinyplanner';
+/** Planner that reads our codes: the test server until the update is released (D90 `WHEEL_UPDATE_RELEASED`). */
+export const PLANNER_URL = WHEEL_UPDATE_RELEASED ? LIVE_PLANNER_URL : TEST_PLANNER_URL;
 export const PLANNER_CODE_VERSION = 1;
 export const GRID_SIZE = 36;
 export const VESSEL_COUNT = 8;
@@ -170,7 +172,7 @@ export function decodePlannerCode(code: string): DecodedPlannerCode {
   return { vocation, variant: version === 0 ? 'live' : 'current', version, legacy: version === 0, points, vessels };
 }
 
-/** Planner URL for a code; version 0 codes (live variant, D88) open the live planner. */
+/** Planner URL for a code; version 0 codes (live variant, D88) open the live planner (one planner after D90). */
 export function plannerUrl(code: string): string {
   const c = code.trim();
   return `${c[1] === String(LIVE_CODE_VERSION) ? LIVE_PLANNER_URL : PLANNER_URL}&code=${encodeURIComponent(c)}`;

@@ -2,6 +2,7 @@ import { useId } from 'react';
 import type { ComparisonItem, Vocation, WheelComparison, WheelVariant } from '../types';
 import { engineText, useT } from '../i18n';
 import { MAX_COMPARE_CODE, type OwnWheel } from '../lib/compare';
+import { wheelVariants } from '../lib/api';
 import { cx, VOCATION_LABELS } from '../lib/labels';
 import { Gain } from './Gain';
 
@@ -56,8 +57,10 @@ export function ComparePanel({ code, onCode, own, vocation, variant, onVariant, 
       ? t('compare.invalidCode')
       : own.vocation !== vocation
         ? t('compare.otherVocation', { vocation: VOCATION_LABELS[own.vocation] })
-        : null;
-  const otherVariant = own && own.vocation === vocation && own.variant !== variant ? own.variant : null;
+        : !wheelVariants().includes(own.variant)
+          ? t('compare.retiredVariant')
+          : null;
+  const otherVariant = own && own.vocation === vocation && own.variant !== variant && wheelVariants().includes(own.variant) ? own.variant : null;
   const better = comparison?.items.filter((x) => x.score > 1e-6) ?? [];
   const worse = comparison?.items.filter((x) => x.score < -1e-6) ?? [];
 

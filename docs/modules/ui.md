@@ -134,6 +134,9 @@ Gems and weapons are deliberately **not** in the URL (too long); a shared link c
   "Announced changes" (default) and "Live (tibia.com)"; the request sends `wheelVariant`, the shown wheel, mods
   and revelation reach follow the result's variant. Live vessels show their domain and Vessel Resonance (0–III)
   and the quality-match bonus.
+- **Release switch (D90)**: with `WHEEL_UPDATE_RELEASED` the toggle is hidden (`wheelVariants()` has one entry), a
+  stored or linked `w=live` becomes `current`, and an old-wheel code in the compare panel shows
+  `compare.retiredVariant`.
 - **Compare with your wheel (D89)**: `ComparePanel` takes a planner code or link (`parseOwnWheel` in
   `src/lib/compare.ts`); a code of the selected vocation and wheel variant is sent as `compareWith` (another
   variant offers a switch). It shows the verdict, the optimal-vs-own gain, the differences where each wheel is

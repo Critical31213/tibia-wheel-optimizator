@@ -388,6 +388,7 @@ export const en = {
   'compare.otherVocation': "This code is for a {vocation}; choose that vocation to compare.",
   'compare.otherVariant': "This code is for the wheel variant \"{variant}\".",
   'compare.switchVariant': "Switch the wheel",
+  'compare.retiredVariant': "This code is from the wheel before the update, which is no longer supported; export your wheel again in the current planner.",
   'compare.optimalGives': "Optimal vs yours:",
   'compare.showOwn': "Show my wheel on the chart",
   'compare.betterTitle': "Where the optimal wheel is better",

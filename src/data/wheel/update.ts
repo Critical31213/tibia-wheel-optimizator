@@ -101,6 +101,8 @@ function updateTiles(w: VocationWheelData): VocationWheelData['tiles'] {
   const conv = new Map(w.tiles.map((t) => [t.gridId, t.conviction]));
   const moved = new Map<number, VocationWheelData['tiles'][number]['conviction']>();
   for (const s of Object.values(QUARTER_SLOTS)) {
+    // D90: data extracted after the update already has the new layout; swap only the old one.
+    if (conv.get(s.central)?.category !== 'revelationMastery') continue;
     moved.set(s.leech, conv.get(s.central)!);
     moved.set(s.central, conv.get(s.leech)!);
   }

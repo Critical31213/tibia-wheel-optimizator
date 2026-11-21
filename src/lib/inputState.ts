@@ -1,5 +1,6 @@
 /** Serialisation of the user's inputs (URL query string + localStorage). Pure. */
-import { MELEE_SKILLS, VOCATIONS, WHEEL_VARIANTS } from '../types';
+import { MELEE_SKILLS, VOCATIONS } from '../types';
+import { wheelVariants } from '../data/wheel';
 import type { CharacterStats, FightContext, FightMode, MeleeSkill, Vocation, WheelVariant } from '../types';
 import { clamp } from './labels';
 
@@ -129,7 +130,9 @@ export function sanitize(raw: Record<string, unknown>): Partial<InputState> {
   else if (typeof raw.monsterId === 'string' && MONSTER_ID.test(raw.monsterId.trim()))
     out.monsters = [{ id: raw.monsterId.trim(), weight: 1 }];
   if (FIGHT_MODES.includes(raw.mode as FightMode)) out.mode = raw.mode as FightMode;
-  if (WHEEL_VARIANTS.includes(raw.wheel as WheelVariant)) out.wheel = raw.wheel as WheelVariant;
+  // D90: a variant no longer offered (old wheel after the update) falls back to the default.
+  if (wheelVariants().includes(raw.wheel as WheelVariant)) out.wheel = raw.wheel as WheelVariant;
+  else if (raw.wheel !== undefined) out.wheel = 'current';
   return out;
 }
 

@@ -10,6 +10,7 @@
 import { useEffect, useSyncExternalStore } from 'react';
 import type { Monster, OptimizerResult, Vocation } from '../types';
 import { getWheelData } from '../data/wheel';
+export { wheelVariants } from '../data/wheel';
 import { stanceCombos } from '../data/damage/stances';
 import { STANCE_SEP } from './spellPrefs';
 

@@ -8,6 +8,7 @@ import liveJson from './wheel-data-live.json';
 import { SPELLS } from './spells';
 import type { SpellMeta, VocationWheelData, WheelDataFile } from './types';
 import { applyWheelUpdate } from './update';
+import { WHEEL_UPDATE_RELEASED } from './release';
 
 export type * from './types';
 export { SPELLS };
@@ -16,6 +17,13 @@ export { SPELLS };
 export const WHEEL_DATA: WheelDataFile = applyWheelUpdate(wheelJson as WheelDataFile);
 /** D88: live-server planner data (Vessel Resonance), as extracted. */
 export const WHEEL_DATA_LIVE: WheelDataFile = liveJson as WheelDataFile;
+
+/** D90: wheel variants still offered (the old live wheel goes once the update is released). */
+export const wheelVariants = (): readonly WheelVariant[] => (WHEEL_UPDATE_RELEASED ? ['current'] : ['current', 'live']);
+
+/** D90: a requested variant, or 'current' when it is unknown or no longer offered. */
+export const resolveWheelVariant = (v: unknown): WheelVariant =>
+  wheelVariants().includes(v as WheelVariant) ? (v as WheelVariant) : 'current';
 
 export const wheelDataFile = (variant: WheelVariant = 'current'): WheelDataFile => (variant === 'live' ? WHEEL_DATA_LIVE : WHEEL_DATA);
 

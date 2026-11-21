@@ -17,6 +17,7 @@ import type {
 import {
   getSpell,
   getWheelData,
+  resolveWheelVariant,
   WHEEL_DATA,
   wheelDataFile,
   type WheelBasicMod,
@@ -303,7 +304,8 @@ function build(vocation: Vocation, variant: WheelVariant): EngineWheel {
 
 const cache = new Map<string, EngineWheel>();
 
-export function getEngineWheel(vocation: Vocation, variant: WheelVariant = 'current'): EngineWheel {
+export function getEngineWheel(vocation: Vocation, requested: WheelVariant = 'current'): EngineWheel {
+  const variant = resolveWheelVariant(requested);
   const key = `${variant}:${vocation}`;
   let w = cache.get(key);
   if (!w) {

@@ -382,6 +382,7 @@ export const pl: Dictionary = {
   'compare.otherVocation': "Ten kod jest dla profesji {vocation}; wybierz ją, aby porównać.",
   'compare.otherVariant': "Ten kod jest dla wariantu koła „{variant}”.",
   'compare.switchVariant': "Przełącz koło",
+  'compare.retiredVariant': "Ten kod pochodzi z koła sprzed aktualizacji, które nie jest już obsługiwane; wyeksportuj koło ponownie w aktualnym plannerze.",
   'compare.optimalGives': "Optymalne względem twojego:",
   'compare.showOwn': "Pokaż moje koło na wykresie",
   'compare.betterTitle': "Gdzie optymalne koło jest lepsze",

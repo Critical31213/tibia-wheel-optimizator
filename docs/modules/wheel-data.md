@@ -131,6 +131,28 @@ assertions where they apply and adds:
 - Unlock graph, revelations, augment texts and spells are identical to the current variant.
 - TibiaWiki: a gem has a domain affinity (changeable for gold). The engine assumes any owned gem can go to any domain.
 
+## When the update is released (D90)
+
+The old live wheel is retired with one switch; the current wheel does not depend on it.
+
+1. `npm run check:planner` (also a weekly workflow) fails once www.tibia.com has the new wheel.
+2. Set `WHEEL_UPDATE_RELEASED = true` in `src/data/wheel/release.ts`. Effects: the variant toggle disappears,
+   `live` requests / stored inputs / links fall back to `current` (`resolveWheelVariant`), old-wheel codes in
+   "Compare with your wheel" are rejected with a message, and planner links go to www.tibia.com.
+   `src/release.test.ts` loads the app with the flag on and checks that current builds stay identical.
+3. Gates, commit, deploy.
+4. Optional, later: re-extract from www.tibia.com (`npm run extract:wheel` with the new planner files).
+   `applyWheelUpdate` swaps a quarter only while its central ring 3 slot still holds Revelation Mastery, so data
+   that already has the new layout is not swapped back; check the supreme mod values against the new planner
+   and drop the parts of `update.ts` the extraction now covers. Do not run `extract:wheel-live` then: its
+   Vessel Resonance assertions fail on the new planner.
+5. Optional cleanup (separate commit, after the release has settled): remove `wheel-data-live.json` (+ `.d.json.ts`),
+   `--live` in `extract-wheel.mjs` and the `extract:wheel-live` script, `src/engine/live.test.ts`, the live
+   fixtures and tests in `plannerCode`, the `resonance` branches (`gems.ts` `isRes`/`matchBonus`, `build.ts`
+   resonance keys/spots, `optimizer.ts` `rationale.resonance`), `WheelVariant` and its UI/i18n keys, the
+   `release` flag and `src/release.test.ts`. Keep version 0 decoding (`decodePlannerCode`) so old codes still
+   give a clear message.
+
 ## Planner export code
 
 Build ↔ official planner code/URL (pure TS, byte-identical to the planner): see [planner-code.md](planner-code.md).
