@@ -19,9 +19,7 @@ export function PrioritySlider({ value, onChange }: PrioritySliderProps) {
     <div>
       <div className="mb-1 flex items-center justify-between text-xs">
         <span id={`${id}-label`} className="text-parchment-300">{t('priority.title')}</span>
-        <span className="font-semibold text-gold-300">
-          {label} <span className="font-normal text-parchment-400">· {100 - step}–{step}</span>
-        </span>
+        <span className="font-semibold text-gold-300">{label}</span>
       </div>
       <input
         type="range"
@@ -40,13 +38,6 @@ export function PrioritySlider({ value, onChange }: PrioritySliderProps) {
           <option key={p} value={p} />
         ))}
       </datalist>
-      <div className="mt-0.5 flex justify-between px-1 text-[10px] text-parchment-400 tabular-nums" aria-hidden="true">
-        {PRIORITY_STEPS.map((p) => (
-          <span key={p} className={p === step ? 'text-gold-300' : undefined}>
-            {100 - p}–{p}
-          </span>
-        ))}
-      </div>
       <div className="mt-1 flex justify-between text-[11px]">
         <span className="text-offense">{t('priority.maxDps')}</span>
         <span className="text-defense">{t('priority.maxSurvival')}</span>
