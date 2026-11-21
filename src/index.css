@@ -77,13 +77,6 @@
   }
 }
 
-/* Range input: gold accent; thicker track */
-input[type="range"].priority-range {
-  accent-color: var(--color-gold-500);
-  height: 1.75rem;
-  cursor: pointer;
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

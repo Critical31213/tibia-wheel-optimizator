@@ -168,7 +168,7 @@ describe('integration: input parsing', () => {
     const parsed = fromQuery('?v=necromancer&m=not-a-monster&p=100&prio=20');
     expect(parsed.vocation).toBeUndefined();
     const state = withKnownMonsters({ ...DEFAULT_INPUTS, ...parsed }, known);
-    expect(state).toEqual({ ...DEFAULT_INPUTS, points: 100, priority: 20, monsters: [] });
+    expect(state).toEqual({ ...DEFAULT_INPUTS, points: 100, priority: 25, monsters: [] });
     expect(withKnownMonsters({ ...DEFAULT_INPUTS, monsters: [{ id: 'demon', weight: 1 }] }, known).monsters).toEqual([{ id: 'demon', weight: 1 }]);
   });
 
@@ -601,7 +601,7 @@ describe('integration: URL state (iteration 3 keys)', () => {
       shielding: 40,
       magicLevel: 30,
       monsters: [{ id: 'demon', weight: 2.5 }, { id: 'dragon-lord', weight: 1 }],
-      priority: 35,
+      priority: 25,
       mode: 'boss' as const,
     };
     const q = toQuery(state);

@@ -26,7 +26,7 @@ screens it is two columns (controls left, results right).
 | `src/components/DebugCopy.tsx` | Temporary (D60): link under "Equipment" copying the exact `OptimizerInput` as JSON (textarea fallback) so a reported build can be reproduced. |
 | `src/components/Gain.tsx` | D55: a gain shown as `±x% dmg` (offense colour) and `±y% EHP` (defense colour), negatives red, parts below 0.05 hidden; the blended optimizer score only in the tooltip (shown as `pts` when neither part is visible, e.g. utility). Used for gem recommendations, upgrades (and to IV), weapon ranking, reshapes and suggestions. |
 | `src/components/NotesPanel.tsx` | D54: collapsed "For the curious" section at the end of the page with the descriptive hints (extra points, skills, knight skill, fight mode, monster weight, weapon grid, proficiency assumptions, units, storage); icons credit moved to the footer. |
-| `src/components/PrioritySlider.tsx` | 0–100 range slider (no own panel since D54, rendered inside `FightContextPanel`). |
+| `src/components/PrioritySlider.tsx` | D91: five fixed steps (`PRIORITY_STEPS` 0/25/50/75/100 = DPS–survivability 100–0 … 0–100) as a `SegmentedControl` (no own panel since D54, rendered inside `FightContextPanel`). |
 | `src/components/WheelChart.tsx` | SVG wheel, tooltip, active revelation perks per domain (no fill-order badges). |
 | `src/components/ResultsPanel.tsx` | D58: what the wheel adds (`wheelEffect`: % damage, % EHP vs an empty wheel) instead of the 0–100 bars (share of the theoretical full-wheel maximum, misleading), convictions grouped (`groupConvictions`: "3 × Gem Vessel", augment tier I hidden when tier II is taken), stats; revelations moved into the `WheelChart` legend (all four domains, stage dots, points, next stage). D57: `BuildRationale` ("Why this build") is its own full-width panel at the end of the page, above "For the curious"; the fill order list was removed. |
 | `src/components/SegmentedControl.tsx` | Generic compact `radiogroup` (roving tabindex, arrows/Home/End, `disabled`). |
@@ -90,7 +90,7 @@ Components never import `src/engine` / `src/data` directly — only `src/lib/api
    absent optional keys as empty). Every change is written back to
    localStorage (try/catch) and to the URL with `history.replaceState`.
    All values are sanitised (`sanitize`) — unknown vocation dropped, points clamped to 0–`MAX_POINTS` (4000 = wheel
-   capacity), priority to 0–100. Once the monster dataset is loaded, unknown monster ids are dropped
+   capacity), priority snapped to the nearest step (`snapPriority`, D91). Once the monster dataset is loaded, unknown monster ids are dropped
    (`withKnownMonsters`). A legacy `monsterId` / single `m=id` becomes a one-monster list.
 2. `App` derives `wheel = getWheel(vocation)` (memo) and clamps points to `wheel.totalCapacity`.
 3. `useDeferredValue(inputs)` keeps the slider/typing responsive; the input is built in a

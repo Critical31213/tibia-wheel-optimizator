@@ -1,47 +1,37 @@
 import { useId } from 'react';
 import { useT } from '../i18n';
-import { priorityKey } from '../lib/labels';
+import { PRIORITY_STEPS, priorityKey, snapPriority } from '../lib/labels';
+import { SegmentedControl } from './SegmentedControl';
 
 interface PrioritySliderProps {
   value: number;
   onChange: (v: number) => void;
 }
 
-/** 0 = Max DPS, 100 = Max Survivability. Results recompute live. */
+/** D91: five fixed steps, 0 = Max DPS … 100 = Max Survivability (DPS–survival weights 100–0 … 0–100). */
 export function PrioritySlider({ value, onChange }: PrioritySliderProps) {
   const t = useT();
   const id = useId();
-  const label = t(priorityKey(value));
+  const step = snapPriority(value);
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-xs">
         <span id={`${id}-label`} className="text-parchment-300">{t('priority.title')}</span>
-        <span className="font-semibold text-gold-300">{label}</span>
+        <span className="font-semibold text-gold-300">{t(priorityKey(step))}</span>
       </div>
-      <input
-        type="range"
-        min={0}
-        max={100}
-        step={1}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        list={`${id}-ticks`}
-        aria-labelledby={`${id}-label`}
-        aria-valuetext={t('priority.valueText', { label, value })}
-        className="priority-range w-full"
+      <SegmentedControl
+        labelledBy={`${id}-label`}
+        options={PRIORITY_STEPS.map((p) => ({
+          value: p,
+          label: `${100 - p}–${p}`,
+          title: t('priority.stepTitle', { label: t(priorityKey(p)), dps: 100 - p, defense: p }),
+        }))}
+        value={step}
+        onChange={onChange}
       />
-      <datalist id={`${id}-ticks`}>
-        <option value="50" />
-      </datalist>
-      <div className="relative mt-1 flex justify-between text-[11px] text-parchment-300">
+      <div className="mt-1 flex justify-between text-[11px]">
         <span className="text-offense">{t('priority.maxDps')}</span>
-        <button
-          type="button"
-          onClick={() => onChange(50)}
-          className="absolute left-1/2 -translate-x-1/2 text-parchment-400 hover:text-gold-300"
-        >
-          {t('priority.balanced')}
-        </button>
+        <span className="text-parchment-400">{t('priority.weights')}</span>
         <span className="text-defense">{t('priority.maxSurvival')}</span>
       </div>
     </div>

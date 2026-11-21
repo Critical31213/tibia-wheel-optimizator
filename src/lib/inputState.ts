@@ -2,7 +2,7 @@
 import { MELEE_SKILLS, VOCATIONS } from '../types';
 import { wheelVariants } from '../data/wheel';
 import type { CharacterStats, FightContext, FightMode, MeleeSkill, Vocation, WheelVariant } from '../types';
-import { clamp } from './labels';
+import { clamp, snapPriority } from './labels';
 
 export interface MonsterEntry {
   id: string;
@@ -114,7 +114,8 @@ export function sanitize(raw: Record<string, unknown>): Partial<InputState> {
   const p = toInt(raw.points);
   if (p !== undefined) out.points = clamp(p, 0, MAX_POINTS);
   const pr = toInt(raw.priority);
-  if (pr !== undefined) out.priority = clamp(pr, 0, 100);
+  // D91: priority is one of five steps; older stored / linked values snap to the nearest.
+  if (pr !== undefined) out.priority = snapPriority(clamp(pr, 0, 100));
   const sc = toInt(raw.scrolls);
   if (sc !== undefined) out.scrolls = clamp(sc, 0, MAX_SCROLLS);
   const lv = optionalInt(raw, 'level', 1, MAX_LEVEL);

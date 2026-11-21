@@ -184,7 +184,8 @@ export const en = {
   'priority.balanced': 'Balanced',
   'priority.defense': 'Defense-leaning',
   'priority.maxSurvival': 'Max Survivability',
-  'priority.valueText': '{label} ({value} of 100)',
+  'priority.stepTitle': '{label}: DPS {dps}%, survivability {defense}%',
+  'priority.weights': 'DPS – survivability (%)',
 
   'gems.title': 'My gems',
   'gems.import': "Import from screenshots",

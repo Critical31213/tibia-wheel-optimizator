@@ -38,3 +38,10 @@ describe('gemName', () => {
     expect(gemName('paladin', 'lesser')).toBe('Lesser Marksman Gem');
   });
 });
+
+describe('snapPriority (D91)', () => {
+  it('snaps to the five steps', async () => {
+    const { snapPriority } = await import('./labels');
+    expect([0, 10, 13, 37, 50, 62, 63, 90, 100, 150, NaN].map(snapPriority)).toEqual([0, 0, 25, 25, 50, 50, 75, 100, 100, 100, 50]);
+  });
+});

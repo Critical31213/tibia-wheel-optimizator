@@ -46,6 +46,15 @@ export function modifierKind(percent: number): ModifierKind {
 }
 
 /** Dictionary key for the priority slider value (0 = DPS, 100 = survivability). */
+/** D91: the selectable priority steps (DPS–survival weights 100–0, 75–25, 50–50, 25–75, 0–100). */
+export const PRIORITY_STEPS = [0, 25, 50, 75, 100] as const;
+
+/** Nearest priority step (ties towards DPS); invalid → 50. */
+export function snapPriority(value: number): number {
+  if (!Number.isFinite(value)) return 50;
+  return PRIORITY_STEPS.reduce((best, s) => (Math.abs(s - value) < Math.abs(best - value) ? s : best), PRIORITY_STEPS[0]);
+}
+
 export function priorityKey(value: number): MessageKey {
   if (value <= 10) return 'priority.maxDps';
   if (value < 40) return 'priority.dps';
