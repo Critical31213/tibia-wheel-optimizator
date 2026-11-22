@@ -37,7 +37,7 @@ export const PROF = {
   VOID_MANA_LEECH: 8,
 } as const;
 
-import { noCritImbue, noLifeLeechImbue, noManaLeechImbue } from '../data/equipment';
+import { INTRINSIC_CRIT, noCritImbue, noLifeLeechImbue, noManaLeechImbue } from '../data/equipment';
 export { noCritImbue, noLifeLeechImbue, noManaLeechImbue };
 
 export interface Loadout {
@@ -149,7 +149,8 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
   const pp = (f: (p: Perk) => boolean) => 100 * sum(perks, f);
   const noImbue = noCritImbue(w);
   const gear = model.gear;
-  const strike = gear?.weaponImbues ? { chance: gear.weaponImbues.critChance, extra: gear.weaponImbues.critExtra } : IMBUE_CRIT;
+  // D94: only the imbuement part goes; the character's own crit stays.
+  const strike = gear?.weaponImbues ? { chance: gear.weaponImbues.critChance, extra: gear.weaponImbues.critExtra } : { chance: IMBUE_CRIT.chance - INTRINSIC_CRIT.chance, extra: IMBUE_CRIT.extra - INTRINSIC_CRIT.extra };
   const critChance = pp((p) => p.kind === 'critChance') + 100 * (w.specials?.critChance ?? 0) - (noImbue ? strike.chance : 0);
   const critExtra = pp((p) => p.kind === 'critDamage') + 100 * (w.specials?.critDamage ?? 0) - (noImbue ? strike.extra : 0);
   const elemCrit = (e: Element | null) => [pp((p) => p.kind === 'elementCritChance' && p.element === e), pp((p) => p.kind === 'elementCritDamage' && p.element === e)];

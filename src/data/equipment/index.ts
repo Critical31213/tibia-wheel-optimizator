@@ -59,11 +59,16 @@ export interface ImbueDef {
 
 const SKILL_SLOTS: readonly ImbueSlot[] = ['weapon', 'helmet', 'offhand'];
 const PROTECTION_SLOTS: readonly ImbueSlot[] = ['armor', 'offhand'];
+/**
+ * D94: every character has 5 % crit chance / +10 % extra damage (Summer Update 2025); Strike adds 5 / 5, 5 / 15, 5 / 40,
+ * so the default Powerful Strike gives the `critDefaults` 10 % / +50 %.
+ */
+export const INTRINSIC_CRIT = { chance: 5, extra: 10 };
 const POWERFUL_STRIKE = SPELL_FORMULAS.critDefaults;
 
 /** Imbuements with an effect the engine models (others, e.g. speed or capacity, are left out). */
 export const IMBUEMENTS: readonly ImbueDef[] = [
-  { id: 'strike', name: 'Strike', group: 'crit', values: [5, 5, POWERFUL_STRIKE.critChance], extra: [5, 15, POWERFUL_STRIKE.critDamage], slots: ['weapon'] },
+  { id: 'strike', name: 'Strike', group: 'crit', values: [5, 5, POWERFUL_STRIKE.critChance - INTRINSIC_CRIT.chance], extra: [5, 15, POWERFUL_STRIKE.critDamage - INTRINSIC_CRIT.extra], slots: ['weapon'] },
   { id: 'vampirism', name: 'Vampirism', group: 'lifeLeech', values: [5, 10, 25], slots: ['weapon', 'armor'] },
   { id: 'void', name: 'Void', group: 'manaLeech', values: [3, 5, 8], slots: ['weapon', 'helmet'] },
   { id: 'precision', name: 'Precision', group: 'skill', skill: 'distance', values: [1, 2, 4], slots: SKILL_SLOTS },

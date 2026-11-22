@@ -170,7 +170,7 @@ Plans carry their weapon; the choice, re-choice and `result.weapon` are describe
 
 Optional `input.gear` (owned items per slot, D75): `wearBest` picks the set for the spot and sets `input.equipment`
 (`GearEffects`): skills added to entered skills, element magic levels, crit / Onslaught / conversion in the spell model
-(`model.gear`), leech, resistances and off-hand. `result.gear` = the worn set. See [`equipment.md`](equipment.md).
+(`model.gear`; D94: crit = own 5 % / +10 % (`INTRINSIC_CRIT`) + Strike 5 / 5, 5 / 15, 5 / 40; Rending Inferniarch drops only the Strike part), leech, resistances and off-hand. `result.gear` = the worn set. See [`equipment.md`](equipment.md).
 
 ## 3. Optimizer (`optimizer.ts`)
 

@@ -78,7 +78,8 @@ describe('gear effects', () => {
     expect(fx.resist.energy).toBeCloseTo(100 * (1 - 0.96 * (1 - boots / 100)), 6);
     expect(fx.onslaught).toBeCloseTo(tierChance('onslaught', 4) * (1 + tierChance('amplification', 2) / 100));
     // The weapon is set: only its chosen imbuements count (no Strike, no Vampirism).
-    expect(fx.crit).toEqual({ chance: 0, extra: 0 });
+    // D94: no Strike: the character's own crit.
+    expect(fx.crit).toEqual({ chance: 5, extra: 10 });
     expect(fx.weaponImbues?.lifeLeech).toBe(0);
   });
 
@@ -162,7 +163,7 @@ describe('wearing the best owned items', () => {
       alternatives: 0,
     });
     // Default: `gear.weapon` (no imbuements).
-    expect(optimize(knight()).gear?.effects.crit).toEqual({ chance: 0, extra: 0 });
+    expect(optimize(knight()).gear?.effects.crit).toEqual({ chance: 5, extra: 10 });
     const own = optimize(knight({ tier: 3, imbues: [{ id: 'strike', level: 3 }] }));
     expect(own.gear?.effects.crit?.chance).toBeGreaterThan(0);
     expect(own.gear?.effects.onslaught).toBeGreaterThan(0);

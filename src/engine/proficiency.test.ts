@@ -49,8 +49,8 @@ describe('weapon proficiency model (D45)', () => {
       const m = applyLoadout(knight('boss'), lo([], weapon));
       return castDamage(m, m.spells.get('Groundshaker')!, NO_BONUS);
     };
-    // Powerful Strike: 10 % × 50 % extra → ×1.05.
-    expect(dmg(plain) / dmg(rending)).toBeCloseTo(1.05, 3);
+    // Powerful Strike: 10 % × 50 % extra → ×1.05; D94: without it the character keeps its own 5 % × 10 %.
+    expect(dmg(plain) / dmg(rending)).toBeCloseTo(1.05 / 1.005, 4);
   });
 
   it('drops the leech imbuement of Draining (life) and Siphoning (mana) weapons', () => {

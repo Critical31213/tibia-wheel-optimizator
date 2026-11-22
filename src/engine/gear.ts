@@ -3,7 +3,7 @@
  * The choice of the set among the owned items is in `optimizer.ts` (`wearBest`).
  */
 import type { Element, GearEffects, GearImbue, GearPiece, GearSlot, MeleeSkill, Vocation, WeaponGear } from '../types';
-import { GEAR_SLOTS, getImbuement, getItem, tierChance, type ItemSkill } from '../data/equipment';
+import { GEAR_SLOTS, getImbuement, getItem, INTRINSIC_CRIT, tierChance, type ItemSkill } from '../data/equipment';
 import { K } from './values';
 
 /** One item (or none) per slot. */
@@ -99,7 +99,8 @@ export function gearEffects(g: WornGear, vocation: Vocation, meleeSkill: MeleeSk
     elementMl: t.elementMl,
     resist: t.resist,
     ...(offhand ? { offhand } : {}),
-    ...(weaponImbues ? { crit: { chance: weaponImbues.critChance, extra: weaponImbues.critExtra }, weaponImbues } : {}),
+    // D94: the character's own crit plus the Strike imbuement.
+    ...(weaponImbues ? { crit: { chance: INTRINSIC_CRIT.chance + weaponImbues.critChance, extra: INTRINSIC_CRIT.extra + weaponImbues.critExtra }, weaponImbues } : {}),
     lifeLeech,
     ...(damage?.d?.element ? { conversion: { element: damage.d.element, pct: imbueValue(damage.c) } } : {}),
     onslaught: tierChance('onslaught', w?.tier ?? 0) * amp,
