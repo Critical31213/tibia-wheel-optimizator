@@ -21,6 +21,7 @@ export const ENGINE_MESSAGES = {
   'rationale.stances': 'Stance: {stances} (picked by its damage / survivability value at your priority).',
   'rationale.noStance': 'No stance: none adds value at your priority.',
   'rationale.forced': 'Augments taken because you forced them: {spells}.',
+  'rationale.charms': 'Charms: {charms}.',
   'rationale.excluded': 'Not cast (excluded by you): {spells}; their augments and revelation effects are not valued.',
   'rationale.forcedImpossible': 'Not enough points to reach the augment of {spells}.',
   'rationale.forcedNoAugment': '{spells}: no wheel augment; only gem mods can boost it.',

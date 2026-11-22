@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import type { GearEffects, GearResult, MeleeSkill, OwnedWeapon, Vocation } from '../types';
+import type { CharmResult, GearEffects, GearResult, MeleeSkill, OwnedWeapon, Vocation } from '../types';
+import { CharmIcon, CharmsEditor } from './CharmsEditor';
 import { useT, type TFunction } from '../i18n';
 import {
   getImbuement,
@@ -35,6 +36,9 @@ type Slot = ImbueSlot;
 const DOLL: readonly (Slot | null)[] = ['amulet', 'helmet', null, 'weapon', 'armor', 'offhand', 'ring', 'legs', null, null, 'boots', null];
 
 const NOT_MODELLED = new Set(['momentum', 'transcendence']);
+
+/** D93: paper-doll cell of the charms button (bottom left). */
+const CHARM_CELL = 9;
 
 // ---------------------------------------------------------------------------
 // Labels
@@ -444,12 +448,14 @@ export interface EquipmentPanelProps {
   weaponName: string | null;
   weapons: WeaponPrefs;
   onWeapons: (f: (p: WeaponPrefs) => WeaponPrefs) => void;
+  /** D93: charms the engine assigned for the shown build. */
+  charmPicks?: CharmResult[];
 }
 
 /** D74: equipment as a Tibia paper doll; a slot opens its editor in a window (the weapon slot: owned weapons with proficiency). */
-export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, worn, weaponName, weapons, onWeapons }: EquipmentPanelProps) {
+export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, worn, weaponName, weapons, onWeapons, charmPicks }: EquipmentPanelProps) {
   const t = useT();
-  const [editing, setEditing] = useState<Slot | null>(null);
+  const [editing, setEditing] = useState<Slot | 'charms' | null>(null);
   const close = () => setEditing(null);
   // The shown build may lag behind edits: a worn index past the list falls back to the first item.
   const wornIndex = (s: Slot) => {
@@ -463,12 +469,34 @@ export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, worn, weapo
           {DOLL.map((s, k) =>
             s ? (
               <SlotButton key={s} slot={s} gear={gear} weaponName={weaponName} wornIndex={wornIndex(s)} weaponCount={weapons.weapons.length} off={s === 'offhand' && !!worn?.offhandOff} active={editing === s} onClick={() => setEditing(editing === s ? null : s)} />
+            ) : k === CHARM_CELL ? (
+              <button
+                key="charms"
+                type="button"
+                onClick={() => setEditing(editing === 'charms' ? null : 'charms')}
+                aria-expanded={editing === 'charms'}
+                aria-label={t('charm.button', { n: gear.charms.length })}
+                title={t('charm.title')}
+                className={cx(
+                  'relative flex aspect-square min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border p-1',
+                  editing === 'charms' ? 'border-gold-400 bg-gold-700/25' : gear.charms.length ? 'border-gold-700/70 bg-ink-950/70 hover:border-gold-500' : 'border-dashed border-ink-500 bg-ink-950/40 hover:border-gold-600',
+                )}
+              >
+                <CharmIcon className={cx('size-6', gear.charms.length ? 'text-gold-300' : 'text-parchment-500')} />
+                <span className="text-[10px] uppercase tracking-wide text-parchment-400">{t('charm.title')}</span>
+                {gear.charms.length > 0 && <span className="absolute left-1 top-1 rounded bg-ink-700 px-1 text-[10px] text-parchment-200">{gear.charms.length}</span>}
+              </button>
             ) : (
-              <span key={k} aria-hidden="true" className={cx('aspect-square rounded-lg', k !== 9 && k !== 11 && 'border border-ink-700/60 bg-ink-950/20')} />
+              <span key={k} aria-hidden="true" className={cx('aspect-square rounded-lg', k !== 11 && 'border border-ink-700/60 bg-ink-950/20')} />
             ),
           )}
         </div>
-        {editing && (
+        {editing === 'charms' && (
+          <Modal title={t('charm.title')} onClose={close}>
+            <CharmsEditor value={gear.charms} onChange={(charms) => onGear((g) => ({ ...g, charms }))} picks={charmPicks} />
+          </Modal>
+        )}
+        {editing && editing !== 'charms' && (
           <Modal title={slotName(t, editing)} wide={editing === 'weapon'} onClose={close}>
             <SlotEditor
               key={editing}

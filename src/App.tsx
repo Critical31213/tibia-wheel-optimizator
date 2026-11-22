@@ -104,11 +104,12 @@ export default function App() {
             weapons: deferredWeapons.weapons.length ? deferredWeapons.weapons : undefined,
             suggestWeapons: deferredWeapons.weapons.length && deferredWeapons.suggest ? true : undefined,
             gear: gearRequest,
+            charms: deferredGear.charms.length ? deferredGear.charms : undefined,
             wheelVariant: deferred.wheel === 'current' ? undefined : deferred.wheel,
             compareWith: deferredCompare,
           }
         : null,
-    [deferredCompare, deferred.wheel, deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, meleeSkill, rotationId, customRotation, forcedSpells, forcedStage2, forcedRevelations, excludedSpells, stance, deferredWeapons, gearRequest],
+    [deferredCompare, deferred.wheel, deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, meleeSkill, rotationId, customRotation, forcedSpells, forcedStage2, forcedRevelations, excludedSpells, stance, deferredWeapons, gearRequest, deferredGear.charms],
   );
   const optimized = useOptimizer(request);
   // The shown build may lag the inputs while the worker computes; everything below follows its own vocation.
@@ -145,6 +146,7 @@ export default function App() {
             weaponName={weaponName}
             weapons={weaponPrefs}
             onWeapons={setWeaponPrefs}
+            charmPicks={current ? shown?.charms : undefined}
           />
           <DebugCopy input={request} />
         </div>

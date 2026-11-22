@@ -17,6 +17,7 @@ import {
   type ElementMagicLevel,
   type SpellEval,
   type SpellModel,
+  type ModelExtras,
 } from './spells';
 import { applyLoadout, loadoutAttack, loadoutElementMl, type Loadout } from './proficiency';
 
@@ -126,17 +127,17 @@ export function stanceBuilder(
   /** D69: cooldown cuts (s) applied to the base spells (a plan's rotation augments). */
   preCd?: ReadonlyMap<string, number>,
   equipment?: GearEffects,
-  /** D92: spells the player does not cast. */
-  excluded?: readonly string[],
+  /** D92 / D93: excluded spells, charms. */
+  extras?: ModelExtras,
 ) {
   const cut = (m: SpellModel) => (preCd?.size ? withCooldownCuts(m, preCd) : m);
-  if (!loadout) return (c: Required<CharacterStats>) => cut(applyStanceSpells(buildSpellModel(vocation, context, monsters, c, stanceElementMl(c, stances), undefined, equipment, excluded), stances, preset));
+  if (!loadout) return (c: Required<CharacterStats>) => cut(applyStanceSpells(buildSpellModel(vocation, context, monsters, c, stanceElementMl(c, stances), undefined, equipment, extras), stances, preset));
   const { healing: _healing, ...weaponMl } = loadoutElementMl(loadout);
   const attack = loadoutAttack(vocation, loadout);
   return (c: Required<CharacterStats>) => {
     const ml: ElementMagicLevel = { ...stanceElementMl(c, stances) };
     for (const [e, x] of Object.entries(weaponMl) as [keyof ElementMagicLevel, number][]) ml[e] = (ml[e] ?? 0) + x;
-    return cut(applyLoadout(applyStanceSpells(buildSpellModel(vocation, context, monsters, c, ml, attack, equipment, excluded), stances, preset), loadout));
+    return cut(applyLoadout(applyStanceSpells(buildSpellModel(vocation, context, monsters, c, ml, attack, equipment, extras), stances, preset), loadout));
   };
 }
 

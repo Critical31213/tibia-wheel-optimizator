@@ -8,7 +8,7 @@
  * D16: in hunt mode single-target spells never enter the rotation (zero value for their augments/gems).
  * Perk values are ΔT / T0 (T0 = rotation without wheel bonuses, no revelation).
  */
-import { GREEDY_ROTATION_ID, type CharacterStats, type Element, type FightContext, type GearEffects, type Monster, type RotationPreset, type Vocation, type WeightedMonster } from '../types';
+import { GREEDY_ROTATION_ID, type CharacterStats, type CharmAssign, type Element, type FightContext, type GearEffects, type Monster, type RotationPreset, type Vocation, type WeightedMonster } from '../types';
 import { getSpell, getWheelSpellNames, type SpellMeta } from '../data/wheel';
 import { MAX_CHAIN_TARGETS } from '../data/wheel/update';
 import {
@@ -26,7 +26,8 @@ import {
   weaponBracket,
   type DamageSpell,
 } from '../data/damage';
-import { resolveCharacterStats } from '../data/character';
+import { maxHitPoints, maxMana, resolveCharacterStats } from '../data/character';
+import { CARNAGE_NEIGHBOURS, getCharm } from '../data/charms';
 import { getEngineWheel } from './wheel/build';
 
 export const DEFAULT_CONTEXT: FightContext = { mode: 'hunt' };
@@ -210,6 +211,66 @@ export interface SpellModel {
   gear?: GearModel;
   /** D92: spells the player does not cast (never in the rotation, their augments / revelation effects worth 0). */
   excluded?: ReadonlySet<string>;
+  /** D93: assigned charms, averaged over the spot. */
+  charms?: CharmModel;
+}
+
+/** D93: charm effects weighted over the spot's creatures. */
+export interface CharmModel {
+  /** Low Blow / Savage Blow (pp). */
+  critChance: number;
+  critExtra: number;
+  /** Expected charm damage per attack hit on one creature. */
+  perHit: number;
+  /** Carnage: extra damage as a fraction of all damage dealt (kills ∝ damage / max HP). */
+  carnage: number;
+}
+
+/** Model inputs beyond the character and the spot. */
+export interface ModelExtras {
+  /** D92: spells the player does not cast. */
+  excluded?: readonly string[];
+  /** D93: charms per creature. */
+  charms?: readonly CharmAssign[];
+}
+
+/** D93: charm effects of an assignment over the spot (undefined = none). */
+export function charmModel(vocation: Vocation, level: number, context: FightContext, spot: { monster: Monster; weight: number }[], picks: readonly CharmAssign[] | undefined): CharmModel | undefined {
+  if (!picks?.length) return undefined;
+  const out: CharmModel = { critChance: 0, critExtra: 0, perHit: 0, carnage: 0 };
+  const hpP = maxHitPoints(vocation, level);
+  const manaP = maxMana(vocation, level);
+  const phys = spotElementMultiplier(spot, 'physical');
+  for (const { monster, weight: w } of spot) {
+    const pick = picks.find((p) => p.monsterId === monster.id);
+    const c = pick && getCharm(pick.id);
+    if (!c) continue;
+    const v = c.values[pick.stage - 1];
+    const hp = monster.hitpoints && monster.hitpoints > 0 ? monster.hitpoints : 0;
+    if (c.kind === 'crit') {
+      if (c.crit === 'chance') out.critChance += w * v;
+      else out.critExtra += w * v;
+    } else if (c.kind === 'element' && hp) {
+      out.perHit += (w * v / 100) * Math.min((hp * c.pct!) / 100, c.levelCap! * level) * elementMultiplier(monster, c.element!);
+    } else if (c.kind === 'player') {
+      const raw = ((c.resource === 'mana' ? manaP : hpP) * c.pct!) / 100;
+      out.perHit += (w * v / 100) * (hp ? Math.min(raw, (hp * c.creatureCap!) / 100) : raw);
+    } else if (c.kind === 'kill' && hp && context.mode === 'hunt') {
+      out.carnage += (w * v / 100) * (Math.min((hp * c.pct!) / 100, c.levelCap! * level) / hp) * phys * CARNAGE_NEIGHBOURS;
+    }
+  }
+  return out;
+}
+
+/** D93: charm damage per turn: every spell hit on a creature rolls the charm; auto attacks only on the main target. */
+function withCharms(model: SpellModel, r: RotationResult): RotationResult {
+  const c = model.charms;
+  if (!c || (!c.perHit && !c.carnage)) return r;
+  let hits = 1;
+  for (const [n, x] of r.rates) hits += x.rate * (model.spells.get(n)?.targets ?? 1);
+  const procs = hits * c.perHit;
+  const total = (r.total + procs) * (1 + c.carnage);
+  return { ...r, total, charms: total - r.total };
 }
 
 /** D74: equipment effects inside the damage model. */
@@ -295,9 +356,9 @@ const modelCache = new Map<string, SpellModel>();
 /** D24: extra magic level for spells of some elements (stances). */
 export type ElementMagicLevel = Partial<Record<Element, number>>;
 
-function cacheKey(vocation: Vocation, ctx: FightContext, monsters: { monster: Monster; weight: number }[], c: Required<CharacterStats>, eml: ElementMagicLevel, attack?: number, gear?: GearModel, excluded: readonly string[] = []) {
+function cacheKey(vocation: Vocation, ctx: FightContext, monsters: { monster: Monster; weight: number }[], c: Required<CharacterStats>, eml: ElementMagicLevel, attack?: number, gear?: GearModel, extras: ModelExtras = {}) {
   const m = monsters.map((x) => `${x.monster.id}:${x.weight.toFixed(6)}`).join(',');
-  return `${vocation}|${ctx.mode}|${m}|${c.level}|${c.mainSkill}|${c.magicLevel}|${c.shielding}|${JSON.stringify(eml)}|${attack ?? ''}|${gear ? JSON.stringify(gear) : ''}|${[...excluded].sort().join(',')}`;
+  return `${vocation}|${ctx.mode}|${m}|${c.level}|${c.mainSkill}|${c.magicLevel}|${c.shielding}|${JSON.stringify(eml)}|${attack ?? ''}|${gear ? JSON.stringify(gear) : ''}|${[...(extras.excluded ?? [])].sort().join(',')}|${(extras.charms ?? []).map((p) => `${p.monsterId}:${p.id}:${p.stage}`).join(',')}`;
 }
 
 export function buildSpellModel(
@@ -310,8 +371,8 @@ export function buildSpellModel(
   weaponAttack?: number,
   /** D74: equipment (its element magic levels are added to `elementMl`). */
   equipment?: GearEffects,
-  /** D92: spells the player does not cast. */
-  excludedSpells: readonly string[] = [],
+  /** D92 / D93: excluded spells, charms. */
+  extras: ModelExtras = {},
 ): SpellModel {
   const spot = Array.isArray(monsters) ? monsters : monsters ? [{ monster: monsters, weight: 1 }] : [];
   const char = resolveCharacterStats(vocation, character ?? { level: 600 });
@@ -321,8 +382,9 @@ export function buildSpellModel(
     for (const [e, x] of Object.entries(equipment.elementMl) as [Element, number][]) merged[e] = (merged[e] ?? 0) + x;
     elementMl = merged;
   }
-  const key = cacheKey(vocation, context, spot, char, elementMl, weaponAttack, gear, excludedSpells);
-  const excluded = new Set(excludedSpells);
+  const key = cacheKey(vocation, context, spot, char, elementMl, weaponAttack, gear, extras);
+  const excluded = new Set(extras.excluded ?? []);
+  const charms = charmModel(vocation, char.level, context, spot, extras.charms);
   const cached = modelCache.get(key);
   if (cached && cached.monsters.every((m, i) => m.monster === spot[i].monster)) return cached;
 
@@ -392,7 +454,7 @@ export function buildSpellModel(
   const autoTargets = context.mode === 'boss' ? 1 : AUTO_ATTACK_TARGETS[vocation];
   const mage = vocation === 'sorcerer' || vocation === 'druid';
   const autoElem = mage ? spotElementMultiplier(spot, 'physical') : convertedPhysical(spot, gear?.conversion);
-  const base = autoHit * autoTargets * autoElem * critEV(gear?.critChance ?? 0, gear?.critExtra ?? 0) * (gear?.mult ?? 1);
+  const base = autoHit * autoTargets * autoElem * critEV((gear?.critChance ?? 0) + (charms?.critChance ?? 0), (gear?.critExtra ?? 0) + (charms?.critExtra ?? 0)) * (gear?.mult ?? 1);
 
   const model: SpellModel = {
     vocation,
@@ -410,6 +472,7 @@ export function buildSpellModel(
     flatHealPerPoint: 0,
     ...(gear ? { gear } : {}),
     ...(excluded.size ? { excluded } : {}),
+    ...(charms ? { charms } : {}),
   };
   model.total = Math.max(1, rotationTotal(model, NO_BONUS));
   model.flatOffPerPoint = (100 * (rotationTotal(model, { ...NO_BONUS, flat: 1 }) - model.total)) / model.total;
@@ -515,8 +578,8 @@ export function castDamage(model: SpellModel, s: SpellEval, r: RotationInput, m:
     else if (def?.extra === 'half') dmg = ((val(h.main) + val(h.extra)) / 2) * t;
     else dmg += val(h.extra) * t;
   }
-  let critChance = m.critChance + (s.critChance ?? 0);
-  let critExtra = m.critExtra + (s.critExtra ?? 0) + (r.critExtra ?? 0);
+  let critChance = m.critChance + (s.critChance ?? 0) + (model.charms?.critChance ?? 0);
+  let critExtra = m.critExtra + (s.critExtra ?? 0) + (r.critExtra ?? 0) + (model.charms?.critExtra ?? 0);
   let mult = s.elem * (s.mult ?? 1) * (model.damageMult ?? 1);
   for (const [name, d] of model.passives) {
     const st = r.stages[d] ?? 0;
@@ -541,6 +604,8 @@ export interface RotationResult {
   total: number;
   /** Casts per turn and damage per cast of each scheduled spell. */
   rates: Map<string, { rate: number; perCast: number }>;
+  /** D93: charm damage per turn (in `total`). */
+  charms?: number;
 }
 
 type Cand = { s: SpellEval; perCast: number; cap: number };
@@ -648,7 +713,10 @@ function waterFill(items: (Cand & { ratio: number; alts: Cand[] })[], budget: nu
 
 /** Rotation of the model's plan: preset schedule, or greedy (highest damage per cast first, capped at 1 / cooldown). */
 export function rotation(model: SpellModel, r: RotationInput): RotationResult {
-  if (model.plan.preset) return presetRotation(model, r);
+  return withCharms(model, model.plan.preset ? presetRotation(model, r) : greedyRotation(model, r));
+}
+
+function greedyRotation(model: SpellModel, r: RotationInput): RotationResult {
   const cands: { s: SpellEval; perCast: number; cap: number }[] = [];
   for (const s of model.spells.values()) {
     if (!s.usable) continue;

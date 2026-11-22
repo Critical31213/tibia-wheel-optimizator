@@ -5,7 +5,8 @@
  * anything, no equipment is sent and the engine keeps its previous assumptions (typical gear, Powerful Strike,
  * Vampirism on weapon and armor).
  */
-import type { GearImbue, GearInput, GearPiece, GearSlot, Vocation, WeaponGear } from '../types';
+import type { GearImbue, GearInput, GearPiece, GearSlot, OwnedCharm, Vocation, WeaponGear } from '../types';
+import { CHARM_IDS } from '../data/charms';
 import {
   GEAR_SLOTS,
   getItem,
@@ -25,12 +26,25 @@ export type ImbueChoice = GearImbue;
 export interface GearPrefs {
   pieces: Partial<Record<GearSlot, GearPiece[]>>;
   weapon: WeaponGear | null;
+  /** D93: unlocked offensive charms. */
+  charms: OwnedCharm[];
 }
 
 /** Owned items kept per slot. */
 export const MAX_PIECES = 20;
 
-export const EMPTY_GEAR: GearPrefs = { pieces: {}, weapon: null };
+export const EMPTY_GEAR: GearPrefs = { pieces: {}, weapon: null, charms: [] };
+
+/** D93: known charms, unique, stage 1..3. */
+export function sanitizeCharms(raw: unknown): OwnedCharm[] {
+  const out: OwnedCharm[] = [];
+  for (const r of Array.isArray(raw) ? raw : []) {
+    const id = r?.id;
+    const stage = int(r?.stage, 1, 3) as OwnedCharm['stage'] | null;
+    if (CHARM_IDS.includes(id) && stage && !out.some((x) => x.id === id)) out.push({ id, stage });
+  }
+  return out;
+}
 
 export const gearStorageKey = (vocation: Vocation): string => `wheel-optimizer:gear:v1:${vocation}`;
 
@@ -64,7 +78,7 @@ function sanitizePiece(raw: unknown, slot: GearSlot, vocation: Vocation): GearPi
 }
 
 export function sanitizeGear(raw: unknown, vocation: Vocation): GearPrefs {
-  const r = (raw && typeof raw === 'object' ? raw : {}) as { pieces?: Record<string, unknown>; weapon?: Partial<WeaponGear> | null };
+  const r = (raw && typeof raw === 'object' ? raw : {}) as { pieces?: Record<string, unknown>; weapon?: Partial<WeaponGear> | null; charms?: unknown };
   const pieces: GearPrefs['pieces'] = {};
   for (const s of GEAR_SLOTS) {
     const v = r.pieces?.[s];
@@ -76,7 +90,7 @@ export function sanitizeGear(raw: unknown, vocation: Vocation): GearPrefs {
   const weapon = w && typeof w === 'object'
     ? { tier: int(w.tier, 0, MAX_TIER) ?? 0, imbues: sanitizeImbues(w.imbues, 'weapon', vocation, WEAPON_IMBUE_SLOTS) }
     : null;
-  return { pieces, weapon };
+  return { pieces, weapon, charms: sanitizeCharms(r.charms) };
 }
 
 export function parseGear(json: string | null, vocation: Vocation): GearPrefs {

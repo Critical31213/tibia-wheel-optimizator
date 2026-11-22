@@ -7,6 +7,8 @@ import type {
   ActivatedRevelation,
   AlternativeBuild,
   CharacterStats,
+  CharmAssign,
+  CharmResult,
   Domain,
   EngineMessage,
   Element,
@@ -44,6 +46,8 @@ import type { WheelVariant } from '../types';
 import { resolveCharacterStats } from '../data/character';
 import { GEAR_SLOTS, getItem } from '../data/equipment';
 import { gearEffects, type WornGear } from './gear';
+import { assignCharms, ownedCharms } from './charms';
+import { getCharm } from '../data/charms';
 import { BALLISTIC_MASTERY, healingAverage, pierceDamageMod, POSITIONAL_TACTICS, TURN_SECONDS } from '../data/damage';
 import { customPreset, getRotationPresets } from '../data/damage/rotations';
 import { getStance, stanceCombos, type StanceDef } from '../data/damage/stances';
@@ -90,6 +94,7 @@ import {
   type SpellModel,
   TEAM_HEALS,
   withPlan,
+  type ModelExtras,
 } from './spells';
 import {
   add,
@@ -805,7 +810,7 @@ function rotationUsage(p: Prepared, stages: number[], alloc: ArrayLike<number>, 
   }
   spells.sort((a, b) => b.share - a.share || a.name.localeCompare(b.name));
   const autoAttack = round1((100 * v.model.base) / rot.total);
-  const window = { seconds: DAMAGE_WINDOW, autoAttack: Math.round(v.model.base * turns), total: Math.round(rot.total * turns) };
+  const window = { seconds: DAMAGE_WINDOW, autoAttack: Math.round(v.model.base * turns), total: Math.round(rot.total * turns), ...(rot.charms ? { charms: Math.round(rot.charms * turns) } : {}) };
   return { presetId: v.model.plan.id, auto: p.auto, spells, ...(autoAttack > 0 ? { autoAttack } : {}), window };
 }
 
@@ -848,6 +853,11 @@ function rationale(p: Prepared, best: State, stages: number[], revPoints: number
   out.push(text(p.auto ? 'rationale.rotationAuto' : 'rationale.rotationManual', { rotation: rotName }));
   if (!p.auto && plan.requires && !planValid(p, stages)) out.push(text('rationale.rotationRequires', { revelation: plan.requires }));
   out.push(model.stances?.length ? text('rationale.stances', { stances: model.stances.join(' + ') }) : text('rationale.noStance'));
+  const picks = p.input.charmPicks ?? [];
+  if (picks.length) {
+    const name = (id: string) => model.monsters.find((m) => m.monster.id === id)?.monster.name ?? id;
+    out.push(text('rationale.charms', { charms: picks.map((c) => `${name(c.monsterId)}: ${getCharm(c.id)?.name ?? c.id} ${'I'.repeat(c.stage)}`).join(', ') }));
+  }
   if (model.excluded?.size) out.push(text('rationale.excluded', { spells: [...model.excluded].sort().join(', ') }));
   const f = p.forced;
   if (f.taken.length) out.push(text('rationale.forced', { spells: f.taken.join(', ') }));
@@ -956,7 +966,9 @@ const pointsOf = (input: Pick<OptimizerInput, 'points'>) =>
   Math.max(0, Math.floor(Number.isFinite(input.points) ? input.points : 0));
 
 type ValuationInput = Pick<OptimizerInput, 'vocation' | 'points' | 'monster' | 'context' | 'character' | 'monsters' | 'equipment' | 'equipmentTwoHanded' | 'wornPieces' | 'weapons' | 'gear'> &
-  Partial<Pick<OptimizerInput, 'rotationId' | 'forcedSpells' | 'customRotation' | 'excludedSpells'>>;
+  Partial<Pick<OptimizerInput, 'rotationId' | 'forcedSpells' | 'customRotation' | 'excludedSpells' | 'charmPicks'>>;
+
+const extrasOf = (input: Pick<OptimizerInput, 'excludedSpells' | 'charmPicks'>): ModelExtras => ({ excluded: input.excludedSpells, charms: input.charmPicks });
 
 /** Level used for valuation: `character.level`, else points + 50. */
 export function levelFor(input: Pick<OptimizerInput, 'points' | 'character'>): number {
@@ -985,7 +997,7 @@ function modelInputs(input: ValuationInput) {
     shielding: plus(clean(input.character?.shielding), gear?.shielding),
   });
   const monsters = normaliseMonsters(input.monsters, input.monster ?? null);
-  const model = buildSpellModel(input.vocation, context, monsters, character, {}, undefined, input.equipment, input.excludedSpells);
+  const model = buildSpellModel(input.vocation, context, monsters, character, {}, undefined, input.equipment, extrasOf(input));
   return { context, level, character, monsters, model };
 }
 
@@ -1181,7 +1193,7 @@ export function valuationFor(
   input = armedWith(input, loadout);
   const mi0 = modelInputs(input);
   const { context, level, monsters } = mi0;
-  const build = stanceBuilder(input.vocation, context, monsters, stances, preset, loadout, preCd, input.equipment, input.excludedSpells);
+  const build = stanceBuilder(input.vocation, context, monsters, stances, preset, loadout, preCd, input.equipment, extrasOf(input));
   const armed = loadout ? loadoutCharacter(mi0.character, input.vocation, loadout) : mi0.character;
   const character = stancedCharacter(armed, stances);
   const mi = stances.length || loadout || preCd ? { ...mi0, character, model: build(character) } : mi0;
@@ -1930,9 +1942,26 @@ export function pickStances(input: OptimizerInput, preset: RotationPreset | null
   return { stances: best.stances, v: best.v ?? undefined };
 }
 
+/** D93: charms for the spot, assigned on the plain model of the chosen (else the best) rotation. */
+function charmsFor(input: OptimizerInput): { picks: CharmAssign[]; results: CharmResult[] } | null {
+  const owned = ownedCharms(input.charms);
+  if (!owned.length) return null;
+  const { charmPicks: _p, ...plain } = input;
+  const mi = modelInputs(plain);
+  const chosen = presetById(input.vocation, input.rotationId, input.customRotation);
+  const all = getRotationPresets(input.vocation);
+  const plans: (RotationPreset | null)[] = chosen ? [chosen] : [...all, ...(input.context?.mode === 'boss' || !all.length ? [null] : [])];
+  const preset = plans.reduce((a, b) => (planTotal(mi.model, b) > planTotal(mi.model, a) ? b : a));
+  const { picks, gains } = assignCharms({ ...mi.model, plan: planFor(mi.model, preset) }, owned);
+  const name = (id: string) => mi.monsters.find((m) => m.monster.id === id)?.monster.name ?? id;
+  return { picks, results: picks.map((c, i) => ({ ...c, monsterName: name(c.monsterId), gain: Math.round(gains[i] * 100) / 100 })) };
+}
+
 export function runOptimizer(raw: OptimizerInput): OptimizerResult {
   const worn = wearBest(raw);
-  const dressed = worn ? { ...raw, equipment: worn.gear.effects, wornPieces: worn.wornPieces, ...(worn.twoHanded ? { equipmentTwoHanded: worn.twoHanded } : {}) } : raw;
+  const dressed0 = worn ? { ...raw, equipment: worn.gear.effects, wornPieces: worn.wornPieces, ...(worn.twoHanded ? { equipmentTwoHanded: worn.twoHanded } : {}) } : raw;
+  const charms = charmsFor(dressed0);
+  const dressed = charms?.picks.length ? { ...dressed0, charmPicks: charms.picks } : dressed0;
   const input = dressed.gems?.length ? { ...dressed, gems: withSharedGrades(dressed.gems) } : dressed;
   const { p, plans, main } = bestBuild(input);
   const n = Math.max(0, Math.min(5, Math.floor(input.alternatives ?? DEFAULT_ALTERNATIVES)));
@@ -1948,6 +1977,7 @@ export function runOptimizer(raw: OptimizerInput): OptimizerResult {
     const effects = (lo && equipmentWith(input, lo)) ?? worn.gear.effects;
     result.gear = { ...worn.gear, effects, ...(off ? { offhandOff: true } : {}) };
   }
+  if (charms) result.charms = charms.results;
   return result;
 }
 
@@ -2286,7 +2316,7 @@ function loadoutValuer(input: OptimizerInput, spec: Pick<PlanSpec, 'preset' | 'r
   return (lo: Loadout): Parts => {
     const { inp, mi, offhand } = setup(lo);
     const c = stancedCharacter(loadoutCharacter(mi.character, inp.vocation, lo), stances);
-    const m0 = stanceBuilder(inp.vocation, mi.context, mi.monsters, stances, preset, lo, preCd, inp.equipment, inp.excludedSpells)(c);
+    const m0 = stanceBuilder(inp.vocation, mi.context, mi.monsters, stances, preset, lo, preCd, inp.equipment, extrasOf(inp))(c);
     const model: SpellModel = { ...m0, plan: planFor(m0, preset), total: reference };
     const off = (100 * (rotationTotal(model, ri) - reference)) / reference;
     const mitigation = characterFacts(input.vocation, mi.level, c.shielding, offhand).mitigation;

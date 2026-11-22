@@ -198,7 +198,7 @@ export interface RotationUsage {
   /** D51: auto-attack share of the damage (%), not in `spells`. */
   autoAttack?: number;
   /** D67: average damage of the whole rotation over `seconds` (with the build's revelations, augments and flat bonus). */
-  window?: { seconds: number; autoAttack: number; total: number };
+  window?: { seconds: number; autoAttack: number; total: number; /** D93: charm damage. */ charms?: number };
 }
 
 /** D67: average damage of one spell over `RotationUsage.window`. */
@@ -417,6 +417,10 @@ export interface OptimizerInput {
   forcedRevelations?: ForcedRevelation[];
   /** D92: spells the player does not cast (e.g. no time to stand still at the spot); never in the rotation, no value. */
   excludedSpells?: string[];
+  /** D93: offensive charms the player has unlocked; the engine assigns them to the spot's creatures. */
+  charms?: OwnedCharm[];
+  /** D93: the assignment (set by the engine from `charms`). */
+  charmPicks?: CharmAssign[];
   /** D32: stance names chosen by the user ([] = none); undefined = engine picks per plan. */
   stances?: string[];
   /** D51: knight's trained melee skill; weapons of the other types are skipped (undefined = all). */
@@ -433,6 +437,25 @@ export interface OptimizerInput {
   equipmentTwoHanded?: GearEffects;
   /** D81: the worn items (set by the engine), so a loadout's own weapon tier and imbuements can be applied. */
   wornPieces?: Partial<Record<GearSlot, GearPiece>>;
+}
+
+/** D93: offensive charms. */
+export type CharmId = 'wound' | 'enflame' | 'poison' | 'freeze' | 'zap' | 'curse' | 'divineWrath' | 'overpower' | 'overflux' | 'carnage' | 'lowBlow' | 'savageBlow';
+
+export interface OwnedCharm {
+  id: CharmId;
+  stage: 1 | 2 | 3;
+}
+
+/** D93: a charm assigned to a creature of the spot. */
+export interface CharmAssign extends OwnedCharm {
+  monsterId: string;
+}
+
+/** D93: an assigned charm and its damage gain on the spot (% of the rotation's damage, before the wheel). */
+export interface CharmResult extends CharmAssign {
+  monsterName: string;
+  gain: number;
 }
 
 /** D74: paper-doll slots the player fills (the weapon comes from the owned weapons). */
@@ -580,6 +603,8 @@ export interface ActivatedRevelation {
 }
 
 export interface OptimizerResult {
+  /** D93: charms assigned to the spot's creatures (when the player entered charms). */
+  charms?: CharmResult[];
   /** Points invested per slice (only slices with > 0 points). */
   allocation: Record<SliceId, number>;
   /** Order in which slices should be filled in-game. */
