@@ -228,8 +228,9 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
     targets = mode === 'boss' ? 1 : hunt;
     const [pc, pd] = elemCrit(autoElement);
     const crit = critEV(
-      critChance + pc + pp((p) => p.kind === 'autoCritChance') + (gear?.critChance ?? 0),
-      critExtra + pd + pp((p) => p.kind === 'autoCritDamage') + (gear?.critExtra ?? 0),
+      // D95: Low Blow / Savage Blow count on auto attacks too.
+      critChance + pc + pp((p) => p.kind === 'autoCritChance') + (gear?.critChance ?? 0) + (model.charms?.critChance ?? 0),
+      critExtra + pd + pp((p) => p.kind === 'autoCritDamage') + (gear?.critExtra ?? 0) + (model.charms?.critExtra ?? 0),
     );
     base = hit * targets * autoMix * crit * (model.damageMult ?? 1) * mult * (gear?.mult ?? 1);
   }

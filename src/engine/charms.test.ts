@@ -41,6 +41,17 @@ describe('D93: charms', () => {
     expect(charmModel('druid', 800, { mode: 'hunt' }, half, [{ id: 'lowBlow', stage: 3, monsterId: dl.id }])!.critChance).toBeCloseTo(4.5, 6);
   });
 
+  it('D95: crit charms reach auto attacks of a proficiency weapon; gains are on the built wheel', () => {
+    const pal = { ...base, vocation: 'paladin' as const, monsters: [spot[0]], character: { level: 800 }, weapons: [{ weaponId: 'sanguine-bow', level: 7 }] };
+    const plain = optimize(pal);
+    const r = optimize({ ...pal, charms: [{ id: 'lowBlow', stage: 3 }] });
+    expect(r.charms!.map((p) => p.id)).toEqual(['lowBlow']);
+    // +9 pp crit chance: at least ×(1 + 0.19 × 0.5) / (1 + 0.1 × 0.5) on auto attacks (the bow's perks add crit damage).
+    expect(r.rotation!.window!.autoAttack / plain.rotation!.window!.autoAttack).toBeGreaterThan(1.095 / 1.05);
+    expect(r.charms![0].gain).toBeGreaterThan(0);
+    expect(r.rotation!.window!.total).toBeGreaterThan(plain.rotation!.window!.total * (1 + r.charms![0].gain / 200));
+  });
+
   it('owned charms and stored prefs: known ids, valid stages, no duplicates', () => {
     expect(ownedCharms([{ id: 'zap', stage: 1 }, { id: 'zap', stage: 3 }, { id: 'nope' as 'zap', stage: 2 }, { id: 'wound', stage: 4 as 3 }])).toEqual([{ id: 'zap', stage: 3 }]);
     expect(sanitizeGear({ charms: [{ id: 'carnage', stage: 2 }, { id: 'carnage', stage: 1 }, { id: 'x', stage: 1 }] }, 'druid').charms).toEqual([{ id: 'carnage', stage: 2 }]);

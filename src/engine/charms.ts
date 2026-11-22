@@ -4,7 +4,7 @@
  */
 import type { CharmAssign, OwnedCharm } from '../types';
 import { CHARM_IDS } from '../data/charms';
-import { charmModel, critEV, NO_BONUS, rotationTotal, type SpellModel } from './spells';
+import { charmModel, critEV, NO_BONUS, rotationTotal, type RotationInput, type SpellModel } from './spells';
 
 /** Known charms, unique (the highest stage kept), stages 1..3. */
 export function ownedCharms(raw: readonly OwnedCharm[] | undefined): OwnedCharm[] {
@@ -30,16 +30,21 @@ export interface CharmAssignment {
   picks: CharmAssign[];
   /** Damage gain (%) of each pick alone, same order. */
   gains: number[];
+  /** Damage gain (%) of any charm on any creature of the spot, alone (0 = unknown / none). */
+  gainOf: (c: CharmAssign) => number;
 }
 
-/** Best assignment on a planned model (its rotation plan set). */
-export function assignCharms(model: SpellModel, owned: readonly OwnedCharm[]): CharmAssignment {
+/**
+ * Best assignment on a planned model (its rotation plan set), for the wheel bonuses `r` (D95: the built wheel; crit
+ * charms scale with the wheel's damage, flat charm hits do not).
+ */
+export function assignCharms(model: SpellModel, owned: readonly OwnedCharm[], r: RotationInput = NO_BONUS): CharmAssignment {
   const monsters = model.monsters.map((m) => m.monster.id);
-  if (!owned.length || !monsters.length) return { picks: [], gains: [] };
+  if (!owned.length || !monsters.length) return { picks: [], gains: [], gainOf: () => 0 };
   const plain = withCharmPicks(model, []);
-  const t0 = Math.max(1, rotationTotal(plain, NO_BONUS));
+  const t0 = Math.max(1, rotationTotal(plain, r));
   const value = monsters.map((monsterId) =>
-    owned.map((c) => Math.max(0, rotationTotal(withCharmPicks(plain, [{ ...c, monsterId }]), NO_BONUS) - t0)),
+    owned.map((c) => Math.max(0, rotationTotal(withCharmPicks(plain, [{ ...c, monsterId }]), r) - t0)),
   );
   // Exact: DP over creatures with the set of charms used (12 charms at most).
   const n = owned.length;
@@ -61,5 +66,10 @@ export function assignCharms(model: SpellModel, owned: readonly OwnedCharm[]): C
     .map((c, m) => (c < 0 ? null : { pick: { ...owned[c], monsterId: monsters[m] }, gain: (100 * value[m][c]) / t0 }))
     .filter((x): x is { pick: CharmAssign; gain: number } => !!x)
     .sort((a, b) => b.gain - a.gain);
-  return { picks: rows.map((r) => r.pick), gains: rows.map((r) => r.gain) };
+  const gainOf = (c: CharmAssign) => {
+    const m = monsters.indexOf(c.monsterId);
+    const k = owned.findIndex((o) => o.id === c.id && o.stage === c.stage);
+    return m < 0 || k < 0 ? 0 : (100 * value[m][k]) / t0;
+  };
+  return { picks: rows.map((r) => r.pick), gains: rows.map((r) => r.gain), gainOf };
 }

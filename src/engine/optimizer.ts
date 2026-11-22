@@ -8,7 +8,7 @@ import type {
   AlternativeBuild,
   CharacterStats,
   CharmAssign,
-  CharmResult,
+  OwnedCharm,
   Domain,
   EngineMessage,
   Element,
@@ -46,7 +46,7 @@ import type { WheelVariant } from '../types';
 import { resolveCharacterStats } from '../data/character';
 import { GEAR_SLOTS, getItem } from '../data/equipment';
 import { gearEffects, type WornGear } from './gear';
-import { assignCharms, ownedCharms } from './charms';
+import { assignCharms, ownedCharms, type CharmAssignment } from './charms';
 import { getCharm } from '../data/charms';
 import { BALLISTIC_MASTERY, healingAverage, pierceDamageMod, POSITIONAL_TACTICS, TURN_SECONDS } from '../data/damage';
 import { customPreset, getRotationPresets } from '../data/damage/rotations';
@@ -779,13 +779,20 @@ const PER_MINUTE = 60 / TURN_SECONDS;
 /** D67: damage window shown under the rotation (s). */
 const DAMAGE_WINDOW = 30;
 
-function rotationUsage(p: Prepared, stages: number[], alloc: ArrayLike<number>, vessels: readonly VesselAssignment[]): RotationUsage {
+/** Rotation bonuses of a built wheel (revelation stages, full augments, flat damage). */
+function wheelRotation(p: Prepared, stages: number[], alloc: ArrayLike<number>, vessels: readonly VesselAssignment[]) {
   const { v, wheel } = p;
   const augments = wheel.slices.filter((s) => s.kind === 'augment' && isFull(wheel, alloc, s.idx)).map((s) => s.tile);
-  const mods = augmentMods(v, augments);
   const vesselSlices = wheel.vesselTiles.filter((i) => isFull(wheel, alloc, i)).length;
   const flat = stages.reduce((a, st) => a + REVELATION_FLAT_BONUS[st], 0) + vesselFlat(wheel, vesselSlices, vessels);
-  const rot = rotation(v.model, { stages, mods, flat });
+  return { stages, mods: augmentMods(v, augments), flat };
+}
+
+function rotationUsage(p: Prepared, stages: number[], alloc: ArrayLike<number>, vessels: readonly VesselAssignment[]): RotationUsage {
+  const { v, wheel } = p;
+  const wr = wheelRotation(p, stages, alloc, vessels);
+  const mods = wr.mods;
+  const rot = rotation(v.model, wr);
   const turns = DAMAGE_WINDOW / TURN_SECONDS;
   const spells: RotationUsage['spells'] = [];
   for (const [name, x] of rot.rates) {
@@ -1942,9 +1949,8 @@ export function pickStances(input: OptimizerInput, preset: RotationPreset | null
   return { stances: best.stances, v: best.v ?? undefined };
 }
 
-/** D93: charms for the spot, assigned on the plain model of the chosen (else the best) rotation. */
-function charmsFor(input: OptimizerInput): { picks: CharmAssign[]; results: CharmResult[] } | null {
-  const owned = ownedCharms(input.charms);
+/** D93: first guess of the charms, assigned on the plain model (no wheel) of the chosen (else the best) rotation. */
+function charmsFor(input: OptimizerInput, owned: readonly OwnedCharm[]): CharmAssignment | null {
   if (!owned.length) return null;
   const { charmPicks: _p, ...plain } = input;
   const mi = modelInputs(plain);
@@ -1952,17 +1958,22 @@ function charmsFor(input: OptimizerInput): { picks: CharmAssign[]; results: Char
   const all = getRotationPresets(input.vocation);
   const plans: (RotationPreset | null)[] = chosen ? [chosen] : [...all, ...(input.context?.mode === 'boss' || !all.length ? [null] : [])];
   const preset = plans.reduce((a, b) => (planTotal(mi.model, b) > planTotal(mi.model, a) ? b : a));
-  const { picks, gains } = assignCharms({ ...mi.model, plan: planFor(mi.model, preset) }, owned);
-  const name = (id: string) => mi.monsters.find((m) => m.monster.id === id)?.monster.name ?? id;
-  return { picks, results: picks.map((c, i) => ({ ...c, monsterName: name(c.monsterId), gain: Math.round(gains[i] * 100) / 100 })) };
+  return assignCharms({ ...mi.model, plan: planFor(mi.model, preset) }, owned);
 }
 
-export function runOptimizer(raw: OptimizerInput): OptimizerResult {
-  const worn = wearBest(raw);
-  const dressed0 = worn ? { ...raw, equipment: worn.gear.effects, wornPieces: worn.wornPieces, ...(worn.twoHanded ? { equipmentTwoHanded: worn.twoHanded } : {}) } : raw;
-  const charms = charmsFor(dressed0);
-  const dressed = charms?.picks.length ? { ...dressed0, charmPicks: charms.picks } : dressed0;
-  const input = dressed.gems?.length ? { ...dressed, gems: withSharedGrades(dressed.gems) } : dressed;
+/** D95: re-assignment passes on the built wheel (the wheel is rebuilt when the charms change). */
+const CHARM_PASSES = 2;
+
+interface Solved {
+  input: OptimizerInput;
+  p: Prepared;
+  main: State;
+  result: OptimizerResult;
+}
+
+function solve(dressed: OptimizerInput, picks: readonly CharmAssign[]): Solved {
+  const charmed = picks.length ? { ...dressed, charmPicks: [...picks] } : dressed;
+  const input = charmed.gems?.length ? { ...charmed, gems: withSharedGrades(charmed.gems) } : charmed;
   const { p, plans, main } = bestBuild(input);
   const n = Math.max(0, Math.min(5, Math.floor(input.alternatives ?? DEFAULT_ALTERNATIVES)));
   const count = Number.isFinite(n) ? n : DEFAULT_ALTERNATIVES;
@@ -1971,13 +1982,48 @@ export function runOptimizer(raw: OptimizerInput): OptimizerResult {
   if (input.compareWith) result.comparison = compareWheel(p, result, input.compareWith);
   const weapon = weaponResult(p, main);
   if (weapon) result.weapon = weapon;
+  return { input, p, main, result };
+}
+
+/** D95: charms assigned on the built wheel of a solved build. */
+function charmsOnWheel(s: Solved, owned: readonly OwnedCharm[]): CharmAssignment {
+  const r = wheelRotation(s.p, s.result.revelations.map((x) => x.stage), s.main.alloc, s.result.vessels);
+  return assignCharms(s.p.v.model, owned, r);
+}
+
+const pickKey = (picks: readonly CharmAssign[]) => picks.map((c) => `${c.monsterId}:${c.id}:${c.stage}`).sort().join(',');
+
+export function runOptimizer(raw: OptimizerInput): OptimizerResult {
+  const worn = wearBest(raw);
+  const dressed = worn ? { ...raw, equipment: worn.gear.effects, wornPieces: worn.wornPieces, ...(worn.twoHanded ? { equipmentTwoHanded: worn.twoHanded } : {}) } : raw;
+  const owned = ownedCharms(dressed.charms);
+  const first = charmsFor(dressed, owned);
+  let s = solve(dressed, first?.picks ?? []);
+  let charms: CharmAssignment | null = null;
+  if (first) {
+    // D95: the wheel changes what charms are worth (crit charms scale with its damage, flat charm hits do not):
+    // assign on the built wheel and rebuild it while the assignment changes.
+    for (let pass = 0; ; pass++) {
+      charms = charmsOnWheel(s, owned);
+      if (pickKey(charms.picks) === pickKey(s.input.charmPicks ?? []) || pass >= CHARM_PASSES) break;
+      s = solve(dressed, charms.picks);
+    }
+  }
+  const { input, p, result } = s;
   if (worn) {
     const off = !!worn.twoHanded && p.weapon?.weapon.hands === 2;
     const lo = p.weapon && choiceLoadout(p.weapon);
     const effects = (lo && equipmentWith(input, lo)) ?? worn.gear.effects;
     result.gear = { ...worn.gear, effects, ...(off ? { offhandOff: true } : {}) };
   }
-  if (charms) result.charms = charms.results;
+  if (charms) {
+    // The charms the build uses, with their gain on the built wheel.
+    const name = (id: string) => p.v.model.monsters.find((m) => m.monster.id === id)?.monster.name ?? id;
+    const gainOf = charms.gainOf;
+    result.charms = (input.charmPicks ?? [])
+      .map((c) => ({ ...c, monsterName: name(c.monsterId), gain: Math.round(gainOf(c) * 100) / 100 }))
+      .sort((a, b) => b.gain - a.gain);
+  }
   return result;
 }
 
