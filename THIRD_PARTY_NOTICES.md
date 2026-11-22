@@ -67,7 +67,8 @@ license for its data; on request of its owners the data will be removed or repla
 
 Some spell cooldowns, stance values, a few wand damage values, imbuement protection values, the stacking of
 protections, the offensive charm values (chances, damage, caps), the character's own critical hit and the Strike
-imbuement values were checked against TibiaWiki
+imbuement values were checked against TibiaWiki, and the item augments (spell, effect, value) are read from its item
+infoboxes through the MediaWiki API (`scripts/import-item-augments.mjs`)
 (https://tibia.fandom.com). Only individual facts (numbers) are used; no wiki text is copied. TibiaWiki text is
 licensed under CC BY-SA.
 

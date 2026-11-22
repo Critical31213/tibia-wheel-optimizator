@@ -77,6 +77,7 @@ import { type EngineMessageKey, text } from './messages';
 import {
   buildSpellModel,
   elementMultiplier,
+  damageShare,
   healShare,
   NO_STAGES,
   NO_BONUS,
@@ -1077,8 +1078,24 @@ function gearScorer(input: OptimizerInput): (fx: GearEffects) => number {
     const ruse = Math.min(50, fx.ruse) / 100;
     const ehp = ((100 - mitRef) / Math.max(50, 100 - mit)) / Math.max(0.05, taken) / (1 - ruse);
     const def = 100 * (ehp - 1) * threat + 100 * leechEhp(mi.model, threat, fx.lifeLeech ?? K.LIFE_LEECH_IMBUE[input.vocation]);
-    return blend({ off, def, util: 0 });
+    const aug = augmentSustain(mi.model, threat, fx.augments);
+    return blend({ off: off + aug.off, def: def + aug.def, util: 0 });
   };
+}
+
+/** D97: item augments outside the damage model: per-spell life / mana leech and base healing. */
+function augmentSustain(model: SpellModel, threat: number, augments: GearEffects['augments']): Parts {
+  let life = 0;
+  let mana = 0;
+  let heal = 0;
+  for (const a of augments ?? []) {
+    if (a.kind === 'lifeLeech' || a.kind === 'manaLeech') {
+      const share = damageShare(model, a.spell) / 100;
+      if (a.kind === 'lifeLeech') life += 100 * a.value * share;
+      else mana += 100 * a.value * share;
+    } else if (a.kind === 'baseHealing' && model.spells.get(a.spell)?.kind === 'healing') heal += 100 * a.value * healShare(model, a.spell);
+  }
+  return { off: mana * K.MANA_LEECH_OFF, def: (life ? 100 * leechEhp(model, threat, life) : 0) + heal * K.HEAL_EHP * threat, util: 0 };
 }
 
 /**

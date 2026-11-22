@@ -284,6 +284,27 @@ export interface GearModel {
   /** Total life leech % (undefined = default imbuements). */
   lifeLeech?: number;
   weaponImbues?: GearEffects['weaponImbues'];
+  /** D97: item augments. */
+  augments?: GearEffects['augments'];
+}
+
+/** D97: item augments on the spell model: base damage, crit chance / extra damage (fractions), cooldown (s). */
+function applyItemAugments(spells: Map<string, SpellEval>, augments: GearModel['augments']) {
+  for (const a of augments ?? []) {
+    const s = spells.get(a.spell);
+    if (!s) continue;
+    if (a.kind === 'cooldown') s.cd = (s.cd ?? 0) + a.value;
+    if (s.kind !== 'damage') continue;
+    if (a.kind === 'critChance') s.critChance = (s.critChance ?? 0) + 100 * a.value;
+    else if (a.kind === 'critDamage') s.critExtra = (s.critExtra ?? 0) + 100 * a.value;
+    else if (a.kind === 'baseDamage') {
+      const k = a.value;
+      s.hits = s.hits.map((h) => ({
+        main: { ...h.main, base: h.main.base + k * h.main.boost },
+        extra: h.extra && { ...h.extra, base: h.extra.base + k * h.extra.boost },
+      }));
+    }
+  }
 }
 
 /** Onslaught (fatal hit) extra damage. */
@@ -298,6 +319,7 @@ export function gearModel(g: GearEffects | undefined): GearModel | undefined {
     ...(g.conversion && g.conversion.pct > 0 ? { conversion: g.conversion } : {}),
     ...(g.lifeLeech !== undefined ? { lifeLeech: g.lifeLeech } : {}),
     ...(g.weaponImbues ? { weaponImbues: g.weaponImbues } : {}),
+    ...(g.augments?.length ? { augments: g.augments } : {}),
   };
 }
 
@@ -448,6 +470,8 @@ export function buildSpellModel(
       hits,
     });
   }
+
+  applyItemAugments(spells, gear?.augments);
 
   const attack = weaponAttack ?? weaponBracket(vocation, char.level, paladinWeaponFor(context.mode)).attack;
   const autoHit = autoAttackHit(vocation, char, attack);

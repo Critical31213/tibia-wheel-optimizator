@@ -499,6 +499,14 @@ export interface GearResult {
  * D74: equipment effects (items, imbuements, forge tiers) as the engine uses them. Skills are added to the
  * entered (base) skills only. Optional fields left undefined keep the default assumption.
  */
+/** D97: an item's bonus to one spell (item augment). */
+export interface ItemAugment {
+  spell: string;
+  kind: 'baseDamage' | 'baseHealing' | 'critDamage' | 'critChance' | 'cooldown' | 'lifeLeech' | 'manaLeech';
+  /** Fraction (0.08 = +8 %) or seconds (cooldown). */
+  value: number;
+}
+
 export interface GearEffects {
   skills: { main: number; magic: number; shielding: number };
   /** Extra magic level for spells of an element (and healing). */
@@ -518,6 +526,8 @@ export interface GearEffects {
   /** Forge: Onslaught chance (%, +60 % damage), Ruse dodge chance (%). */
   onslaught: number;
   ruse: number;
+  /** D97: augments of the worn items (not the weapon: its augments come with the proficiency loadout). */
+  augments?: ItemAugment[];
 }
 
 /** D45: an owned weapon and its proficiency progress. Character skills are entered without weapon bonuses. */

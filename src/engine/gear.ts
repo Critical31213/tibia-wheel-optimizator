@@ -3,7 +3,7 @@
  * The choice of the set among the owned items is in `optimizer.ts` (`wearBest`).
  */
 import type { Element, GearEffects, GearImbue, GearPiece, GearSlot, MeleeSkill, Vocation, WeaponGear } from '../types';
-import { GEAR_SLOTS, getImbuement, getItem, INTRINSIC_CRIT, tierChance, type ItemSkill } from '../data/equipment';
+import { GEAR_SLOTS, getImbuement, getItem, INTRINSIC_CRIT, itemAugments, tierChance, type ItemSkill } from '../data/equipment';
 import { K } from './values';
 
 /** One item (or none) per slot. */
@@ -94,7 +94,9 @@ export function gearEffects(g: WornGear, vocation: Vocation, meleeSkill: MeleeSk
     : undefined;
 
   const amp = 1 + tierChance('amplification', g.pieces.boots?.tier ?? 0) / 100;
+  const augments = GEAR_SLOTS.flatMap((s) => (g.pieces[s] ? itemAugments(g.pieces[s]!.itemId) : []));
   return {
+    ...(augments.length ? { augments } : {}),
     skills: { main, magic: t.skills.magic ?? 0, shielding: t.skills.shielding ?? 0 },
     elementMl: t.elementMl,
     resist: t.resist,

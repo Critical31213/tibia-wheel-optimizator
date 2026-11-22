@@ -408,7 +408,9 @@ export function spellBundleParts(
 export function avatarParts(v: ValuationContext, stage: number, cdReduction = 0): Parts {
   if (v.context.mode !== 'boss' || stage < 1) return ZERO;
   const extra = [0.05, 0.1, 0.15][stage - 1];
-  const cdMin = Math.max([120, 90, 60][stage - 1] * 0.5, [120, 90, 60][stage - 1] - cdReduction / 60);
+  // D97: item augments shorten the avatar's cooldown (s).
+  const items = (v.model.gear?.augments ?? []).reduce((a, x) => a + (x.kind === 'cooldown' && x.spell.startsWith('Avatar of') ? x.value : 0), 0);
+  const cdMin = Math.max([120, 90, 60][stage - 1] * 0.5, [120, 90, 60][stage - 1] - (cdReduction + items) / 60);
   const fights = Math.min(1, K.BOSS_INTERVAL_MIN / cdMin);
   const uptime = K.AVATAR_DURATION_S / K.BOSS_FIGHT_S;
   const boost = (1 + 0.5 + extra) / (1 + 0.1 * 0.5) - 1;

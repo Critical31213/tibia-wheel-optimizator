@@ -37,7 +37,7 @@ export const PROF = {
   VOID_MANA_LEECH: 8,
 } as const;
 
-import { INTRINSIC_CRIT, noCritImbue, noLifeLeechImbue, noManaLeechImbue } from '../data/equipment';
+import { INTRINSIC_CRIT, itemAugments, noCritImbue, noLifeLeechImbue, noManaLeechImbue } from '../data/equipment';
 export { noCritImbue, noLifeLeechImbue, noManaLeechImbue };
 
 export interface Loadout {
@@ -63,8 +63,18 @@ export function levelOptions(owned: Pick<OwnedWeapon, 'level' | 'shaped'>, weapo
 }
 
 export function loadoutOf(weapon: Weapon, options: Perk[][], choice: readonly number[], ammo?: Ammo): Loadout {
-  const perks = options.map((o, i) => o[Math.min(o.length - 1, Math.max(0, choice[i] ?? 0))]);
+  const perks = [...options.map((o, i) => o[Math.min(o.length - 1, Math.max(0, choice[i] ?? 0))]), ...weaponAugments(weapon.id)];
   return ammo ? { weapon, perks, ammo } : { weapon, perks };
+}
+
+/** D97: the weapon's own augments as augment perks (cooldown perks are negative seconds). */
+function weaponAugments(id: string): Perk[] {
+  return itemAugments(id).map((a) => ({
+    kind: 'augment',
+    spell: a.spell,
+    augment: a.kind === 'baseHealing' ? 'healing' : a.kind,
+    value: a.kind === 'cooldown' ? -a.value : a.value,
+  }));
 }
 
 /** Owned weapon → weapon + its options (null for unknown weapons). */

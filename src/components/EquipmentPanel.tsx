@@ -10,6 +10,7 @@ import {
   imbuementsFor,
   imbueLevelFor,
   itemsFor,
+  itemAugments,
   maxTier,
   MAX_TIER,
   SLOT_ITEMS,
@@ -68,6 +69,8 @@ function itemBonusText(t: TFunction, i: EquipmentItem): string {
   for (const [e, v] of Object.entries(b?.resist ?? {})) parts.push(`${t(`element.${e}` as 'element.fire').toLowerCase()} ${v > 0 ? '+' : ''}${v}%`);
   if (b?.lifeLeech) parts.push(t('gear.lifeLeech', { v: b.lifeLeech }));
   if (i.defense) parts.push(t('gear.defense', { v: i.defense }));
+  // D97: augments (bonuses to one spell).
+  for (const a of itemAugments(i.id)) parts.push(t(`gear.augment.${a.kind}`, { spell: a.spell, v: a.kind === 'cooldown' ? a.value : Math.round(a.value * 1000) / 10 }));
   return parts.join(', ');
 }
 

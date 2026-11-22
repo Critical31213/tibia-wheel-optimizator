@@ -189,6 +189,19 @@ describe('engine with equipment', () => {
     expect(more).toBeGreaterThan(plain);
   });
 
+  it('D97: item augments: listed per worn item and applied to their spell', () => {
+    const g = worn({ legs: { itemId: 'sanguine-greaves' }, helmet: { itemId: 'moonsilver-trail-hood' } });
+    const aug = gearEffects(g, 'paladin', null).augments!;
+    expect(aug).toContainEqual({ spell: 'Divine Caldera', kind: 'critDamage', value: 0.08 });
+    expect(aug).toContainEqual({ spell: 'Avatar of Light', kind: 'cooldown', value: 900 });
+    const c = { level: 600, mainSkill: 110 };
+    const plain = buildSpellModel('paladin', { mode: 'hunt' }, null, c, undefined, undefined, fx({})).spells.get('Divine Caldera')!;
+    const with8 = buildSpellModel('paladin', { mode: 'hunt' }, null, c, undefined, undefined, fx({ augments: aug })).spells.get('Divine Caldera')!;
+    expect((with8.critExtra ?? 0) - (plain.critExtra ?? 0)).toBeCloseTo(8, 6);
+    const base = buildSpellModel('paladin', { mode: 'hunt' }, null, c, undefined, undefined, fx({ augments: [{ spell: 'Divine Caldera', kind: 'baseDamage', value: 0.1 }] })).spells.get('Divine Caldera')!;
+    expect(base.hits[0].main.base).toBeGreaterThan(plain.hits[0].main.base);
+  });
+
   it('no Strike lowers damage; onslaught raises it', () => {
     const plain = buildSpellModel('knight', { mode: 'hunt' }, null, { level: 600, mainSkill: 110 }).total;
     const noStrike = buildSpellModel('knight', { mode: 'hunt' }, null, { level: 600, mainSkill: 110 }, undefined, undefined,
