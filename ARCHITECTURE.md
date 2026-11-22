@@ -70,7 +70,7 @@ RUNTIME (static SPA)
 │   ├── extract-wheel.mjs   # planner WASM → src/data/wheel/wheel-data.json
 │   ├── datamine-damage.mjs  # damage API → src/data/damage/spell-formulas.json
 │   ├── datamine-damage-meta.mjs # curated cooldowns / areas / healing formulas
-│   └── import-proficiency.mjs # TibiaPal trees + tibiopedia weapon stats → src/data/proficiency/proficiency.json
+│   └── import-proficiency.mjs # proficiency trees + tibiopedia weapon stats → src/data/proficiency/proficiency.json
 ├── public/favicon.svg
 ├── index.html
 ├── vite.config.ts          # React + Tailwind plugins, CSP meta, third-party-licenses.txt (D37), chunk size limit
