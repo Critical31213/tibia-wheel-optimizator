@@ -11,6 +11,7 @@ import {
   GEAR_SLOTS,
   getItem,
   imbuementsFor,
+  imbueLevelFor,
   maxTier,
   MAX_TIER,
   SLOT_ITEMS,
@@ -57,13 +58,14 @@ const int = (x: unknown, min: number, max: number): number | null =>
   typeof x === 'number' && Number.isInteger(x) && x >= min && x <= max ? x : null;
 
 export function sanitizeImbues(raw: unknown, slot: ImbueSlot, vocation: Vocation, max: number, item?: EquipmentItem, options?: readonly { id: string }[]): GearImbue[] {
-  const allowed = new Set((options ?? imbuementsFor(slot, vocation, item)).map((x) => x.id));
+  const allowed = new Map((options ?? imbuementsFor(slot, vocation, item)).map((x) => [x.id, x as { levels?: readonly GearImbue['level'][] }]));
   const out: GearImbue[] = [];
   for (const r of Array.isArray(raw) ? raw : []) {
     const id = typeof r?.id === 'string' ? r.id : '';
     const level = int(r?.level, 1, 3) as GearImbue['level'] | null;
+    const def = allowed.get(id);
     // One imbuement of each kind per item, as in the game.
-    if (out.length < max && allowed.has(id) && level && !out.some((x) => x.id === id)) out.push({ id, level });
+    if (out.length < max && def && level && !out.some((x) => x.id === id)) out.push({ id, level: imbueLevelFor(def, level) });
   }
   return out;
 }

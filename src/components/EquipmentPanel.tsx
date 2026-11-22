@@ -8,6 +8,7 @@ import {
   getItem,
   IMBUE_LEVELS,
   imbuementsFor,
+  imbueLevelFor,
   itemsFor,
   maxTier,
   MAX_TIER,
@@ -147,7 +148,7 @@ function ImbueEditor({ slot, vocation, item, weapon, count, value, onChange }: {
       <legend className="mb-1 text-xs text-parchment-300">{t('gear.imbues')}</legend>
       {Array.from({ length: Math.min(count, value.length + 1) }, (_, k) => {
         const c = value[k];
-        const d = c && getImbuement(c.id);
+        const d = c && (options.find((o) => o.id === c.id) ?? getImbuement(c.id));
         const taken = new Set(value.filter((_, j) => j !== k).map((x) => x.id));
         return (
           <div key={k} className="flex items-center gap-1.5">
@@ -155,7 +156,10 @@ function ImbueEditor({ slot, vocation, item, weapon, count, value, onChange }: {
             <select
               id={`${id}-${k}`}
               value={c?.id ?? ''}
-              onChange={(e) => set(k, e.target.value ? { id: e.target.value, level: c?.level ?? 3 } : null)}
+              onChange={(e) => {
+                const o = options.find((x) => x.id === e.target.value);
+                set(k, o ? { id: o.id, level: imbueLevelFor(o, c?.level ?? 3) } : null);
+              }}
               className="field min-w-0 flex-1 py-0.5 text-xs"
             >
               <option value="">{t('gear.imbueNone')}</option>
@@ -167,7 +171,7 @@ function ImbueEditor({ slot, vocation, item, weapon, count, value, onChange }: {
               <>
                 <label htmlFor={`${id}-${k}-l`} className="sr-only">{t('gear.imbueLevel')}</label>
                 <select id={`${id}-${k}-l`} value={c.level} onChange={(e) => set(k, { ...c, level: Number(e.target.value) as ImbueLevel })} className="field w-auto py-0.5 pr-7 text-xs">
-                  {IMBUE_LEVELS.map((l) => (
+                  {(d.levels ?? IMBUE_LEVELS).map((l) => (
                     <option key={l} value={l}>{`${t(`gear.level.${l}`)} (${imbueValueText(t, d, l)})`}</option>
                   ))}
                 </select>

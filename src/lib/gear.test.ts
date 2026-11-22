@@ -221,4 +221,12 @@ describe('engine with equipment', () => {
     expect(imbuementsFor('helmet', 'monk').some((x) => x.id === 'fist')).toBe(true);
     expect(getImbuement('lich-shroud')!.values).toEqual([2, 5, 10]);
   });
+
+  it('D96: Epiphany on helmets: any level on mage helmets, Intricate only on the others', () => {
+    const hood = getItem('moonsilver-trail-hood')!;
+    const epi = imbuementsFor('helmet', 'paladin', hood).find((x) => x.id === 'epiphany')!;
+    expect(epi.levels).toEqual([2]);
+    expect(imbuementsFor('helmet', 'sorcerer', getItem('cobra-crown')).find((x) => x.id === 'epiphany')!.levels).toBeUndefined();
+    expect(sanitizeGear({ pieces: { helmet: [{ itemId: hood.id, imbues: [{ id: 'epiphany', level: 3 }] }] } }, 'paladin').pieces.helmet![0].imbues).toEqual([{ id: 'epiphany', level: 2 }]);
+  });
 });

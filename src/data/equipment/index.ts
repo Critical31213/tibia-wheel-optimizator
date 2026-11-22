@@ -55,6 +55,8 @@ export interface ImbueDef {
   skill?: ItemSkill;
   element?: Element;
   slots: readonly ImbueSlot[];
+  /** D96: levels available on this item (all when unset). */
+  levels?: readonly (1 | 2 | 3)[];
 }
 
 const SKILL_SLOTS: readonly ImbueSlot[] = ['weapon', 'helmet', 'offhand'];
@@ -109,12 +111,18 @@ export function imbuementsFor(slot: ImbueSlot, vocation: Vocation, item?: Equipm
       x.slots.includes(slot) &&
       (!x.skill || skills.includes(x.skill)) &&
       !(x.group === 'damage' && MAGE.has(vocation)) &&
-      // D84: Epiphany only on mage-exclusive helmets.
-      !(x.skill === 'magic' && slot === 'helmet' && item && !item.vocations?.every((v) => MAGE.has(v))) &&
       !(x.group === 'protection' && x.element && own?.resist?.[x.element as keyof typeof own.resist]) &&
       !nativeOf(x, own),
-  );
+  ).map((x) => (x.skill === 'magic' && slot === 'helmet' && !mageHelmet(item) ? { ...x, levels: NON_MAGE_EPIPHANY } : x));
 }
+
+/** D96: on helmets that are not mage-exclusive Epiphany is Intricate only (Basic / Powerful: mage helmets; TibiaWiki). */
+const NON_MAGE_EPIPHANY = [2] as const;
+const mageHelmet = (item: EquipmentItem | undefined) => !!item?.vocations?.length && item.vocations.every((v) => MAGE.has(v));
+
+/** D96: the level kept for an imbuement (the highest allowed one when `level` is not available). */
+export const imbueLevelFor = (x: Pick<ImbueDef, 'levels'>, level: 1 | 2 | 3): 1 | 2 | 3 =>
+  !x.levels || x.levels.includes(level) ? level : x.levels[x.levels.length - 1];
 
 /** D83: a native critical hit, life or mana leech blocks Strike, Vampirism or Void. */
 const nativeOf = (x: ImbueDef, own: { critChance?: number; lifeLeech?: number; manaLeech?: number } | undefined) =>
