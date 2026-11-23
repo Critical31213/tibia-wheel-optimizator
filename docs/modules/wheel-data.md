@@ -135,7 +135,8 @@ assertions where they apply and adds:
 
 The old live wheel is retired with one switch; the current wheel does not depend on it.
 
-1. `npm run check:planner` (also a weekly workflow) fails once www.tibia.com has the new wheel.
+1. Check by hand that the official planner (www.tibia.com) has the new wheel (Gem Vessels). An automatic check
+   was removed (D98): the site serves an anti-bot challenge to scripts.
 2. Set `WHEEL_UPDATE_RELEASED = true` in `src/data/wheel/release.ts`. Effects: the variant toggle disappears,
    `live` requests / stored inputs / links fall back to `current` (`resolveWheelVariant`), old-wheel codes in
    "Compare with your wheel" are rejected with a message, and planner links go to www.tibia.com.

@@ -15,7 +15,6 @@
     "extract:wheel": "node scripts/extract-wheel.mjs",
     "extract:wheel-live": "node scripts/extract-wheel.mjs --live",
     "datamine:damage": "node scripts/datamine-damage.mjs",
-    "check:planner": "node scripts/check-live-planner.mjs",
     "import:proficiency": "node scripts/import-proficiency.mjs",
     "import:equipment": "node scripts/import-equipment.mjs",
     "import:augments": "node scripts/import-item-augments.mjs"

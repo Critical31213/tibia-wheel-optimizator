@@ -1,7 +1,7 @@
 /**
  * D90: release switch for the announced wheel update (D73).
  *
- * Set to `true` once the update is on the live servers (`npm run check:planner` fails). Then:
+ * Set to `true` by hand once the update is on the live servers (the official planner shows Gem Vessels). Then:
  * - the old live wheel (D88) is no longer offered: the toggle disappears, stored / linked `live` inputs and
  *   engine requests fall back to the current wheel, own-wheel codes of the old wheel are rejected;
  * - "Open planner" links go to www.tibia.com instead of the test server.
