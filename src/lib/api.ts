@@ -97,6 +97,13 @@ export function getSpotsWithMonster(id: string): readonly HuntingSpot[] {
   return data ? data.spotsWithMonster(id) : [];
 }
 
+/** D99: the hunting spot with exactly these monsters (any order and weights), if any. */
+export function spotOf(ids: readonly string[]): HuntingSpot | undefined {
+  if (ids.length < 2) return undefined;
+  const set = new Set(ids);
+  return getSpotsWithMonster(ids[0]).find((s) => s.monsters.length === set.size && s.monsters.every((m) => set.has(m.id)));
+}
+
 /** True when the spot's weights come from kill statistics (not all 1). */
 export const spotHasKillWeights = (s: HuntingSpot): boolean => s.monsters.some((m) => m.weight !== 1);
 

@@ -4,7 +4,7 @@ import { ATTACK_ELEMENTS } from '../types';
 import type { Monster, WeightedMonster } from '../types';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useT } from '../i18n';
-import { getSpotsWithMonster, searchMonsters, spotHasKillWeights, type HuntingSpot } from '../lib/api';
+import { getSpotsWithMonster, searchMonsters, spotHasKillWeights, spotOf, type HuntingSpot } from '../lib/api';
 import { MAX_MONSTERS, MAX_WEIGHT, MIN_WEIGHT, normalizeWeight } from '../lib/inputState';
 import type { MonsterEntry } from '../lib/inputState';
 import { cx, formatNumber, modifierKind } from '../lib/labels';
@@ -61,9 +61,10 @@ function CombinedCard({ list }: { list: WeightedMonster[] }) {
     .filter((m) => m.kind !== 'neutral')
     .sort((a, b) => b.percent - a.percent);
   const deals = combinedDamageTypes(list);
+  const spot = spotOf(list.map((w) => w.monster.id));
   return (
     <div className="rounded-xl border border-ink-600 bg-ink-950/50 p-3">
-      <h3 className="text-sm text-parchment-50">{t('monster.combined')}</h3>
+      <h3 className="text-sm text-parchment-50">{spot ? spot.name : t('monster.combined')}</h3>
       <p className="mt-2 mb-1 text-xs text-parchment-400">{t('card.takes')}</p>
       {mods.length ? (
         <ul className="flex flex-wrap gap-1.5" aria-label={t('card.modifiers')}>

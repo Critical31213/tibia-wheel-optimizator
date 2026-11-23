@@ -156,7 +156,7 @@ npx vitest run src/data                 # validate the new JSON
   each of its creatures is found in the statistics and appears in no other hunting place; otherwise every weight is 1.
 - API: `spotsWithMonster(id)` (`src/data/spots.ts`): spots with the monster, the ones where it has the largest share
   first. The spot panel shows up to three of them after the first monster is chosen; a click replaces the list with
-  the spot's creatures (the chosen monster first).
+  the spot's creatures (the chosen monster first). While the list holds exactly the creatures of a spot (any weights), the combined card is titled with the spot's name (`spotOf`).
 
 ## Known limitations
 

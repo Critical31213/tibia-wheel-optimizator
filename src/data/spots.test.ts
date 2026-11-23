@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { getMonsterById } from '.';
 import { SPOTS, spotsWithMonster } from './spots';
+import { loadMonsterData, spotOf } from '../lib/api';
 
 describe('hunting spots (D99)', () => {
   it('lists known monsters, 2–10 per spot, positive weights', () => {
@@ -22,6 +23,15 @@ describe('hunting spots (D99)', () => {
     const w = Object.fromEntries(s.monsters.map((m) => [m.id, m.weight]));
     expect(w['mega-dragon']).toBeLessThan(w.dragolisk);
     expect(spotsWithMonster('hellspawn').some((x) => x.monsters.every((m) => m.weight === 1))).toBe(true);
+  });
+
+  it('names the spot only for exactly its monsters', async () => {
+    await loadMonsterData();
+    const s = spotsWithMonster('dragolisk')[0];
+    const ids = s.monsters.map((m) => m.id);
+    expect(spotOf([...ids].reverse())?.name).toBe(s.name);
+    expect(spotOf(ids.slice(0, 2))).toBeUndefined();
+    expect(spotOf([...ids, 'dragon'])).toBeUndefined();
   });
 
   it('puts the spot where the monster is the largest share first', () => {
