@@ -4,13 +4,15 @@ import { ATTACK_ELEMENTS } from '../types';
 import type { Monster, WeightedMonster } from '../types';
 import { useDebouncedValue } from '../hooks/useDebouncedValue';
 import { useT } from '../i18n';
-import { searchMonsters } from '../lib/api';
+import { getSpotsWithMonster, searchMonsters, spotHasKillWeights, type HuntingSpot } from '../lib/api';
 import { MAX_MONSTERS, MAX_WEIGHT, MIN_WEIGHT, normalizeWeight } from '../lib/inputState';
 import type { MonsterEntry } from '../lib/inputState';
 import { cx, formatNumber, modifierKind } from '../lib/labels';
 import { combinedDamageTypes, combinedModifiers } from '../lib/monsters';
 import { ElementChip, MonsterCard } from './MonsterCard';
 import { Panel } from './Panel';
+
+const MAX_SPOT_SUGGESTIONS = 3;
 
 interface MonsterSearchProps {
   /** Monsters of the hunting spot (resolved from the dataset). */
@@ -82,6 +84,37 @@ function CombinedCard({ list }: { list: WeightedMonster[] }) {
           </ul>
         </>
       )}
+    </div>
+  );
+}
+
+/** D99: after the first monster, offers the rest of a hunting spot it lives on. */
+function SpotSuggest({ first, onAdd }: { first: WeightedMonster; onAdd: (entries: MonsterEntry[]) => void }) {
+  const t = useT();
+  const spots = getSpotsWithMonster(first.monster.id).slice(0, MAX_SPOT_SUGGESTIONS);
+  if (!spots.length) return null;
+  const add = (s: HuntingSpot) => {
+    const own = s.monsters.find((m) => m.id === first.monster.id);
+    const rest = s.monsters.filter((m) => m.id !== first.monster.id);
+    onAdd([{ id: first.monster.id, weight: own?.weight ?? first.weight }, ...rest].slice(0, MAX_MONSTERS));
+  };
+  return (
+    <div className="rounded-xl border border-ink-600 bg-ink-950/50 px-3 py-2">
+      <p className="text-xs text-parchment-300">{t('monster.spotSuggest')}</p>
+      <ul className="mt-1.5 flex flex-wrap gap-1.5">
+        {spots.map((s) => (
+          <li key={s.name}>
+            <button
+              type="button"
+              onClick={() => add(s)}
+              title={t(spotHasKillWeights(s) ? 'monster.spotKills' : 'monster.spotEqual')}
+              className="rounded-lg border border-gold-700/60 px-2 py-1 text-xs text-gold-300 hover:bg-gold-700/25"
+            >
+              {t('monster.spotAdd', { spot: s.name, n: s.monsters.length - 1 })}
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -232,6 +265,7 @@ export function MonsterSearch({ value, ready, onChange }: MonsterSearchProps) {
                 </li>
               ))}
             </ul>
+            {value.length === 1 && <SpotSuggest first={value[0]} onAdd={onChange} />}
             {value.length === 1 ? <MonsterCard monster={value[0].monster} /> : <CombinedCard list={value} />}
           </>
         ) : (

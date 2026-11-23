@@ -88,6 +88,10 @@ export const pl: Dictionary = {
   'monster.loading': 'Wczytywanie danych potworów…',
   'monster.generic': 'Brak potwora (build ogólny)',
   'monster.hp': '{hp} HP',
+  'monster.spotSuggest': 'Dodać pozostałe potwory z expowiska?',
+  'monster.spotAdd': '{spot} (+{n})',
+  'monster.spotKills': 'Wagi według tygodniowych statystyk zabić',
+  'monster.spotEqual': 'Wagi 1 (brak pewnych danych), ustaw je sam',
 
   'card.source': 'Źródło',
   'card.hp': 'HP',

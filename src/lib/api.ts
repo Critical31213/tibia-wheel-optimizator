@@ -9,6 +9,7 @@
  */
 import { useEffect, useSyncExternalStore } from 'react';
 import type { Monster, OptimizerResult, Vocation } from '../types';
+import type { HuntingSpot } from '../data/spots';
 import { getWheelData, getWheelSpellNames } from '../data/wheel';
 import { getCustomRotationSpells } from '../data/damage/rotations';
 export { wheelVariants } from '../data/wheel';
@@ -88,6 +89,16 @@ export function searchMonsters(query: string, limit = 10): Monster[] {
 export function getMonsterById(id: string): Monster | undefined {
   return data?.getMonsterById(id);
 }
+
+export type { HuntingSpot };
+
+/** D99: hunting spots with the monster (empty until the data chunk is loaded). */
+export function getSpotsWithMonster(id: string): readonly HuntingSpot[] {
+  return data ? data.spotsWithMonster(id) : [];
+}
+
+/** True when the spot's weights come from kill statistics (not all 1). */
+export const spotHasKillWeights = (s: HuntingSpot): boolean => s.monsters.some((m) => m.weight !== 1);
 
 // D47: weapon proficiency (weapon data is small and bundled).
 export { getAmmo, getShapingOption, getWeapon, iconKeys, perkIcon, searchWeapons, shapingId, shapingOptions } from '../data/proficiency';

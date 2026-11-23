@@ -94,6 +94,10 @@ export const en = {
   'monster.loading': 'Loading monster data…',
   'monster.generic': 'No monster (generic build)',
   'monster.hp': '{hp} HP',
+  'monster.spotSuggest': 'Add the other monsters of the hunting spot?',
+  'monster.spotAdd': '{spot} (+{n})',
+  'monster.spotKills': 'Weights from weekly kill statistics',
+  'monster.spotEqual': 'Weights 1 (no reliable data), set them yourself',
 
   'card.source': 'Source',
   'card.hp': 'HP',

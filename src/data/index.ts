@@ -8,6 +8,7 @@
 import type { Element, Monster } from '../types';
 import { ATTACK_ELEMENTS } from '../types';
 import monstersJson from './monsters.json';
+export { spotsWithMonster, type HuntingSpot } from './spots';
 
 /** All known monsters, sorted by name. */
 export const MONSTERS: Monster[] = monstersJson;

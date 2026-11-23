@@ -68,9 +68,16 @@ license for its data; on request of its owners the data will be removed or repla
 Some spell cooldowns, stance values, a few wand damage values, imbuement protection values, the stacking of
 protections, the offensive charm values (chances, damage, caps), the character's own critical hit and the Strike
 imbuement values were checked against TibiaWiki, and the item augments (spell, effect, value) are read from its item
-infoboxes through the MediaWiki API (`scripts/import-item-augments.mjs`)
+infoboxes through the MediaWiki API (`scripts/import-item-augments.mjs`), and the creatures of each hunting place are
+read from its `CreatureList` (`scripts/import-hunting-spots.mjs`)
 (https://tibia.fandom.com). Only individual facts (numbers) are used; no wiki text is copied. TibiaWiki text is
 licensed under CC BY-SA.
+
+## TibiaData
+
+The hunting spot weights are shares of the weekly kill statistics of all worlds (© CipSoft GmbH, published on
+tibia.com), read offline through the TibiaData API (https://api.tibiadata.com, `scripts/import-hunting-spots.mjs`).
+Only the kill counts are used, summed over the worlds and turned into shares; the app makes no requests to the API.
 
 ## TibiaWiki BR
 
