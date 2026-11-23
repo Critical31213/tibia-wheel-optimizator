@@ -5,7 +5,7 @@ import { loadMonsterData, spotOf } from '../lib/api';
 
 describe('hunting spots (D99)', () => {
   it('lists known monsters, 2–10 per spot, positive weights', () => {
-    expect(SPOTS.length).toBeGreaterThan(300);
+    expect(SPOTS.length).toBeGreaterThan(150);
     for (const s of SPOTS) {
       expect(s.monsters.length).toBeGreaterThanOrEqual(2);
       expect(s.monsters.length).toBeLessThanOrEqual(10);

@@ -9,7 +9,7 @@
  * - TibiaData: last-week kill statistics of every world (tibia.com kill statistics), summed.
  *
  * Kept creatures: known monsters (src/data/monsters.json) with a bestiary class (no bosses); places with at least
- * two of them. Weights: the creatures' share of weekly kills (%) when every creature of the place is found in the kill
+ * two of them, recommended above level 100 (MIN_LEVEL). Weights: the creatures' share of weekly kills (%) when every creature of the place is found in the kill
  * statistics and lives in no other hunting place (its kills then come from this place); otherwise 1 for all.
  * At most MAX creatures per place, the most killed first.
  *
@@ -27,6 +27,8 @@ const TIBIADATA = 'https://api.tibiadata.com/v4';
 const UA = { 'User-Agent': 'wheel-optimizer-research' };
 const MAX = 10;
 const RARE = 0.01;
+/** Places whose highest recommended level is at most this are left out (they still count for shared creatures). */
+const MIN_LEVEL = 100;
 const refresh = process.argv.includes('--refresh');
 
 mkdirSync(CACHE, { recursive: true });
@@ -63,7 +65,12 @@ for (let i = 0; i < titles.length; i += 50) {
         if (m && !ids.includes(m.id)) ids.push(m.id);
       }
     }
-    if (ids.length >= 2) places.push({ name: p.title, ids });
+    // Highest recommended level of any vocation ("600?", "80+", "25-50"); unknown = kept.
+    const levels = ['lvlknights', 'lvlpaladins', 'lvlmages'].flatMap((k) =>
+      (text.match(new RegExp(`\\|\\s*${k}\\s*=\\s*([^|\\n}]*)`))?.[1] ?? '').match(/\d+/g)?.map(Number) ?? [],
+    );
+    const level = levels.length ? Math.max(...levels) : undefined;
+    if (ids.length >= 2) places.push({ name: p.title, ids, low: level !== undefined && level <= MIN_LEVEL });
   }
 }
 
@@ -77,7 +84,7 @@ const SPLIT = {
 for (const [place, parts] of Object.entries(SPLIT)) {
   const i = places.findIndex((p) => p.name === place);
   if (i < 0) throw new Error(`split: no place ${place}`);
-  const split = Object.entries(parts).map(([name, list]) => ({ name, ids: list.map((n) => byName.get(norm(n))?.id ?? fail(`split: unknown ${n}`)) }));
+  const split = Object.entries(parts).map(([name, list]) => ({ name, low: places[i].low, ids: list.map((n) => byName.get(norm(n))?.id ?? fail(`split: unknown ${n}`)) }));
   places.splice(i, 1, ...split);
 }
 function fail(msg) {
@@ -106,6 +113,7 @@ for (const p of places) for (const id of p.ids) placesOf.set(id, (placesOf.get(i
 
 let weighted = 0;
 const spots = places.flatMap((p) => {
+  if (p.low) return [];
   const all = p.ids.map((id) => ({ id, kills: killsOf(id) }));
   // Rare creatures (bosses with a bestiary entry, event creatures): under RARE of the most killed one.
   const most = Math.max(0, ...all.map((x) => x.kills ?? 0));

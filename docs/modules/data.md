@@ -151,7 +151,8 @@ npx vitest run src/data                 # validate the new JSON
 - Spots: pages of TibiaWiki `Category:Hunting_Places` (MediaWiki API); creatures from their `{{CreatureList}}`,
   matched by name to `monsters.json`. Only creatures with a bestiary class (no bosses); creatures killed less than 1 %
   as often as the most killed creature of the spot are dropped; at most 10 per spot (most killed first); spots with
-  fewer than two creatures are skipped. Places hunted as separate spots are split by hand (`SPLIT` in the script, e.g.
+  fewer than two creatures are skipped, and so are places whose highest recommended level (wiki infobox, any vocation)
+  is 100 or less (they still count when checking whether a creature lives on one spot only). Places hunted as separate spots are split by hand (`SPLIT` in the script, e.g.
   Podzilla → Podzilla Quaras, Podzilla Rootthings); creatures not listed there are dropped.
 - Weights: last-week kills of every world (TibiaData kill statistics), summed. A spot gets kill shares (%) only when
   each of its creatures is found in the statistics and appears in no other hunting place; otherwise every weight is 1.
