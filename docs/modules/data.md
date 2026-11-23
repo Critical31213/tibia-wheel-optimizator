@@ -153,7 +153,11 @@ npx vitest run src/data                 # validate the new JSON
   as often as the most killed creature of the spot are dropped; at most 10 per spot (most killed first); spots with
   fewer than two creatures are skipped, and so are places whose highest recommended level (wiki infobox, any vocation)
   is 100 or less (they still count when checking whether a creature lives on one spot only). Places hunted as separate spots are split by hand (`SPLIT` in the script, e.g.
-  Podzilla → Podzilla Quaras, Podzilla Rootthings); creatures not listed there are dropped.
+  Podzilla → Podzilla Quaras, Podzilla Rootthings; Book World → Chapters II–IV); creatures not listed there are dropped.
+- Curation (D100, `scripts/hunting-spots.overrides.json`, keyed by wiki title): `remove` drops marginal creatures from
+  the spot's top 10 (they still count as living there for the weights); `display` shows the spot under its common
+  name; `names` adds other common names. Spots carry `aliases` (the other names, incl. the wiki title when renamed),
+  shown as a tooltip on the spot button and the combined card. The script fails on an unknown place or creature.
 - Weights: last-week kills of every world (TibiaData kill statistics), summed. A spot gets kill shares (%) only when
   each of its creatures is found in the statistics and appears in no other hunting place; otherwise every weight is 1.
 - API: `spotsWithMonster(id)` (`src/data/spots.ts`): spots with the monster, the ones where it has the largest share

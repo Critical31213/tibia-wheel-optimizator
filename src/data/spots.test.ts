@@ -34,6 +34,13 @@ describe('hunting spots (D99)', () => {
     expect(spotOf([...ids, 'dragon'])).toBeUndefined();
   });
 
+  it('applies the curated names and removals', () => {
+    const feru = SPOTS.find((s) => s.name === 'Feru Way');
+    expect(feru?.aliases).toContain('Hell Hub');
+    expect(SPOTS.some((s) => s.name === 'Hell Hub')).toBe(false);
+    expect(SPOTS.find((s) => s.name === 'Nykri Delta')?.monsters.map((m) => m.id).sort()).toEqual(['lamassu', 'sphinx']);
+  });
+
   it('puts the spot where the monster is the largest share first', () => {
     const list = spotsWithMonster('lost-berserker');
     expect(list.length).toBeGreaterThan(1);

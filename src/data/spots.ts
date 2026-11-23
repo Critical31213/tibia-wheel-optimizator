@@ -6,6 +6,8 @@ import spotsJson from './spots.json';
 
 export interface HuntingSpot {
   name: string;
+  /** Other common names (the wiki title when the spot is shown under a common name). */
+  aliases?: string[];
   monsters: { id: string; weight: number }[];
 }
 

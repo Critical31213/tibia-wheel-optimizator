@@ -13,6 +13,10 @@
  * statistics and lives in no other hunting place (its kills then come from this place); otherwise 1 for all.
  * At most MAX creatures per place, the most killed first.
  *
+ * Curated overrides (scripts/hunting-spots.overrides.json): `remove` drops marginal creatures of a place (after the
+ * shared-creature count, so weights still see every place they live in), `display` shows a spot under its common
+ * name and `names` adds other common names (aliases; the wiki title stays one when the spot is renamed).
+ *
  * Output: src/data/spots.json.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -22,6 +26,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CACHE = join(ROOT, 'scripts', '.cache', 'spots');
 const OUT = join(ROOT, 'src', 'data', 'spots.json');
+const OVERRIDES = JSON.parse(readFileSync(join(ROOT, 'scripts', 'hunting-spots.overrides.json'), 'utf8'));
 const WIKI = 'https://tibia.fandom.com/api.php';
 const TIBIADATA = 'https://api.tibiadata.com/v4';
 const UA = { 'User-Agent': 'wheel-optimizer-research' };
@@ -80,6 +85,11 @@ const SPLIT = {
     'Podzilla Quaras': ['Quara Raider', 'Quara Looter', 'Quara Plunderer'],
     'Podzilla Rootthings': ['Rootthing Nutshell', 'Rootthing Bug Tracker', 'Rootthing Amber Shaper'],
   },
+  'Book World': {
+    'Book World Chapter II': ['Bramble Wyrmling', 'Hawk Hopper'],
+    'Book World Chapter III': ['Bluebeak', 'Lion Hydra'],
+    'Book World Chapter IV': ['Crusader', 'Headwalker'],
+  },
 };
 for (const [place, parts] of Object.entries(SPLIT)) {
   const i = places.findIndex((p) => p.name === place);
@@ -111,6 +121,13 @@ const killsOf = (id) => {
 const placesOf = new Map();
 for (const p of places) for (const id of p.ids) placesOf.set(id, (placesOf.get(id) ?? 0) + 1);
 
+const names = new Set(places.map((p) => p.name));
+for (const [kind, map] of Object.entries(OVERRIDES)) for (const n of Object.keys(map)) if (!names.has(n)) fail(`overrides.${kind}: no place ${n}`);
+for (const [n, ids] of Object.entries(OVERRIDES.remove)) {
+  const p = places.find((x) => x.name === n);
+  for (const id of ids) if (!p.ids.includes(id)) fail(`overrides.remove: ${id} not at ${n}`);
+}
+
 let weighted = 0;
 const spots = places.flatMap((p) => {
   if (p.low) return [];
@@ -119,12 +136,16 @@ const spots = places.flatMap((p) => {
   const most = Math.max(0, ...all.map((x) => x.kills ?? 0));
   const k = all.filter((x) => x.kills === undefined || x.kills >= RARE * most);
   k.sort((a, b) => (b.kills ?? 0) - (a.kills ?? 0));
-  if (k.length < 2) return [];
-  const top = k.slice(0, MAX);
+  // Curated removals apply to the reviewed top MAX, so no creature beyond it moves in.
+  const removed = OVERRIDES.remove[p.name] ?? [];
+  const top = k.slice(0, MAX).filter((x) => !removed.includes(x.id));
+  if (top.length < 2) return [];
   const sure = k.length <= MAX && top.every((x) => x.kills > 0 && placesOf.get(x.id) === 1);
   const sum = top.reduce((a, x) => a + (x.kills ?? 0), 0);
   if (sure) weighted++;
-  return [{ name: p.name, monsters: top.map((x) => ({ id: x.id, weight: sure ? Math.max(1, Math.round((100 * x.kills) / sum)) : 1 })) }];
+  const name = OVERRIDES.display[p.name] ?? p.name;
+  const aliases = [...new Set([p.name, ...(OVERRIDES.names[p.name] ?? [])])].filter((a) => a !== name);
+  return [{ name, ...(aliases.length ? { aliases } : {}), monsters: top.map((x) => ({ id: x.id, weight: sure ? Math.max(1, Math.round((100 * x.kills) / sum)) : 1 })) }];
 });
 spots.sort((a, b) => a.name.localeCompare(b.name, 'en'));
 

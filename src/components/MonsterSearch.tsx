@@ -64,7 +64,9 @@ function CombinedCard({ list }: { list: WeightedMonster[] }) {
   const spot = spotOf(list.map((w) => w.monster.id));
   return (
     <div className="rounded-xl border border-ink-600 bg-ink-950/50 p-3">
-      <h3 className="text-sm text-parchment-50">{spot ? spot.name : t('monster.combined')}</h3>
+      <h3 className="text-sm text-parchment-50" title={spot?.aliases?.join(', ')}>
+        {spot ? spot.name : t('monster.combined')}
+      </h3>
       <p className="mt-2 mb-1 text-xs text-parchment-400">{t('card.takes')}</p>
       {mods.length ? (
         <ul className="flex flex-wrap gap-1.5" aria-label={t('card.modifiers')}>
@@ -108,7 +110,7 @@ function SpotSuggest({ first, onAdd }: { first: WeightedMonster; onAdd: (entries
             <button
               type="button"
               onClick={() => add(s)}
-              title={t(spotHasKillWeights(s) ? 'monster.spotKills' : 'monster.spotEqual')}
+              title={[s.aliases?.join(', '), t(spotHasKillWeights(s) ? 'monster.spotKills' : 'monster.spotEqual')].filter(Boolean).join('\n')}
               className="rounded-lg border border-gold-700/60 px-2 py-1 text-xs text-gold-300 hover:bg-gold-700/25"
             >
               {t('monster.spotAdd', { spot: s.name, n: s.monsters.length - 1 })}
