@@ -67,6 +67,23 @@ for (let i = 0; i < titles.length; i += 50) {
   }
 }
 
+/** Wiki places split into separately hunted spots: place → { spot: creature names }; other creatures are dropped. */
+const SPLIT = {
+  Podzilla: {
+    'Podzilla Quaras': ['Quara Raider', 'Quara Looter', 'Quara Plunderer'],
+    'Podzilla Rootthings': ['Rootthing Nutshell', 'Rootthing Bug Tracker', 'Rootthing Amber Shaper'],
+  },
+};
+for (const [place, parts] of Object.entries(SPLIT)) {
+  const i = places.findIndex((p) => p.name === place);
+  if (i < 0) throw new Error(`split: no place ${place}`);
+  const split = Object.entries(parts).map(([name, list]) => ({ name, ids: list.map((n) => byName.get(norm(n))?.id ?? fail(`split: unknown ${n}`)) }));
+  places.splice(i, 1, ...split);
+}
+function fail(msg) {
+  throw new Error(msg);
+}
+
 // Weekly kills of all worlds; races are lowercase plurals ("dragon lords").
 const worlds = (await cached('worlds.json', `${TIBIADATA}/worlds`)).worlds.regular_worlds.map((w) => w.name);
 const kills = new Map();
