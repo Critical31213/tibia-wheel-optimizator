@@ -134,7 +134,8 @@ interface GemsPanelProps {
 export function GemsPanel({ vocation, gems, mods, emptyVessels, onChange }: GemsPanelProps) {
   const t = useT();
   const bodyId = useId();
-  const [open, setOpen] = useState(() => gems.length > 0);
+  // D104: collapsed on load when the vocation already has gems (open to add the first ones).
+  const [open, setOpen] = useState(() => gems.length === 0);
   const [closed, setClosed] = useState<ReadonlySet<GemQuality>>(new Set());
   const toggle = (q: GemQuality) =>
     setClosed((s) => {
