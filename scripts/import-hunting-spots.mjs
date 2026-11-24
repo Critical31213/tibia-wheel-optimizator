@@ -90,6 +90,12 @@ const SPLIT = {
     'Book World Chapter III': ['Bluebeak', 'Lion Hydra'],
     'Book World Chapter IV': ['Crusader', 'Headwalker'],
   },
+  'Secret Library': {
+    'Fire Library': ['Flying Book', 'Ink Blob', 'Guardian of Tales', 'Rage Squid', 'Burning Book'],
+    'Energy Library': ['Flying Book', 'Biting Book', 'Knowledge Elemental', 'Energuardian of Tales', 'Brain Squid', 'Energetic Book'],
+    'Ice Library': ['Librarian', 'Ink Blob', 'Animated Feather', 'Squid Warden', 'Icecold Book'],
+    'Earth Library': ['Cursed Book', 'Biting Book', 'Ink Blob'],
+  },
 };
 for (const [place, parts] of Object.entries(SPLIT)) {
   const i = places.findIndex((p) => p.name === place);
