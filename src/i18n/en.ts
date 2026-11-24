@@ -30,6 +30,8 @@ export const en = {
   'gain.score': '{v} pts',
   'gain.tip': 'Damage: {dmg}% · effective HP: {ehp}% · optimizer score: {score}',
   'notes.storage': 'Gems, weapons and equipment are stored in this browser per vocation (not in the link).',
+  'app.reset': 'Reset {vocation} settings',
+  'app.resetConfirm': 'Restore the default {vocation} settings? Level, points, skills, hunting spot, priority, mode, gems, rotation, weapons, equipment, charms and the compare code of this vocation are cleared. Other vocations stay as they are.',
   'debug.copy': 'Copy configuration (debug)',
   'debug.copied': 'Copied — paste it in the chat',
   'app.licenses': 'Sources & licenses',

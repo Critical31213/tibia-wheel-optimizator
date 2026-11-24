@@ -24,6 +24,8 @@ export const pl: Dictionary = {
   'gain.score': '{v} pkt',
   'gain.tip': 'Obrażenia: {dmg}% · efektywne HP: {ehp}% · wynik optymalizatora: {score}',
   'notes.storage': 'Gemy, bronie i ekwipunek są zapisywane w tej przeglądarce osobno dla każdej profesji (nie w linku).',
+  'app.reset': 'Resetuj ustawienia profesji {vocation}',
+  'app.resetConfirm': 'Przywrócić domyślne ustawienia profesji {vocation}? Wyczyszczone zostaną poziom, punkty, skille, expowisko, priorytet, tryb, gemy, rotacja, bronie, ekwipunek, charmy i kod porównania tej profesji. Pozostałe profesje się nie zmienią.',
   'debug.copy': 'Kopiuj konfigurację (debug)',
   'debug.copied': 'Skopiowano — wklej ją w rozmowie',
   'app.licenses': 'Źródła i licencje',

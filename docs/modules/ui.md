@@ -52,6 +52,7 @@ screens it is two columns (controls left, results right).
 | `src/i18n/` | `en.ts` / `pl.ts` dictionaries, `lang.ts` (pure helpers), `context.ts` (`useT`, `useI18n`), `I18nProvider.tsx` (tested). |
 | `src/hooks/useDebouncedValue.ts` | Generic debounce hook. |
 | `src/hooks/usePersistentInputs.ts` | Inputs state persisted to localStorage + URL. |
+| `src/lib/inputStorage.ts` | D101: stored inputs per vocation (vocation and wheel variant shared), migration of the old shared key, `resetVocation`. |
 | `src/lib/api.ts` | UI facade over `src/engine` + lazily loaded `src/data` (`loadMonsterData`, `useMonsterData`). |
 | `src/lib/geometry.ts` | Pure SVG geometry helpers (tested). |
 | `src/lib/inputState.ts` | Input (de)serialisation + validation, monster-list codec, `characterOf` (tested). |
@@ -85,13 +86,18 @@ Components never import `src/engine` / `src/data` directly — only `src/lib/api
 ## State flow
 
 1. `usePersistentInputs()` holds `{ vocation, points, level, scrolls, mainSkill, shielding, magicLevel, monsters, priority, mode }`.
-   Initial value = defaults ← localStorage (`wheel-optimizer:inputs:v1`) ← URL query
+   Initial value = defaults ← localStorage (D101: `wheel-optimizer:inputs:v2` for the vocation and wheel variant,
+   `wheel-optimizer:inputs:v2:<vocation>` for the rest; a vocation switch loads that vocation's own values) ← URL query
    (`?v=druid&p=420&lv=470&ml=110&m=demon_dragon-lord*2&prio=75&f=hunt`; the removed hunt-style key `h` is ignored and dropped; URL wins; a link with `v` treats
    absent optional keys as empty). Every change is written back to
    localStorage (try/catch) and to the URL with `history.replaceState`.
    All values are sanitised (`sanitize`) — unknown vocation dropped, points clamped to 0–`MAX_POINTS` (4000 = wheel
    capacity), priority snapped to the nearest step (`snapPriority`, D91). Once the monster dataset is loaded, unknown monster ids are dropped
    (`withKnownMonsters`). A legacy `monsterId` / single `m=id` becomes a one-monster list.
+   D101: "Reset <vocation> settings" (below the left column, with a confirmation) removes every stored key of the
+   active vocation (`vocationStorageKeys`: inputs, spells, gems, weapons, gear with charms, compare code), keeps only
+   `v` / `w` in the URL and remounts the optimizer (`App` keys `Optimizer` by a reset counter), so all hooks read the
+   defaults. Other vocations are untouched.
 2. `App` derives `wheel = getWheel(vocation)` (memo) and clamps points to `wheel.totalCapacity`.
 3. `useDeferredValue(inputs)` keeps the slider/typing responsive; the input is built in a
    `useMemo` and computed by `useOptimizer` in a Web Worker (D42: `src/workers/optimize.worker.ts`, newest input only,
@@ -109,7 +115,9 @@ Components never import `src/engine` / `src/data` directly — only `src/lib/api
 
 | Key | Where | Content |
 |-----|-------|---------|
-| `wheel-optimizer:inputs:v1` | localStorage | the whole `InputState` (legacy `monsterId` migrated) |
+| `wheel-optimizer:inputs:v2` | localStorage | D101: `{ vocation, wheel }` |
+| `wheel-optimizer:inputs:v2:<vocation>` | localStorage | D101: the rest of `InputState` for that vocation (legacy `monsterId` migrated) |
+| `wheel-optimizer:inputs:v1` | localStorage | up to D100: the whole `InputState`, shared; copied to every vocation that has no own inputs yet, then removed |
 | `?v= &p= &lv= &sc= &sk= &sh= &ml= &ms= &m= &prio= &f= &w=` | URL query | same inputs (`w=live` = live wheel, omitted for the default; `lv` level, `sc` scrolls, `sk` main skill, `sh` shielding, `ml` magic level, `ms` knight's melee skill sword/axe/club; `m` = `id[*weight]` joined by `_`, weight 1 omitted; `f` = hunt/boss; legacy `h` ignored); empty optional keys omitted |
 | `wheel-optimizer:spells:v1:<vocation>` | localStorage | `{ rotationId, forcedSpells }` JSON, validated against the vocation's presets / forceable spells (max 8) |
 | `?r= &fs=` | URL query | rotation preset id (absent = auto), forced spells joined by `,`; a link with `v` but no `r`/`fs` = auto / none |

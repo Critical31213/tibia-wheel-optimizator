@@ -33,8 +33,16 @@ import { gearInput } from './lib/gear';
 import { resolveMonsters } from './lib/monsters';
 import { emptyUnlockedByQuality } from './lib/vessels';
 import { VOCATION_LABELS } from './lib/labels';
+import { resetVocation } from './lib/inputStorage';
+import type { Vocation } from './types';
 
+/** D101: a reset remounts the optimizer, so every per-vocation hook reads its (now empty) storage again. */
 export default function App() {
+  const [epoch, setEpoch] = useState(0);
+  return <Optimizer key={epoch} onReset={() => setEpoch((e) => e + 1)} />;
+}
+
+function Optimizer({ onReset }: { onReset: () => void }) {
   const t = useT();
   const [inputs, update] = usePersistentInputs();
   const [gems, setGems] = usePersistentGems(inputs.vocation);
@@ -148,6 +156,7 @@ export default function App() {
             onWeapons={setWeaponPrefs}
             charmPicks={current ? shown?.charms : undefined}
           />
+          <ResetButton vocation={inputs.vocation} onReset={onReset} />
           <DebugCopy input={request} />
         </div>
 
@@ -271,6 +280,31 @@ export default function App() {
           {t('app.licenses')}
         </a>
       </footer>
+    </div>
+  );
+}
+
+/** D101: clears every setting of the active vocation (other vocations keep theirs). */
+function ResetButton({ vocation, onReset }: { vocation: Vocation; onReset: () => void }) {
+  const t = useT();
+  const reset = () => {
+    if (!window.confirm(t('app.resetConfirm', { vocation: VOCATION_LABELS[vocation] }))) return;
+    try {
+      resetVocation(window.localStorage, vocation);
+      // The URL mirrors the inputs; without this the old values would come back from it.
+      const q = new URLSearchParams(window.location.search);
+      const kept = new URLSearchParams([...q].filter(([k]) => k === 'v' || k === 'w'));
+      window.history.replaceState(window.history.state, '', `${window.location.pathname}?${kept.toString()}${window.location.hash}`);
+    } catch {
+      /* storage blocked — the remount still restores the defaults in memory */
+    }
+    onReset();
+  };
+  return (
+    <div className="text-center">
+      <button type="button" onClick={reset} className="text-xs text-parchment-400 underline hover:text-red-300">
+        {t('app.reset', { vocation: VOCATION_LABELS[vocation] })}
+      </button>
     </div>
   );
 }

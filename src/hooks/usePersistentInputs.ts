@@ -1,37 +1,40 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getMonsterById, loadMonsterData } from '../lib/api';
-import { DEFAULT_INPUTS, fromQuery, sanitize, toQuery, withKnownMonsters } from '../lib/inputState';
+import { DEFAULT_INPUTS, fromQuery, toQuery, withKnownMonsters } from '../lib/inputState';
 import type { InputState } from '../lib/inputState';
-
-const STORAGE_KEY = 'wheel-optimizer:inputs:v1';
-
-function readStorage(): Partial<InputState> {
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return {};
-    const parsed: unknown = JSON.parse(raw);
-    return parsed && typeof parsed === 'object' ? sanitize(parsed as Record<string, unknown>) : {};
-  } catch {
-    return {};
-  }
-}
+import { migrateInputs, readShared, readVocation, vocationOf, writeInputs } from '../lib/inputStorage';
 
 function initialState(): InputState {
   if (typeof window === 'undefined') return DEFAULT_INPUTS;
-  // Priority: URL (shared link) > localStorage (last visit) > defaults.
-  return { ...DEFAULT_INPUTS, ...readStorage(), ...fromQuery(window.location.search) };
+  try {
+    migrateInputs(window.localStorage);
+    // Priority: URL (shared link) > localStorage (last visit) > defaults.
+    const url = fromQuery(window.location.search);
+    const shared = { ...DEFAULT_INPUTS, ...readShared(window.localStorage), ...url };
+    return { ...shared, ...readVocation(window.localStorage, shared.vocation), ...url };
+  } catch {
+    return { ...DEFAULT_INPUTS, ...fromQuery(window.location.search) };
+  }
+}
+
+function vocationInputs(vocation: InputState['vocation']) {
+  try {
+    return readVocation(window.localStorage, vocation);
+  } catch {
+    return vocationOf(DEFAULT_INPUTS);
+  }
 }
 
 /**
- * The optimizer inputs, persisted to localStorage and mirrored into
- * the URL query string (via `history.replaceState`, so no history spam).
+ * The optimizer inputs, persisted to localStorage (D101: per vocation, except the vocation and wheel variant) and
+ * mirrored into the URL query string (via `history.replaceState`, so no history spam).
  */
 export function usePersistentInputs() {
   const [state, setState] = useState<InputState>(initialState);
 
   useEffect(() => {
     try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      writeInputs(window.localStorage, state);
     } catch {
       /* storage blocked (private mode, quota) — ignore */
     }
@@ -53,7 +56,12 @@ export function usePersistentInputs() {
   }, []);
 
   const update = useCallback((patch: Partial<InputState>) => {
-    setState((prev) => ({ ...prev, ...patch }));
+    setState((prev) =>
+      // A vocation switch brings that vocation's own inputs (the wheel variant stays).
+      patch.vocation && patch.vocation !== prev.vocation
+        ? { ...prev, ...vocationInputs(patch.vocation), ...patch }
+        : { ...prev, ...patch },
+    );
   }, []);
 
   return [state, update] as const;
