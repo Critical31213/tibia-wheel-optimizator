@@ -293,7 +293,7 @@ function ResetButton({ vocation, onReset }: { vocation: Vocation; onReset: () =>
       resetVocation(window.localStorage, vocation);
       // The URL mirrors the inputs; without this the old values would come back from it.
       const q = new URLSearchParams(window.location.search);
-      const kept = new URLSearchParams([...q].filter(([k]) => k === 'v' || k === 'w'));
+      const kept = new URLSearchParams([...q].filter(([k]) => k === 'v' || k === 'w' || k === 'o'));
       window.history.replaceState(window.history.state, '', `${window.location.pathname}?${kept.toString()}${window.location.hash}`);
     } catch {
       /* storage blocked — the remount still restores the defaults in memory */

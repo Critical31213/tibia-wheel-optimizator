@@ -74,3 +74,51 @@ export const vocationStorageKeys = (vocation: Vocation): string[] => [
 export function resetVocation(storage: KeyValueStorage, vocation: Vocation): void {
   for (const k of vocationStorageKeys(vocation)) storage.removeItem(k);
 }
+
+/**
+ * D102: the app mirrors its state into the URL with this browser's id (`o`). Opening such a link again (bookmark,
+ * history, address-bar suggestion) must not bring back its older values over the stored ones; a link from someone
+ * else (other id or none) still applies.
+ */
+export const OWNER_KEY = 'wheel-optimizer:owner:v1';
+export const OWNER_PARAM = 'o';
+
+export function ownerId(storage: KeyValueStorage): string {
+  let id = storage.getItem(OWNER_KEY);
+  if (!id) {
+    id = Math.random().toString(36).slice(2, 10);
+    storage.setItem(OWNER_KEY, id);
+  }
+  return id;
+}
+
+export function isOwnLink(storage: KeyValueStorage, search: string): boolean {
+  const o = new URLSearchParams(search).get(OWNER_PARAM);
+  return o !== null && o === storage.getItem(OWNER_KEY);
+}
+
+export function withOwner(search: string, id: string): string {
+  const q = new URLSearchParams(search);
+  q.set(OWNER_PARAM, id);
+  return `?${q.toString()}`;
+}
+
+/** The URL's settings, unless this browser wrote that URL itself (then the stored settings are newer). */
+export function linkSearch(): string {
+  try {
+    return isOwnLink(window.localStorage, window.location.search) ? '' : window.location.search;
+  } catch {
+    return window.location.search;
+  }
+}
+
+/** Replaces the URL's query with `search` plus this browser's id. */
+export function mirrorSearch(search: string): void {
+  let next = search;
+  try {
+    next = withOwner(search, ownerId(window.localStorage));
+  } catch {
+    /* storage blocked — no id */
+  }
+  if (next !== window.location.search) window.history.replaceState(window.history.state, '', `${window.location.pathname}${next}${window.location.hash}`);
+}

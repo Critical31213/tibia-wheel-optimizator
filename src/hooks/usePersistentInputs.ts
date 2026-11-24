@@ -2,18 +2,18 @@ import { useCallback, useEffect, useState } from 'react';
 import { getMonsterById, loadMonsterData } from '../lib/api';
 import { DEFAULT_INPUTS, fromQuery, toQuery, withKnownMonsters } from '../lib/inputState';
 import type { InputState } from '../lib/inputState';
-import { migrateInputs, readShared, readVocation, vocationOf, writeInputs } from '../lib/inputStorage';
+import { linkSearch, migrateInputs, mirrorSearch, readShared, readVocation, vocationOf, writeInputs } from '../lib/inputStorage';
 
 function initialState(): InputState {
   if (typeof window === 'undefined') return DEFAULT_INPUTS;
   try {
     migrateInputs(window.localStorage);
     // Priority: URL (shared link) > localStorage (last visit) > defaults.
-    const url = fromQuery(window.location.search);
+    const url = fromQuery(linkSearch());
     const shared = { ...DEFAULT_INPUTS, ...readShared(window.localStorage), ...url };
     return { ...shared, ...readVocation(window.localStorage, shared.vocation), ...url };
   } catch {
-    return { ...DEFAULT_INPUTS, ...fromQuery(window.location.search) };
+    return { ...DEFAULT_INPUTS, ...fromQuery(linkSearch()) };
   }
 }
 
@@ -39,10 +39,7 @@ export function usePersistentInputs() {
       /* storage blocked (private mode, quota) — ignore */
     }
     try {
-      const search = toQuery(state, window.location.search);
-      if (search !== window.location.search) {
-        window.history.replaceState(window.history.state, '', `${window.location.pathname}${search}${window.location.hash}`);
-      }
+      mirrorSearch(toQuery(state, window.location.search));
     } catch {
       /* sandboxed iframe etc. — ignore */
     }

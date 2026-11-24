@@ -3,6 +3,10 @@ import { DEFAULT_INPUTS } from './inputState';
 import { gemsStorageKey } from './gems';
 import {
   LEGACY_INPUTS_KEY,
+  OWNER_KEY,
+  isOwnLink,
+  ownerId,
+  withOwner,
   SHARED_INPUTS_KEY,
   migrateInputs,
   readShared,
@@ -49,5 +53,20 @@ describe('per-vocation inputs (D101)', () => {
     expect(s.getItem(gemsStorageKey('sorcerer'))).toBe('[]');
     expect(s.getItem(SHARED_INPUTS_KEY)).not.toBeNull();
     expect(s.getItem(vocationInputsKey('sorcerer'))).not.toBeNull();
+  });
+});
+
+describe('own links (D102)', () => {
+  it('recognises a URL this browser wrote, not a link from elsewhere', () => {
+    const s = memory();
+    const id = ownerId(s);
+    expect(ownerId(s)).toBe(id);
+    expect(s.getItem(OWNER_KEY)).toBe(id);
+    const own = withOwner('?v=knight&lv=300', id);
+    expect(own).toBe(`?v=knight&lv=300&o=${id}`);
+    expect(isOwnLink(s, own)).toBe(true);
+    expect(isOwnLink(s, '?v=knight&lv=300')).toBe(false);
+    expect(isOwnLink(s, withOwner('?v=knight', 'someone'))).toBe(false);
+    expect(isOwnLink(memory(), own)).toBe(false);
   });
 });

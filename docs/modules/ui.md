@@ -89,7 +89,10 @@ Components never import `src/engine` / `src/data` directly — only `src/lib/api
    Initial value = defaults ← localStorage (D101: `wheel-optimizer:inputs:v2` for the vocation and wheel variant,
    `wheel-optimizer:inputs:v2:<vocation>` for the rest; a vocation switch loads that vocation's own values) ← URL query
    (`?v=druid&p=420&lv=470&ml=110&m=demon_dragon-lord*2&prio=75&f=hunt`; the removed hunt-style key `h` is ignored and dropped; URL wins; a link with `v` treats
-   absent optional keys as empty). Every change is written back to
+   absent optional keys as empty). D102: the mirrored URL carries this browser's id (`o`, `wheel-optimizer:owner:v1`);
+   a URL with the own id (bookmark, history, address-bar suggestion) is ignored on load, so the stored (newer) settings
+   win; a link without it or with another id applies (`linkSearch`, `mirrorSearch` in `src/lib/inputStorage.ts`, also
+   used by the spell prefs). Every change is written back to
    localStorage (try/catch) and to the URL with `history.replaceState`.
    All values are sanitised (`sanitize`) — unknown vocation dropped, points clamped to 0–`MAX_POINTS` (4000 = wheel
    capacity), priority snapped to the nearest step (`snapPriority`, D91). Once the monster dataset is loaded, unknown monster ids are dropped
@@ -116,6 +119,7 @@ Components never import `src/engine` / `src/data` directly — only `src/lib/api
 | Key | Where | Content |
 |-----|-------|---------|
 | `wheel-optimizer:inputs:v2` | localStorage | D101: `{ vocation, wheel }` |
+| `wheel-optimizer:owner:v1` | localStorage | D102: random id of this browser, written to the URL as `o` |
 | `wheel-optimizer:inputs:v2:<vocation>` | localStorage | D101: the rest of `InputState` for that vocation (legacy `monsterId` migrated) |
 | `wheel-optimizer:inputs:v1` | localStorage | up to D100: the whole `InputState`, shared; copied to every vocation that has no own inputs yet, then removed |
 | `?v= &p= &lv= &sc= &sk= &sh= &ml= &ms= &m= &prio= &f= &w=` | URL query | same inputs (`w=live` = live wheel, omitted for the default; `lv` level, `sc` scrolls, `sk` main skill, `sh` shielding, `ml` magic level, `ms` knight's melee skill sword/axe/club; `m` = `id[*weight]` joined by `_`, weight 1 omitted; `f` = hunt/boss; legacy `h` ignored); empty optional keys omitted |

@@ -3,6 +3,7 @@ import { CUSTOM_ROTATION_ID, type Vocation } from '../types';
 import { getCustomRotationSpells, getExcludableSpells, getForceableSpells, getRevelationNames, getRotationPresets, getStanceOptions } from '../lib/api';
 import { parseSpellPrefs, spellPrefsFromQuery, spellPrefsStorageKey, spellPrefsToQuery } from '../lib/spellPrefs';
 import type { SpellPrefs } from '../lib/spellPrefs';
+import { linkSearch, mirrorSearch } from '../lib/inputStorage';
 
 const optionsOf = (vocation: Vocation) =>
   [[...getRotationPresets(vocation).map((r) => r.id), CUSTOM_ROTATION_ID], getForceableSpells(vocation), getStanceOptions(vocation), getRevelationNames(vocation), getCustomRotationSpells(vocation), getExcludableSpells(vocation)] as const;
@@ -10,7 +11,7 @@ const optionsOf = (vocation: Vocation) =>
 function readPrefs(vocation: Vocation, fromUrl: boolean): SpellPrefs {
   const [ids, spells, stances, revs, custom, excludable] = optionsOf(vocation);
   if (fromUrl) {
-    const q = spellPrefsFromQuery(window.location.search, ids, spells, stances, revs, custom, excludable);
+    const q = spellPrefsFromQuery(linkSearch(), ids, spells, stances, revs, custom, excludable);
     if (q) return q;
   }
   try {
@@ -40,10 +41,7 @@ export function usePersistentSpellPrefs(vocation: Vocation) {
       /* storage blocked — ignore */
     }
     try {
-      const search = spellPrefsToQuery(state.prefs, window.location.search);
-      if (search !== window.location.search) {
-        window.history.replaceState(window.history.state, '', `${window.location.pathname}${search}${window.location.hash}`);
-      }
+      mirrorSearch(spellPrefsToQuery(state.prefs, window.location.search));
     } catch {
       /* sandboxed iframe — ignore */
     }
