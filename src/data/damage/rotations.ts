@@ -18,6 +18,8 @@ export const ROTATION_PRESETS: readonly RotationPreset[] = [
   { id: 'rp-caldera-ethereal', vocation: 'paladin', name: 'Divine Caldera – Ethereal Barrage', note: 'holy vs physical within ~20%', spells: [{ name: 'Divine Caldera', ratio: 1 }, { name: 'Ethereal Barrage', ratio: 1 }] },
   { id: 'rp-caldera-divine', vocation: 'paladin', name: 'Divine Caldera – Divine Barrage', note: 'holy clearly better', spells: [{ name: 'Divine Caldera', ratio: 1 }, { name: 'Divine Barrage', ratio: 1 }] },
   { id: 'rp-barrages', vocation: 'paladin', name: 'Divine Barrage – Ethereal Barrage', spells: [{ name: 'Divine Barrage', ratio: 1 }, { name: 'Ethereal Barrage', ratio: 1 }] },
+  // D103: Ethereal Barrage on cooldown, Stone Shower in the other turns (e.g. Energy Library).
+  { id: 'rp-ethereal-stoneshower', vocation: 'paladin', name: 'Ethereal Barrage > Stone Shower Rune', note: 'most of the spot takes no holy damage', requires: { holyImmune: true }, spells: [{ name: 'Ethereal Barrage', ratio: 10 }, { name: 'Stone Shower', ratio: 1 }] },
 
   { id: 'ms-gfw-echo', vocation: 'sorcerer', name: 'Great Fire Wave – Death Echo', spells: [{ name: 'Great Fire Wave', ratio: 10 }, { name: 'Death Echo', ratio: 10 }, { name: "Hell's Core", ratio: 1 }] },
   { id: 'ms-gfw-geb', vocation: 'sorcerer', name: 'GFW – Energy Wave – GFW – Great Energy Beam', requires: { revelation: 'Beam Mastery' }, spells: [{ name: 'Great Fire Wave', ratio: 10 }, { name: 'Energy Wave', ratio: 5 }, { name: 'Great Energy Beam', ratio: 5 }, { name: "Hell's Core", ratio: 1 }] },
@@ -40,6 +42,26 @@ export const ROTATION_PRESETS: readonly RotationPreset[] = [
 
 export function getRotationPresets(vocation: Vocation): RotationPreset[] {
   return ROTATION_PRESETS.filter((r) => r.vocation === vocation);
+}
+
+/** Share of the spot's weight above which it counts as not taking holy damage (D103). */
+export const HOLY_IMMUNE_SHARE = 0.5;
+
+/**
+ * D103: presets the engine may pick by itself. When at least HOLY_IMMUNE_SHARE of the spot's weight takes no holy
+ * damage, the vocation's `holyImmune` presets replace the others; otherwise they are left out.
+ */
+export function autoPresets(vocation: Vocation, holyImmuneShare: number): RotationPreset[] {
+  const all = getRotationPresets(vocation);
+  const exception = all.filter((p) => p.requires?.holyImmune);
+  if (exception.length && holyImmuneShare >= HOLY_IMMUNE_SHARE) return exception;
+  return all.filter((p) => !p.requires?.holyImmune);
+}
+
+/** D103: runes named in the vocation's presets (cast only through a preset, never by the greedy schedule). */
+export function presetRunes(vocation: Vocation): string[] {
+  const names = new Set(getRotationPresets(vocation).flatMap((p) => p.spells.map((s) => s.name)));
+  return getDamageSpells(vocation).filter((s) => s.spellType === 'rune' && names.has(s.name)).map((s) => s.name);
 }
 
 /** Spender slot of the monk (Spiritual Outburst goes in it, D66). */

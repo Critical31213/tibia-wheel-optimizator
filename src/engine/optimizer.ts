@@ -42,14 +42,14 @@ import { CUSTOM_ROTATION_ID } from '../types';
 import { ammoFor, shapedPerk, shapingId, shapingOptions, weaponsFor, type Ammo, type Perk as ProfPerk, type Weapon } from '../data/proficiency';
 import { choosePerks, loadoutCharacter, loadoutOf, loadoutParts, ownedOptions, type Loadout } from './proficiency';
 import { encodePlannerCode, gridForSliceId, plannerVesselIssues, type PlannerVessel } from '../data/wheel/plannerCode';
-import type { WheelVariant } from '../types';
+import type { Monster, WheelVariant } from '../types';
 import { resolveCharacterStats } from '../data/character';
 import { GEAR_SLOTS, getItem } from '../data/equipment';
 import { gearEffects, type WornGear } from './gear';
 import { assignCharms, ownedCharms, type CharmAssignment } from './charms';
 import { getCharm } from '../data/charms';
 import { BALLISTIC_MASTERY, healingAverage, pierceDamageMod, POSITIONAL_TACTICS, TURN_SECONDS } from '../data/damage';
-import { customPreset, getRotationPresets } from '../data/damage/rotations';
+import { autoPresets, customPreset, getRotationPresets } from '../data/damage/rotations';
 import { getStance, stanceCombos, type StanceDef } from '../data/damage/stances';
 import { stanceBuilder, stanceDefense, stancedCharacter } from './stances';
 import {
@@ -990,6 +990,13 @@ export function presetById(vocation: OptimizerInput['vocation'], id: string | un
   return id ? (getRotationPresets(vocation).find((p) => p.id === id) ?? null) : null;
 }
 
+/** D103: the presets auto mode evaluates for this spot (holy-immune exception, see autoPresets). */
+function autoPresetsFor(vocation: OptimizerInput['vocation'], monsters: { monster: Monster; weight: number }[]): RotationPreset[] {
+  const total = monsters.reduce((a, m) => a + m.weight, 0);
+  const immune = monsters.reduce((a, m) => a + (elementMultiplier(m.monster, 'holy') <= 0 ? m.weight : 0), 0);
+  return autoPresets(vocation, total > 0 ? immune / total : 0);
+}
+
 /** Context (hunt style ignored, D20), character with estimated gaps, normalised spot and the plain spell model. */
 function modelInputs(input: ValuationInput) {
   const context: FightContext = { mode: input.context?.mode === 'boss' ? 'boss' : 'hunt' };
@@ -1061,8 +1068,8 @@ const GEAR_PASSES = 3;
  */
 function gearScorer(input: OptimizerInput): (fx: GearEffects) => number {
   const chosen = presetById(input.vocation, input.rotationId, input.customRotation);
-  const plans: (RotationPreset | null)[] = chosen ? [chosen] : [...getRotationPresets(input.vocation), null];
   const base = modelInputs({ ...input, equipment: undefined });
+  const plans: (RotationPreset | null)[] = chosen ? [chosen] : [...autoPresetsFor(input.vocation, base.monsters), null];
   const best = (m: SpellModel) => Math.max(1, ...plans.map((x) => planTotal(m, x)));
   const ref = best(base.model);
   const threat = threatOf(spotMonster(base.monsters));
@@ -1909,10 +1916,10 @@ function refine(p: Prepared, best: State): State {
 export function planSpecs(input: OptimizerInput): PlanSpec[] {
   const chosen = presetById(input.vocation, input.rotationId, input.customRotation);
   const boss = input.context?.mode === 'boss';
-  const all = getRotationPresets(input.vocation);
+  const mi = modelInputs(input);
+  const all = autoPresetsFor(input.vocation, mi.monsters);
   const autoPlans: (RotationPreset | null)[] = [...all, ...(boss || !all.length ? [null] : [])];
   const presets = chosen ? [chosen] : autoPlans;
-  const mi = modelInputs(input);
   const base = mi.model;
   // Same reference in manual and auto mode, so offense values stay comparable.
   const reference = Math.max(1, ...autoPlans.filter((x) => !x?.requires?.revelation).map((x) => planTotal(base, x)));
@@ -1972,7 +1979,7 @@ function charmsFor(input: OptimizerInput, owned: readonly OwnedCharm[]): CharmAs
   const { charmPicks: _p, ...plain } = input;
   const mi = modelInputs(plain);
   const chosen = presetById(input.vocation, input.rotationId, input.customRotation);
-  const all = getRotationPresets(input.vocation);
+  const all = autoPresetsFor(input.vocation, mi.monsters);
   const plans: (RotationPreset | null)[] = chosen ? [chosen] : [...all, ...(input.context?.mode === 'boss' || !all.length ? [null] : [])];
   const preset = plans.reduce((a, b) => (planTotal(mi.model, b) > planTotal(mi.model, a) ? b : a));
   return assignCharms({ ...mi.model, plan: planFor(mi.model, preset) }, owned);

@@ -84,7 +84,7 @@ describe('spell shares', () => {
         }
       }
       const boss = buildSpellModel(voc, BOSS, null);
-      for (const s of boss.spells.values()) if (s.dmg) expect(s.usable && s.targets <= BOSS_AREA_TARGETS + 1e-9).toBe(true);
+      for (const s of boss.spells.values()) if (s.dmg && !s.presetRune) expect(s.usable && s.targets <= BOSS_AREA_TARGETS + 1e-9).toBe(true);
     }
     expect(damageShare(buildSpellModel('knight', BOSS, null), 'Annihilation')).toBeGreaterThan(0);
     const v = valuationFor({ vocation: 'knight', points: 1500, monster: null, context: HUNT });

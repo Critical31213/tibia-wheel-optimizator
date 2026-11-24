@@ -8,6 +8,7 @@
  * D16: in hunt mode single-target spells never enter the rotation (zero value for their augments/gems).
  * Perk values are ΔT / T0 (T0 = rotation without wheel bonuses, no revelation).
  */
+import { presetRunes } from '../data/damage/rotations';
 import { GREEDY_ROTATION_ID, type CharacterStats, type CharmAssign, type Element, type FightContext, type GearEffects, type Monster, type RotationPreset, type Vocation, type WeightedMonster } from '../types';
 import { getSpell, getWheelSpellNames, type SpellMeta } from '../data/wheel';
 import { MAX_CHAIN_TARGETS } from '../data/wheel/update';
@@ -141,6 +142,8 @@ export interface SpellEval {
   areaGap: number;
   /** Part of the attack rotation (damage spell, not a rune; D16: not single-target in hunt mode). */
   usable: boolean;
+  /** D103: a rune cast only as a preset entry. */
+  presetRune?: boolean;
   /** D24 stances: extra crit chance / extra damage (pp) and damage multiplier of this spell. */
   critChance?: number;
   critExtra?: number;
@@ -424,6 +427,7 @@ export function buildSpellModel(
   const names = new Set([
     ...wheelSpells,
     ...getDamageSpells(vocation).filter((s) => s.spellType === 'spell').map((s) => s.name),
+    ...presetRunes(vocation),
   ]);
 
   const areaAug = new Set<string>();
@@ -467,6 +471,7 @@ export function buildSpellModel(
       stageDomain: stageOf.get(name) ?? -1,
       avatar: meta?.isAvatar ?? false,
       usable: kind === 'damage' && !!dmg && !isRune && !(context.mode === 'hunt' && singleTarget) && !excluded.has(name),
+      ...(isRune && kind === 'damage' && !excluded.has(name) ? { presetRune: true } : {}),
       hits,
     });
   }
@@ -679,7 +684,7 @@ function presetRotation(model: SpellModel, r: RotationInput): RotationResult {
   const items: (Cand & { ratio: number; alts: Cand[] })[] = [];
   for (const e of model.plan.entries) {
     const s = model.spells.get(e.name);
-    const c = s?.usable && s.revelation < 0 ? candidate(model, s, r) : null;
+    const c = (s?.usable || s?.presetRune) && s.revelation < 0 ? candidate(model, s, r) : null;
     if (!c || e.ratio <= 0) continue;
     // D66: slot spells share the entry's turns, best per cast first; the slot's cap is the sum of their caps.
     const alts = [c];

@@ -177,7 +177,8 @@ export interface RotationPreset {
   /** Short hint when the rotation is used (English). */
   note?: string;
   /** Only valid when the build reaches this revelation / the player wears a shield. */
-  requires?: { revelation?: string; shield?: boolean };
+  /** `holyImmune` (D103): auto mode uses it only, and only then, when most of the spot does not take holy damage. */
+  requires?: { revelation?: string; shield?: boolean; holyImmune?: boolean };
   /** D24: stance this rotation is played with (else picked by the engine). */
   stance?: string;
   spells: RotationSpell[];
