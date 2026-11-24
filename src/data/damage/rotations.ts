@@ -10,6 +10,9 @@ import { getDamageSpells, revelationSpell } from './index';
  * Monk: 5 Harmony builders, then a spender (D68). Spiritual Outburst is a spender, cast only through `slot`
  * (in place of Sweeping Takedown while off cooldown, D66).
  */
+/** D103: area attack runes of every element (Explosion left out: its hunt target count is unknown). */
+const AREA_RUNES = ['Avalanche', 'Great Fireball', 'Thunderstorm'];
+
 export const ROTATION_PRESETS: readonly RotationPreset[] = [
   { id: 'ek-mas', vocation: 'knight', name: 'Fierce Berserk – Groundshaker – Berserk', spells: [{ name: 'Fierce Berserk', ratio: 1 }, { name: 'Groundshaker', ratio: 1 }, { name: 'Berserk', ratio: 1 }] },
   { id: 'ek-min', vocation: 'knight', name: 'Fierce Berserk – Front Sweep – Berserk', spells: [{ name: 'Fierce Berserk', ratio: 1 }, { name: 'Front Sweep', ratio: 1 }, { name: 'Berserk', ratio: 1 }] },
@@ -18,8 +21,8 @@ export const ROTATION_PRESETS: readonly RotationPreset[] = [
   { id: 'rp-caldera-ethereal', vocation: 'paladin', name: 'Divine Caldera – Ethereal Barrage', note: 'holy vs physical within ~20%', spells: [{ name: 'Divine Caldera', ratio: 1 }, { name: 'Ethereal Barrage', ratio: 1 }] },
   { id: 'rp-caldera-divine', vocation: 'paladin', name: 'Divine Caldera – Divine Barrage', note: 'holy clearly better', spells: [{ name: 'Divine Caldera', ratio: 1 }, { name: 'Divine Barrage', ratio: 1 }] },
   { id: 'rp-barrages', vocation: 'paladin', name: 'Divine Barrage – Ethereal Barrage', spells: [{ name: 'Divine Barrage', ratio: 1 }, { name: 'Ethereal Barrage', ratio: 1 }] },
-  // D103: Ethereal Barrage on cooldown, Stone Shower in the other turns (e.g. Energy Library).
-  { id: 'rp-ethereal-stoneshower', vocation: 'paladin', name: 'Ethereal Barrage > Stone Shower Rune', note: 'most of the spot takes no holy damage', requires: { holyImmune: true }, spells: [{ name: 'Ethereal Barrage', ratio: 10 }, { name: 'Stone Shower', ratio: 1 }] },
+  // D103: Ethereal Barrage on cooldown, the best area rune for the spot's elements in the other turns (e.g. Energy Library).
+  { id: 'rp-ethereal-rune', vocation: 'paladin', name: 'Ethereal Barrage > Rune', note: 'most of the spot takes no holy damage; the area rune of the best element', requires: { holyImmune: true }, spells: [{ name: 'Ethereal Barrage', ratio: 10 }, { name: 'Stone Shower', ratio: 1, or: AREA_RUNES }] },
 
   { id: 'ms-gfw-echo', vocation: 'sorcerer', name: 'Great Fire Wave – Death Echo', spells: [{ name: 'Great Fire Wave', ratio: 10 }, { name: 'Death Echo', ratio: 10 }, { name: "Hell's Core", ratio: 1 }] },
   { id: 'ms-gfw-geb', vocation: 'sorcerer', name: 'GFW – Energy Wave – GFW – Great Energy Beam', requires: { revelation: 'Beam Mastery' }, spells: [{ name: 'Great Fire Wave', ratio: 10 }, { name: 'Energy Wave', ratio: 5 }, { name: 'Great Energy Beam', ratio: 5 }, { name: "Hell's Core", ratio: 1 }] },
@@ -60,7 +63,7 @@ export function autoPresets(vocation: Vocation, holyImmuneShare: number): Rotati
 
 /** D103: runes named in the vocation's presets (cast only through a preset, never by the greedy schedule). */
 export function presetRunes(vocation: Vocation): string[] {
-  const names = new Set(getRotationPresets(vocation).flatMap((p) => p.spells.map((s) => s.name)));
+  const names = new Set(getRotationPresets(vocation).flatMap((p) => p.spells.flatMap((s) => [s.name, ...(s.or ?? [])])));
   return getDamageSpells(vocation).filter((s) => s.spellType === 'rune' && names.has(s.name)).map((s) => s.name);
 }
 

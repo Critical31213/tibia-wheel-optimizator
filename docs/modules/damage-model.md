@@ -108,8 +108,9 @@ See `src/data/damage/stances.ts` and docs/modules/engine.md. `pierceDamageMod` c
 ## Holy-immune spots (D103)
 
 When at least half of the spot's weight takes no holy damage (holy modifier 0 %, e.g. Energy Library: Brain Squid,
-Energetic Book), auto mode evaluates only the paladin preset `rp-ethereal-stoneshower` (Ethereal Barrage on
-cooldown, Stone Shower Rune in the other turns; `requires.holyImmune`, `autoPresets` in
+Energetic Book), auto mode evaluates only the paladin preset `rp-ethereal-rune` (Ethereal Barrage on
+cooldown, in the other turns the area rune whose element does the most damage on the spot: Stone Shower, Avalanche,
+Great Fireball or Thunderstorm; Explosion is left out, its hunt target count is unknown; `requires.holyImmune`, `autoPresets` in
 `src/data/damage/rotations.ts`); on other spots it is left out of auto mode but can be chosen by hand. Runes named in
 a preset (`presetRunes`) join the spell model as `presetRune`: cast only as preset entries, never by the greedy
 schedule.
