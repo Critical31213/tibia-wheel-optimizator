@@ -91,9 +91,10 @@ const SPLIT = {
     'Book World Chapter IV': ['Crusader', 'Headwalker'],
   },
   'Secret Library': {
-    'Fire Library': ['Flying Book', 'Ink Blob', 'Guardian of Tales', 'Rage Squid', 'Burning Book'],
-    'Energy Library': ['Flying Book', 'Biting Book', 'Knowledge Elemental', 'Energuardian of Tales', 'Brain Squid', 'Energetic Book'],
-    'Ice Library': ['Librarian', 'Ink Blob', 'Animated Feather', 'Squid Warden', 'Icecold Book'],
+    // Flying Book (no experience, weak) and Librarian (no kills in the statistics) left out; Ink Blob counted at Fire only, Biting Book at Energy only.
+    'Fire Library': ['Ink Blob', 'Guardian of Tales', 'Rage Squid', 'Burning Book'],
+    'Energy Library': ['Biting Book', 'Knowledge Elemental', 'Energuardian of Tales', 'Brain Squid', 'Energetic Book'],
+    'Ice Library': ['Animated Feather', 'Squid Warden', 'Icecold Book'],
     'Earth Library': ['Cursed Book', 'Biting Book', 'Ink Blob'],
   },
 };
@@ -103,6 +104,8 @@ for (const [place, parts] of Object.entries(SPLIT)) {
   const split = Object.entries(parts).map(([name, list]) => ({ name, low: places[i].low, ids: list.map((n) => byName.get(norm(n))?.id ?? fail(`split: unknown ${n}`)) }));
   places.splice(i, 1, ...split);
 }
+/** Spots so rarely hunted that their kills are ignored: they never get kill weights or share creatures' kills. */
+const NO_KILLS = new Set(['Earth Library']);
 function fail(msg) {
   throw new Error(msg);
 }
@@ -125,7 +128,7 @@ const killsOf = (id) => {
 };
 
 const placesOf = new Map();
-for (const p of places) for (const id of p.ids) placesOf.set(id, (placesOf.get(id) ?? 0) + 1);
+for (const p of places) if (!NO_KILLS.has(p.name)) for (const id of p.ids) placesOf.set(id, (placesOf.get(id) ?? 0) + 1);
 
 const names = new Set(places.map((p) => p.name));
 for (const [kind, map] of Object.entries(OVERRIDES)) for (const n of Object.keys(map)) if (!names.has(n)) fail(`overrides.${kind}: no place ${n}`);
@@ -146,7 +149,7 @@ const spots = places.flatMap((p) => {
   const removed = OVERRIDES.remove[p.name] ?? [];
   const top = k.slice(0, MAX).filter((x) => !removed.includes(x.id));
   if (top.length < 2) return [];
-  const sure = k.length <= MAX && top.every((x) => x.kills > 0 && placesOf.get(x.id) === 1);
+  const sure = !NO_KILLS.has(p.name) && k.length <= MAX && top.every((x) => x.kills > 0 && placesOf.get(x.id) === 1);
   const sum = top.reduce((a, x) => a + (x.kills ?? 0), 0);
   if (sure) weighted++;
   const name = OVERRIDES.display[p.name] ?? p.name;
