@@ -110,6 +110,9 @@ type. Sorcerer and monk are not measured. Monk weapon defense is ignored.
 Shields: Demon Shield, Great/Gnome Shield, Eldritch Shield, Falcon Escutcheon, Refined Stag Shield, Soulbastion.
 Spellbooks: Spellbook of Lost Souls, Stag Spellbook/Eldritch Folio, Arboreal Tome/Arcanomancer Folio.
 
+The build's stats show this split (`stat.mitigationTotal`, D113): shielding and defense part, total, with the
+wheel's and gems' Mitigation Multiplier applied and truncated like the Cyclopedia.
+
 **Results with the defaults**
 
 | Level | EK (weapon) | EK (shield) | RP (quiver) | Mage (spellbook) | Monk |

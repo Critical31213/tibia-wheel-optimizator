@@ -5,7 +5,7 @@
  */
 import type { Element, FightContext, Monster, Vocation } from '../types';
 import type { WheelSupremeMod, WheelTile } from '../data/wheel';
-import { maxHitPoints, maxMana, mitigationPercent, type Offhand } from '../data/character';
+import { maxHitPoints, maxMana, mitigationBreakdown, mitigationPercent, type Offhand } from '../data/character';
 import {
   AREA_AUGMENT,
   cooldownGain,
@@ -94,6 +94,8 @@ export interface ValuationContext {
   mitigation: number;
   /** Base mitigation (%) with the vocation's default offhand (EHP reference across rotations). */
   mitigationRef: number;
+  /** D113: base mitigation split as in the Cyclopedia (shielding / defense part, %). */
+  mitigationSplit?: { shielding: number; offhand: number };
   /** D21: forced spells (utility augments keep their value). */
   forced: ReadonlySet<string>;
   /** D69: cooldown cuts (s) already in the model (the plan's rotation augments): their augments' cooldown effect counts 0. */
@@ -201,6 +203,7 @@ export function characterFacts(vocation: Vocation, level: number, shielding: num
     hp: maxHitPoints(vocation, level),
     mana: maxMana(vocation, level),
     mitigation: mitigationPercent(vocation, level, { shielding, offhand: oh.offhand, offhandDefense: oh.defense }),
+    mitigationSplit: mitigationBreakdown(vocation, level, { shielding, offhand: oh.offhand, offhandDefense: oh.defense }),
     mitigationRef: mitigationPercent(vocation, level, { shielding, offhand: ref.offhand, offhandDefense: ref.defense }),
   };
 }

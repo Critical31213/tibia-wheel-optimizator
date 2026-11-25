@@ -102,6 +102,7 @@ export const ENGINE_MESSAGES = {
   'stat.mana': 'Mana',
   'stat.capacity': 'Capacity',
   'stat.mitigation': 'Mitigation multiplier',
+  'stat.mitigationTotal': 'Mitigation (shielding {shielding}% + defense {defense}%)',
   'stat.lifeLeech': 'Life leech',
   'stat.manaLeech': 'Mana leech',
   'stat.skill': '{skill}',

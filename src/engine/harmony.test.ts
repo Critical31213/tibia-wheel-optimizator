@@ -66,6 +66,16 @@ describe('D107: own average targets', () => {
   });
 });
 
+describe('D113: mitigation stat line', () => {
+  it('shows the Cyclopedia split with the wheel multiplier, truncated to 0.01', () => {
+    const r = optimize({ vocation: 'druid', points: 1000, monster: null, priority: 100, context: { mode: 'hunt' }, alternatives: 0, character: { level: 96, shielding: 36 } });
+    const line = r.stats.find((s) => s.labelMsg?.key === 'stat.mitigationTotal')!;
+    const p = line.labelMsg!.params as { shielding: string; defense: string };
+    expect(Number(line.value.replace('%', ''))).toBeCloseTo(Number(p.shielding) + Number(p.defense), 1);
+    expect(Number(p.shielding)).toBeGreaterThanOrEqual(0.38);
+  });
+});
+
 describe('D68: five builders before each spender', () => {
   it.each(['em-voh', 'em-voh-so', 'em-voj', 'em-tfb', 'em-tfb-so'])('%s: builder casts = 5 × spender casts, turns all used', (id) => {
     const r = optimize({ vocation: 'monk', points: 1000, monster: null, priority: 0, context: { mode: 'hunt' }, alternatives: 0, rotationId: id });

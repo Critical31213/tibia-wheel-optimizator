@@ -606,6 +606,7 @@ export const pl: Dictionary = {
   'engine.stat.mana': 'Mana',
   'engine.stat.capacity': 'Udźwig',
   'engine.stat.mitigation': 'Mnożnik mitygacji',
+  'engine.stat.mitigationTotal': 'Mitygacja (shielding {shielding}% + defensywa {defense}%)',
   'engine.stat.lifeLeech': 'Life leech',
   'engine.stat.manaLeech': 'Mana leech',
   'engine.stat.skill': '{skill}',

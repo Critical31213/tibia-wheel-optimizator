@@ -636,6 +636,13 @@ function statLines(wheel: EngineWheel, alloc: Int32Array, stages: number[], env:
   const flat = stages.reduce((s, st) => s + REVELATION_FLAT_BONUS[st], 0) + vesselFlat(wheel, vesselSlices, vessels);
   const lines: StatLine[] = [];
   const gemLines = gemStatLines(env, vessels);
+  // D113: the character's mitigation as in the Cyclopedia (wheel and gem Mitigation Multiplier applied, truncated).
+  const split = env.v.mitigationSplit;
+  if (split) {
+    const k = 1 + (mit * 0.075 + (gemLines.mitMult ?? 0)) / 100;
+    const cut = (x: number) => (Math.floor(x * k * 100 + 1e-9) / 100).toFixed(2);
+    lines.push(stat('stat.mitigationTotal', `${cut(split.shielding + split.offhand)}%`, 'defense', { shielding: cut(split.shielding), defense: cut(split.offhand) }));
+  }
   // D82: gem Hit Points / Mana / Capacity join the wheel's lines.
   hp += gemLines.pooled['Hit Points'] ?? 0;
   mana += gemLines.pooled.Mana ?? 0;
@@ -665,7 +672,7 @@ const vesselFlat = (wheel: EngineWheel, vesselSlices: number, vessels: readonly 
 const POOLED = new Set(['Hit Points', 'Mana', 'Capacity']);
 
 /** Owned gem mods active in their vessels; Hit Points / Mana / Capacity are returned as sums (`pooled`). */
-function gemStatLines(env: GemEnv, vessels: OptimizerResult['vessels']): { lines: StatLine[]; pooled: Record<string, number> } {
+function gemStatLines(env: GemEnv, vessels: OptimizerResult['vessels']): { lines: StatLine[]; pooled: Record<string, number>; mitMult?: number } {
   const lines: StatLine[] = [];
   const pooled: Record<string, number> = {};
   const sums = new Map<string, { value: number; unit: string; category: StatLine['category'] }>();
@@ -695,7 +702,7 @@ function gemStatLines(env: GemEnv, vessels: OptimizerResult['vessels']): { lines
   for (const [name, s] of [...sums].sort((a, b) => a[0].localeCompare(b[0]))) {
     lines.push(stat('stat.gemMod', `${s.value >= 0 ? '+' : ''}${fmt(s.value, 2)}${s.unit}`, s.category, { name }));
   }
-  return { lines, pooled };
+  return { lines, pooled, mitMult: sums.get('Mitigation Multiplier')?.value };
 }
 
 function namedConvictions(wheel: EngineWheel, alloc: Int32Array, path: number[]): Perk[] {
