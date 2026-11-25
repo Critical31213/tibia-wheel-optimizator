@@ -147,24 +147,6 @@ export function RotationPanel({ presets, customSpells, spells, excludable, targe
         <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.excludedHint')}</p>
       </div>
 
-      <div className="mt-3 text-xs">
-        <label className="flex items-center gap-2">
-          <span className="min-w-0 flex-1 text-parchment-300">{t('rotation.autoAttackShare')}</span>
-          <PercentInput value={value.autoAttack} placeholder={autoAttackDefault} onChange={(autoAttack) => onChange({ autoAttack })} />
-          <button
-            type="button"
-            aria-label={t('rotation.autoAttackReset')}
-            title={t('rotation.autoAttackReset')}
-            disabled={value.autoAttack === null}
-            onClick={() => onChange({ autoAttack: null })}
-            className="w-3 text-parchment-400 hover:text-parchment-50 disabled:invisible"
-          >
-            ↺
-          </button>
-        </label>
-        <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.autoAttackHint', { n: autoAttackDefault })}</p>
-      </div>
-
       {usage && (
         <div className="mt-3" aria-live="polite">
           <p className="text-xs text-parchment-300">
@@ -206,6 +188,7 @@ export function RotationPanel({ presets, customSpells, spells, excludable, targe
               usage={usage}
               window={usage.window}
               targets={targetSpells.length ? { spells: targetSpells, value: value.targets, onChange: (targets) => onChange({ targets }) } : undefined}
+              auto={{ value: value.autoAttack, def: autoAttackDefault, onChange: (autoAttack) => onChange({ autoAttack }) }}
             />
           )}
         </div>
@@ -325,6 +308,12 @@ export function RotationPanel({ presets, customSpells, spells, excludable, targe
   );
 }
 
+interface AutoEdit {
+  value: number | null;
+  def: number;
+  onChange: (v: number | null) => void;
+}
+
 interface TargetEdit {
   spells: { name: string; avg: number; max: number }[];
   value: Record<string, number>;
@@ -333,9 +322,10 @@ interface TargetEdit {
 
 /**
  * D67: average damage of the whole rotation over the engine's window (test view). D121: in hunts the Targets column
- * holds the player's average targets per cast (D107; empty = community average).
+ * holds the player's average targets per cast (D107; empty = community average). D122: the auto-attack row holds the
+ * share of turns with an auto-attack.
  */
-function RotationDamage({ usage, window: w, targets }: { usage: RotationUsage; window: NonNullable<RotationUsage['window']>; targets?: TargetEdit }) {
+function RotationDamage({ usage, window: w, targets, auto }: { usage: RotationUsage; window: NonNullable<RotationUsage['window']>; targets?: TargetEdit; auto?: AutoEdit }) {
   const t = useT();
   const id = useId();
   const rows = usage.spells.filter((s) => s.damage);
@@ -371,10 +361,11 @@ function RotationDamage({ usage, window: w, targets }: { usage: RotationUsage; w
     );
   };
   return (
-    <details className="mt-2 text-xs" open={custom > 0 || undefined}>
+    <details className="mt-2 text-xs" open={custom > 0 || (auto && auto.value !== null) || undefined}>
       <summary className="cursor-pointer text-parchment-300">
         {t('rotation.damageTitle', { seconds: w.seconds })}
         {custom > 0 && <span className="text-gold-300"> ({t('rotation.targetsCustom', { n: custom })})</span>}
+        {auto && auto.value !== null && <span className="text-gold-300"> ({t('rotation.autoAttackCustom', { n: auto.value })})</span>}
       </summary>
       <div className="mt-1 overflow-x-auto">
         <table className="w-full text-parchment-200">
@@ -403,10 +394,27 @@ function RotationDamage({ usage, window: w, targets }: { usage: RotationUsage; w
                 <td className={cell}>{num(s.damage!.total)}</td>
               </tr>
             ))}
-            {w.autoAttack > 0 && (
+            {(w.autoAttack > 0 || auto) && (
               <tr className="border-t border-ink-700">
                 <td className="px-1.5 py-0.5 italic">{t('rotation.autoAttack')}</td>
-                <td className={cell} colSpan={6} />
+                <td className="px-1.5 py-0.5" colSpan={6}>
+                  {auto && (
+                    <span className="inline-flex items-center gap-1">
+                      <PercentInput label={t('rotation.autoAttackShare')} value={auto.value} placeholder={auto.def} onChange={auto.onChange} />
+                      <span className="text-parchment-400">{t('rotation.autoAttackTurns')}</span>
+                      <button
+                        type="button"
+                        aria-label={t('rotation.autoAttackReset')}
+                        title={t('rotation.autoAttackReset')}
+                        disabled={auto.value === null}
+                        onClick={() => auto.onChange(null)}
+                        className="w-3 text-parchment-400 hover:text-parchment-50 disabled:invisible"
+                      >
+                        ↺
+                      </button>
+                    </span>
+                  )}
+                </td>
                 <td className={cell}>{num(w.autoAttack)}</td>
               </tr>
             )}
@@ -428,6 +436,7 @@ function RotationDamage({ usage, window: w, targets }: { usage: RotationUsage; w
         </table>
       </div>
       <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.damageNote')}</p>
+      {auto && <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.autoAttackHint', { n: auto.def })}</p>}
       {editable && <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.targetsHint')}</p>}
       {custom > 0 && (
         <button type="button" onClick={() => targets!.onChange({})} className="mt-1 text-[11px] text-gold-300 hover:text-gold-200">
@@ -439,12 +448,13 @@ function RotationDamage({ usage, window: w, targets }: { usage: RotationUsage; w
 }
 
 /** D122: whole percent 0–100; empty = default (placeholder). */
-function PercentInput({ value, placeholder, onChange }: { value: number | null; placeholder: number; onChange: (v: number | null) => void }) {
+function PercentInput({ label, value, placeholder, onChange }: { label: string; value: number | null; placeholder: number; onChange: (v: number | null) => void }) {
   const [draft, setDraft] = useState<{ text: string; value: number | null } | null>(null);
   const text = draft && draft.value === value ? draft.text : (value?.toString() ?? '');
   return (
     <span className="inline-flex shrink-0 items-center gap-0.5">
       <input
+        aria-label={label}
         type="number"
         inputMode="numeric"
         min={0}
@@ -460,7 +470,7 @@ function PercentInput({ value, placeholder, onChange }: { value: number | null; 
           if (next !== value) onChange(next);
         }}
         onBlur={() => setDraft(null)}
-        className="field w-14 py-0.5 text-right text-xs tabular-nums placeholder:text-parchment-500"
+        className="field w-14 py-0 text-right text-xs tabular-nums placeholder:text-parchment-500"
       />
       <span className="text-parchment-400">%</span>
     </span>
