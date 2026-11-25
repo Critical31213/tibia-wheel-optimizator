@@ -164,7 +164,7 @@ export const en = {
   'rotation.customAdd': 'Add spell…',
   'rotation.customEmpty': 'No spells yet: the engine picks the rotation.',
   'rotation.damageTitle': 'Rotation damage in {seconds} s (average, test)',
-  'rotation.damageNote': 'Average casts and targets of this rotation on this spot, with the build’s revelations, wheel augments and flat bonus; gem spell mods not included.',
+  'rotation.damageNote': 'Average casts and targets of this rotation on this spot, with the build’s revelations, wheel augments and flat bonus; gem spell mods not included. Min/Max/Avg: one hit of the spell on one target, without critical hits or revelation extra hits.',
   'rotation.damageSpell': 'Spell',
   'rotation.damageCasts': 'Casts',
   'rotation.damageTargets': 'Targets',

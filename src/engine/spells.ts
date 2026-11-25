@@ -20,6 +20,7 @@ import {
   revelationSpell,
   levelTerm,
   spellAverageHit,
+  spellHitSpread,
   spellVariant,
   SPELL_FORMULAS,
   TURN_SECONDS,
@@ -117,6 +118,8 @@ interface HitPart {
   boost: number;
   /** Flat-bonus factor. */
   bf: number;
+  /** D105: min / max hit relative to the average. */
+  spread?: { min: number; max: number } | null;
 }
 
 export interface SpellEval {
@@ -373,6 +376,7 @@ function hitPart(name: string, char: Required<CharacterStats>, vocation: Vocatio
     base,
     boost: spellAverageHit(name, char, { ...o, baseDamagePct: 100 }) - base,
     bf: variant.bonusFactor,
+    ...(part === 'main' ? { spread: spellHitSpread(name, char, o) } : {}),
   };
 }
 
@@ -588,8 +592,23 @@ export function targetsAt(model: SpellModel, s: SpellEval, stage: number, extra 
 
 /** Average damage of one cast (all targets, element, crit, passives). */
 export function castDamage(model: SpellModel, s: SpellEval, r: RotationInput, m: SpellMods = NO_MODS): number {
+  return castEval(model, s, r, m).damage;
+}
+
+/**
+ * D105: the spell's own (main) hit on one target with every bonus, element and passive, without a critical hit or
+ * revelation extra hits; min / max from the formula's spread (absent without min/max formulas).
+ */
+export function hitRange(model: SpellModel, s: SpellEval, r: RotationInput, m: SpellMods = NO_MODS): { avg: number; min?: number; max?: number } {
   const stage = s.stageDomain >= 0 ? r.stages[s.stageDomain] ?? 0 : 0;
-  if (s.revelation >= 0 && stage < 1) return 0;
+  const spread = s.hits[stage]?.main.spread;
+  const { hit: avg } = castEval(model, s, r, m);
+  return spread && avg > 0 ? { avg, min: avg * spread.min, max: avg * spread.max } : { avg };
+}
+
+function castEval(model: SpellModel, s: SpellEval, r: RotationInput, m: SpellMods): { damage: number; hit: number } {
+  const stage = s.stageDomain >= 0 ? r.stages[s.stageDomain] ?? 0 : 0;
+  if (s.revelation >= 0 && stage < 1) return { damage: 0, hit: 0 };
   const h = s.hits[stage];
   const flat = r.flat ?? 0;
   // D79: the proficiency flat damage is scaled by the base-damage % like the spell itself (confirmed in-game).
@@ -625,8 +644,7 @@ export function castDamage(model: SpellModel, s: SpellEval, r: RotationInput, m:
     const p = PASSIVE_MULT[name];
     if (p.applies(s)) mult *= p.mult[st - 1];
   }
-  mult *= critEV(critChance, critExtra);
-  return Math.max(0, dmg * mult);
+  return { damage: Math.max(0, dmg * mult * critEV(critChance, critExtra)), hit: Math.max(0, val(h.main) * mult) };
 }
 
 export interface RotationResult {

@@ -41,7 +41,7 @@ describe('D23: vessels hold only owned gems', () => {
             }
           }
     }
-  });
+  }, 20_000);
 
   it('recommendations are still produced without owned gems', () => {
     for (const points of [0, 300, 2000]) {

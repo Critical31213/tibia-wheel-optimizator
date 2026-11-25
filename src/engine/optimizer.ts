@@ -90,6 +90,7 @@ import {
   rotation,
   rotationTotal,
   targetsAt,
+  hitRange,
   spellCooldown,
   type RotationInput,
   type SpellModel,
@@ -800,12 +801,21 @@ function rotationUsage(p: Prepared, stages: number[], alloc: ArrayLike<number>, 
     if (x.rate <= 0) continue;
     const s = v.model.spells.get(name);
     const targets = s ? targetsAt(v.model, s, s.stageDomain >= 0 ? stages[s.stageDomain] ?? 0 : 0, mods.get(name)?.extraTargets ?? 0) : 1;
+    const hits = s?.singleTarget ? 1 : targets;
+    const hit = s ? hitRange(v.model, s, wr, mods.get(name)) : null;
     spells.push({
       name,
       ratio: round1(x.rate * PER_MINUTE),
       share: round1((100 * x.rate * x.perCast) / rot.total),
       ...(s && s.revelation >= 0 ? { fromRevelation: true } : {}),
-      damage: { casts: round1(x.rate * turns), targets: round1(s?.singleTarget ? 1 : targets), perCast: Math.round(x.perCast), total: Math.round(x.rate * turns * x.perCast) },
+      damage: {
+        casts: round1(x.rate * turns),
+        targets: round1(hits),
+        perCast: Math.round(x.perCast),
+        total: Math.round(x.rate * turns * x.perCast),
+        ...(hit ? { avgHit: Math.round(hit.avg) } : {}),
+        ...(hit?.min !== undefined ? { minHit: Math.round(hit.min), maxHit: Math.round(hit.max!) } : {}),
+      },
     });
   }
   if (v.context.mode === 'boss') {

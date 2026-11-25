@@ -211,6 +211,10 @@ export interface SpellDamage {
   /** Average damage of one cast (all targets, element, crit). */
   perCast: number;
   total: number;
+  /** D105: the spell's own hit on one target, without crit or revelation extra hits: average, formula min / max. */
+  avgHit?: number;
+  minHit?: number;
+  maxHit?: number;
 }
 
 // ---------------------------------------------------------------------------

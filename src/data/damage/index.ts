@@ -224,6 +224,17 @@ export function spellAverageHit(spellName: string, character: CharacterStats, op
   return levelPart + (raw - levelPart) * (1 + (opts.baseDamagePct ?? 0) / 100) + (opts.flatBonus ?? 0) * v.bonusFactor;
 }
 
+/** D105: min and max raw hit of a variant relative to its average (null without min/max formulas). */
+export function spellHitSpread(spellName: string, character: CharacterStats, opts: HitOptions = {}): { min: number; max: number } | null {
+  const spell = getDamageSpell(spellName);
+  const v = spell && spellVariant(spell, opts.stage ?? 0, opts.part ?? 'main');
+  if (!spell || !v?.min || !v.max) return null;
+  const stats = statsFor(spell, character, opts);
+  const avg = evaluate(v.avg, stats);
+  if (avg <= 0) return null;
+  return { min: Math.max(0, evaluate(v.min, stats)) / avg, max: Math.max(0, evaluate(v.max, stats)) / avg };
+}
+
 /** Average healing of one cast on one target (approximate formulas, see docs). */
 export function healingAverage(spellName: string, character: CharacterStats, opts: { vocation?: Vocation; baseHealingPct?: number; flatBonus?: number; magicLevelBonus?: number } = {}): number {
   const spell = getHealingSpell(spellName);

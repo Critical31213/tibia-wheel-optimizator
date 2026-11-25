@@ -158,7 +158,7 @@ export const pl: Dictionary = {
   'rotation.customAdd': 'Dodaj spell…',
   'rotation.customEmpty': 'Brak spelli: rotację wybiera silnik.',
   'rotation.damageTitle': 'Obrażenia rotacji w {seconds} s (średnio, test)',
-  'rotation.damageNote': 'Średnia liczba castów i celów tej rotacji na tym spocie, z rewelacjami, augmentami koła i bonusem flat buildu; bez modów gemów do spelli.',
+  'rotation.damageNote': 'Średnia liczba castów i celów tej rotacji na tym spocie, z rewelacjami, augmentami koła i bonusem flat buildu; bez modów gemów do spelli. Min/Max/Avg: jedno uderzenie spella w jeden cel, bez krytyka i dodatkowych uderzeń rewelacji.',
   'rotation.damageSpell': 'Spell',
   'rotation.damageCasts': 'Casty',
   'rotation.damageTargets': 'Cele',

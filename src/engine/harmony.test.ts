@@ -34,6 +34,18 @@ describe('D67: rotation damage window', () => {
     expect(spells.reduce((a, s) => a + s.damage!.casts, 0)).toBeCloseTo(15, 0);
     expect(Math.abs(spells.reduce((a, s) => a + s.damage!.total, 0) + w.autoAttack - w.total)).toBeLessThanOrEqual(spells.length + 1);
   });
+
+  it('D105: Min < Avg < Max; Avg × targets within the cast damage', () => {
+    const r = optimize({ vocation: 'sorcerer', points: 1000, monster: null, priority: 0, context: { mode: 'hunt' }, alternatives: 0 });
+    const spells = r.rotation!.spells.filter((s) => s.damage);
+    expect(spells.some((s) => s.damage!.minHit !== undefined)).toBe(true);
+    for (const { damage: d } of spells) {
+      expect(d!.avgHit! * d!.targets).toBeLessThanOrEqual(d!.perCast + 1);
+      if (d!.minHit === undefined) continue;
+      expect(d!.minHit).toBeLessThan(d!.avgHit!);
+      expect(d!.maxHit!).toBeGreaterThan(d!.avgHit!);
+    }
+  });
 });
 
 describe('D68: five builders before each spender', () => {

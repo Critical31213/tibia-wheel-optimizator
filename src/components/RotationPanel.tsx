@@ -291,6 +291,9 @@ function RotationDamage({ usage, window: w }: { usage: RotationUsage; window: No
               <th className="px-1.5 py-0.5 text-left font-normal">{t('rotation.damageSpell')}</th>
               <th className={cx(cell, 'font-normal')}>{t('rotation.damageCasts')}</th>
               <th className={cx(cell, 'font-normal')}>{t('rotation.damageTargets')}</th>
+              <th className={cx(cell, 'font-normal')}>Min</th>
+              <th className={cx(cell, 'font-normal')}>Max</th>
+              <th className={cx(cell, 'font-normal')}>Avg</th>
               <th className={cx(cell, 'font-normal')}>{t('rotation.damagePerCast')}</th>
               <th className={cx(cell, 'font-normal')}>{t('rotation.damageTotal')}</th>
             </tr>
@@ -301,6 +304,9 @@ function RotationDamage({ usage, window: w }: { usage: RotationUsage; window: No
                 <td className="px-1.5 py-0.5">{s.name}</td>
                 <td className={cell}>{s.damage!.casts.toFixed(1)}</td>
                 <td className={cell}>{s.damage!.targets.toFixed(1)}</td>
+                <td className={cell}>{s.damage!.minHit !== undefined ? num(s.damage!.minHit) : '—'}</td>
+                <td className={cell}>{s.damage!.maxHit !== undefined ? num(s.damage!.maxHit) : '—'}</td>
+                <td className={cell}>{s.damage!.avgHit !== undefined ? num(s.damage!.avgHit) : '—'}</td>
                 <td className={cell}>{num(s.damage!.perCast)}</td>
                 <td className={cell}>{num(s.damage!.total)}</td>
               </tr>
@@ -308,20 +314,20 @@ function RotationDamage({ usage, window: w }: { usage: RotationUsage; window: No
             {w.autoAttack > 0 && (
               <tr className="border-t border-ink-700">
                 <td className="px-1.5 py-0.5 italic">{t('rotation.autoAttack')}</td>
-                <td className={cell} colSpan={3} />
+                <td className={cell} colSpan={6} />
                 <td className={cell}>{num(w.autoAttack)}</td>
               </tr>
             )}
             {(w.charms ?? 0) > 0 && (
               <tr className="border-t border-ink-700">
                 <td className="px-1.5 py-0.5 italic">{t('rotation.charms')}</td>
-                <td className={cell} colSpan={3} />
+                <td className={cell} colSpan={6} />
                 <td className={cell}>{num(w.charms!)}</td>
               </tr>
             )}
             <tr className="border-t border-ink-600 font-semibold text-parchment-100">
               <td className="px-1.5 py-0.5">{t('rotation.damageSum')}</td>
-              <td className={cell} colSpan={3}>
+              <td className={cell} colSpan={6}>
                 <span className="font-normal text-parchment-300">{t('rotation.damagePerSecond', { dps: num(w.total / w.seconds) })}</span>
               </td>
               <td className={cell}>{num(w.total)}</td>
