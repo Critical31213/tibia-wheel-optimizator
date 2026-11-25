@@ -55,7 +55,6 @@ export const en = {
   'help.compare': "Paste the export code of your own wheel from the official planner. It is valued with the same rotation, gear and gems, and the lists show where each wheel is better.",
   'help.export': "Copy the code and paste it into the official Wheel of Destiny planner to see or adjust the build there (gems included).",
   'help.vessels': "Which gem goes into which vessel, mods not used by the build, recommended new gems, the best upgrades and mod swaps.",
-  'help.why': "Why the optimizer chose this build: the perks and spells that bring the most value, and what was left out.",
   'help.label': 'How to use: {title}',
   'vocation.title': 'Vocation',
   'vocation.blurb.knight': 'Melee tank',
@@ -510,7 +509,6 @@ export const en = {
   'results.nextStage': ' · next stage at {points}',
   'results.convictions': 'Conviction perks',
   'results.stats': 'Stats',
-  'results.why': 'Why this build',
 
   ...engineEn,
 } as const;

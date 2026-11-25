@@ -10,7 +10,7 @@ import { LanguageSwitch } from './components/LanguageSwitch';
 import { MonsterSearch } from './components/MonsterSearch';
 import { NotesPanel } from './components/NotesPanel';
 import { Panel } from './components/Panel';
-import { BuildRationale, ResultsPanel } from './components/ResultsPanel';
+import { ResultsPanel } from './components/ResultsPanel';
 import { ComparePanel } from './components/ComparePanel';
 import { parseOwnWheel } from './lib/compare';
 import { SegmentedControl } from './components/SegmentedControl';
@@ -280,12 +280,6 @@ function Optimizer({ onReset }: { onReset: () => void }) {
           )}
         </div>
       </div>
-
-      {shown && shown.rationale.length > 0 && (
-        <Panel title={t('results.why')} headingId="why-heading" className="mt-3">
-          <BuildRationale result={shown} />
-        </Panel>
-      )}
 
       <NotesPanel vocation={inputs.vocation} capacity={maxPoints} />
 

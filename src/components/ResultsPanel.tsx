@@ -86,15 +86,3 @@ export function ResultsPanel({ result }: ResultsPanelProps) {
     </div>
   );
 }
-
-/** D57: the engine's reasons for the build (own panel at the end of the page). */
-export function BuildRationale({ result }: { result: BuildResult }) {
-  const t = useT();
-  return (
-    <ul className="list-disc space-y-1 pl-5 text-sm text-parchment-200 marker:text-gold-500">
-      {result.rationale.map((r, i) => (
-        <li key={r}>{engineText(t, result.rationaleMsgs?.[i], r)}</li>
-      ))}
-    </ul>
-  );
-}

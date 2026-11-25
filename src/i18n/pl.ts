@@ -49,7 +49,6 @@ export const pl: Dictionary = {
   'help.compare': "Wklej kod eksportu własnego koła z oficjalnego plannera. Zostanie wycenione z tą samą rotacją, ekwipunkiem i gemami, a listy pokażą, gdzie które koło jest lepsze.",
   'help.export': "Skopiuj kod i wklej go w oficjalnym plannerze Wheel of Destiny, żeby zobaczyć lub poprawić build (razem z gemami).",
   'help.vessels': "Który gem trafia do którego vessela, mody nieużywane przez build, polecane nowe gemy, najlepsze ulepszenia i zamiany modów.",
-  'help.why': "Dlaczego optymalizator wybrał ten build: perki i spelle, które dają najwięcej, oraz co zostało pominięte.",
   'help.label': 'Jak używać: {title}',
   'vocation.title': 'Profesja',
   'vocation.blurb.knight': 'Tank wręcz',
@@ -504,7 +503,6 @@ export const pl: Dictionary = {
   'results.nextStage': ' · następny etap od {points}',
   'results.convictions': 'Perki Conviction',
   'results.stats': 'Statystyki',
-  'results.why': 'Dlaczego ten build',
 
   'engine.rationale.priority': 'Priorytet {priority}/100: atak ważony w {offense}%, przeżywalność w {defense}%.',
   'engine.rationale.character': 'Postać na poziomie {level}: {hp} bazowego HP, bazowa mitygacja ≈ {mitigation}%; obrażenia spelli liczone z poziomu i skilli.',
