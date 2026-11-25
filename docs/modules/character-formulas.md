@@ -52,28 +52,28 @@ monk 70, mages 30.
 There are no fight modes in the current game. The structure follows the in-game mitigation:
 
 ```
-mitigation % = (shielding × vocFactor + offhandFactor × defense) / 100 × distanceFactor × (1 + wheelMultiplier%/100)
+mitigation % = (shielding × vocFactor + offhandFactor × defense) / 100 × (1 + wheelMultiplier%/100)
 ```
 
 Generic server constants (multiplier S/D 1.26, P/M 1.28, K 1.3; primaryShield 2.0–2.08;
 secondaryShield 1.2–1.25, applied to spellbooks and as a ×1.2 *bonus* for quivers) do **not** reproduce the
-in-game Cyclopedia values. These values are used for calibration and take priority:
+in-game Cyclopedia values. These values (no wheel) are used for calibration and take priority (D108 replaced an
+older paladin pair that suggested a quiver penalty):
 
 | Point | Cyclopedia | Model | Inputs |
 |---|---|---|---|
-| RP shielding 108, quiver: shielding part | 1.07 % | 1.07 % | 108 × 1.13/100 × 0.877 |
-| Same RP with a shield: shield part | 1.28 % | 1.28 % | defense 50 × 2.56/100 |
-| Same RP with a shield: total | 2.50 % | 2.50 % | 1.22 + 1.28 |
+| RP level 855, shielding 108, quiver | 1.18 % | 1.18 % | 108 × 1.096/100 |
+| Same RP, shielding 110, Gnome Shield: shielding part | 1.21 % | 1.21 % | 110 × 1.096/100 |
+| Same RP with the shield: shield part | 1.28 % | 1.28 % | defense 50 × 2.56/100 |
 | ED level 781: shielding part | 0.40 % | 0.40 % | default shielding 36 × 1.112/100 |
 | ED level 781: spellbook part | 0.87 % | 0.87 % | default defense 34 × 2.56/100 |
 
 How the constants were inferred:
 
-- **Shielding factor.** The RP shield total (2.50 − 1.28) gives a shielding part of 1.22 % for 108 shielding, or
-  1.13 %/100 points. That is the paladin vocation multiplier 1.28 × 0.883. The other vocations use their
-  multiplier scaled by the same 0.883: K 1.148, P/M 1.13, S/D 1.112.
-- **Quiver factor 0.877.** With a quiver the same RP shows 1.07 % instead of 1.22 %. So the quiver
-  (distance) factor *lowers* mitigation, the opposite of the generic 1.2.
+- **Shielding factor.** 1.18 % at 108 and 1.21 % at 110 shielding (both rounded to 0.01) bound the paladin factor
+  to 1.0955–1.0972 %/100 points; 1.096 is used. Knight (1.126) and mages (1.112) are fitted on their own readings;
+  the monk follows the paladin (not measured).
+- **No quiver factor (D108).** A quiver does not change mitigation (checked in-game).
 - **Offhand factor 2.56 %/100 defense**, the same for shields and spellbooks. Item defense values come from the
   TibiaWiki item data (`scripts/.cache/damage-api/meta/shields.json`). tibiopedia.pl only
   serves a JS "setup" page to scripts, so it could not be scraped. A typical ~50-defense shield (Great/Gnome
@@ -84,8 +84,7 @@ How the constants were inferred:
 
 **Uncertainty.** The RP shield is a **Gnome Shield (defense 50, damage API meta), confirmed in-game**, so the offhand factor 2.56 is
 fitted on a known item. The RP level and the ED shielding are still unknown (the fit uses the default ED stats).
-The quiver factor rests on a single pair of observations. Any bow or crossbow paladin
-without a quiver is treated like `'none'` (factor 1), which is untested. Monk weapon defense is ignored.
+Monk weapon defense is ignored.
 
 **Defaults (`DEFAULT_OFFHAND`)**
 - Paladin: quiver, both for the hunt bow and the boss crossbow.
@@ -107,9 +106,9 @@ Spellbooks: Spellbook of Lost Souls, Stag Spellbook/Eldritch Folio, Arboreal Tom
 
 | Level | EK (none) | EK (shield) | RP (quiver) | Mage (spellbook) | Monk |
 |---|---|---|---|---|---|
-| 200 | 1.01 % | 2.19 % | 0.71 % | 1.13 % | 0.68 % |
-| 800 | 1.25 % | 2.58 % | 0.89 % | 1.32 % | 0.82 % |
-| 1500 | 1.39 % | 2.80 % | 1.01 % | 1.37 % | 0.93 % |
+| 200 | 0.99 % | 2.17 % | 0.79 % | 1.13 % | 0.66 % |
+| 800 | 1.23 % | 2.56 % | 0.99 % | 1.32 % | 0.80 % |
+| 1500 | 1.36 % | 2.77 % | 1.12 % | 1.37 % | 0.90 % |
 
 `effectiveHp(hp, m) = hp / (1 − m/100)` (D18).
 

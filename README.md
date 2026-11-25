@@ -23,9 +23,9 @@ the build in the official planner.
 - **Character.** Level (drives the points), promotion scroll points, optional manual points and per-vocation
   skills (melee/distance/fist, shielding, magic level; empty = estimated from level). They drive HP, base
   mitigation and real spell damage.
-- **Real mitigation formula.** Base mitigation = shielding × vocation factor + shield / spellbook / quiver defense,
-  calibrated on in-game values (paladin quiver for hunts, crossbow for bosses; mages use a spellbook; knights a
-  shield only in the shield rotation).
+- **Real mitigation formula.** Base mitigation = shielding × vocation factor + shield / spellbook defense,
+  calibrated on in-game Cyclopedia values (a quiver adds nothing; mages use a spellbook; knights a shield only in
+  the shield rotation).
 - **Defense as effective HP.** HP, mitigation, dodge and resistances are compared as % effective HP
   (EHP = HP / (1 − mitigation)); capacity and max mana have no value (potions and mana leech are assumed).
 - **Damage model.** Spell damage comes from per-spell formulas fitted offline on the a public damage-calculator API, run through a rotation (cooldowns, crit, augments, flat bonus).
@@ -154,8 +154,8 @@ src/integration.test.ts      end-to-end tests
 - Damage formulas are fitted to the damage API calculator (≤ 1.7 damage error), not taken from the game itself.
 - Healing formulas are approximate, and the cooldowns of the 2026 spells are estimates.
 - Armor is not modelled; base mitigation assumes default equipment per vocation.
-- Hunt target counts are community averages; the shield defense (50) and quiver factor used for paladin
-  mitigation come from a few in-game data points.
+- Hunt target counts are community averages; the mitigation constants come from a few in-game
+  data points.
 - Some legacy monsters have incomplete damage or resistance data on the source site.
 - The UI is functional, not polished; polishing is postponed until the functionality is accepted.
 

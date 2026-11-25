@@ -45,11 +45,12 @@ describe('character formulas', () => {
 describe('mitigation (D19, calibrated on in-game Cyclopedia values)', () => {
   const near = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThanOrEqual(0.05);
 
-  it('Royal Paladin shielding 108: quiver 1.07 %; with a shield 2.50 % total, shield part 1.28 %', () => {
-    near(mitigationBreakdown('paladin', 700, { shielding: 108, offhand: 'quiver' }).shielding, 1.07);
-    const s = mitigationBreakdown('paladin', 700, { shielding: 108, offhand: 'shield', offhandDefense: 50 });
-    near(s.offhand, 1.28);
-    near(s.total, 2.5);
+  it('D108: Royal Paladin 108 shielding + quiver 1.18 %; 110 shielding + Gnome Shield 1.21 % + 1.28 %', () => {
+    const near2 = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThan(0.005);
+    near2(mitigationBreakdown('paladin', 855, { shielding: 108, offhand: 'quiver' }).total, 1.18);
+    const s = mitigationBreakdown('paladin', 855, { shielding: 110, offhand: 'shield', offhandDefense: 50 });
+    near2(s.shielding, 1.21);
+    near2(s.offhand, 1.28);
   });
 
   it('Elder Druid level 781 (defaults): shielding 0.40 %, spellbook 0.87 %', () => {
