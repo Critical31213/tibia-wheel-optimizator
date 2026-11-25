@@ -23,9 +23,11 @@ export interface SpellPrefs {
   targets: Record<string, number>;
   /** D116: minimum number of unlocked gem vessels; 0 = auto. */
   minVessels: number;
+  /** D122: share of rotation turns with an auto-attack (%); null = vocation default. */
+  autoAttack: number | null;
 }
 
-export const EMPTY_SPELL_PREFS: SpellPrefs = { rotationId: null, forcedSpells: [], forcedStage2: [], forcedRevelations: [], stance: null, customRotation: [], excludedSpells: [], targets: {}, minVessels: 0 };
+export const EMPTY_SPELL_PREFS: SpellPrefs = { rotationId: null, forcedSpells: [], forcedStage2: [], forcedRevelations: [], stance: null, customRotation: [], excludedSpells: [], targets: {}, minVessels: 0, autoAttack: null };
 /** D116: gem vessels of the current wheel. */
 export const MAX_VESSELS = 8;
 export const MAX_CUSTOM_SPELLS = 8;
@@ -85,6 +87,7 @@ const CR_KEY = 'cr';
 const XS_KEY = 'xs';
 const TG_KEY = 'tg';
 const MV_KEY = 'mv';
+const AA_KEY = 'aa';
 const SEP = ',';
 
 /** Keeps only known ids/spells (canonical casing), unique, at most MAX_FORCED_SPELLS. */
@@ -99,7 +102,7 @@ export function sanitizeSpellPrefs(
   excludable: readonly string[] = [],
 ): SpellPrefs {
   if (!raw || typeof raw !== 'object') return EMPTY_SPELL_PREFS;
-  const { rotationId, forcedSpells, forcedStage2, forcedRevelations, stance, customRotation, excludedSpells, targets, minVessels } = raw as Record<string, unknown>;
+  const { rotationId, forcedSpells, forcedStage2, forcedRevelations, stance, customRotation, excludedSpells, targets, minVessels, autoAttack } = raw as Record<string, unknown>;
   const byLower = new Map(spells.map((s) => [s.toLowerCase(), s]));
   const forced: string[] = [];
   if (Array.isArray(forcedSpells)) {
@@ -127,7 +130,14 @@ export function sanitizeSpellPrefs(
     excludedSpells: knownSpells(excludedSpells, excludable),
     targets: sanitizeTargets(targets, excludable),
     minVessels: sanitizeMinVessels(minVessels),
+    autoAttack: sanitizeAutoAttack(autoAttack),
   };
+}
+
+/** D122: whole percent 0..100 (anything else = vocation default). */
+export function sanitizeAutoAttack(raw: unknown): number | null {
+  const n = typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : raw;
+  return typeof n === 'number' && Number.isInteger(n) && n >= 0 && n <= 100 ? n : null;
 }
 
 /** D116: whole number 0..MAX_VESSELS (anything else = auto). */
@@ -169,7 +179,7 @@ export function spellPrefsFromQuery(
   excludable: readonly string[] = [],
 ): SpellPrefs | undefined {
   const q = new URLSearchParams(search);
-  if (![R_KEY, FS_KEY, FS2_KEY, FR_KEY, ST_KEY, CR_KEY, XS_KEY, TG_KEY, MV_KEY, 'v'].some((k) => q.has(k))) return undefined;
+  if (![R_KEY, FS_KEY, FS2_KEY, FR_KEY, ST_KEY, CR_KEY, XS_KEY, TG_KEY, MV_KEY, AA_KEY, 'v'].some((k) => q.has(k))) return undefined;
   const customRotation = (q.get(CR_KEY) ?? '')
     .split(SEP)
     .map((x) => {
@@ -191,7 +201,7 @@ export function spellPrefsFromQuery(
       }),
   );
   return sanitizeSpellPrefs(
-    { targets, minVessels: q.get(MV_KEY), rotationId: q.get(R_KEY), forcedSpells: (q.get(FS_KEY) ?? '').split(SEP), forcedStage2: (q.get(FS2_KEY) ?? '').split(SEP), forcedRevelations, stance: q.get(ST_KEY), customRotation, excludedSpells: (q.get(XS_KEY) ?? '').split(SEP) },
+    { targets, minVessels: q.get(MV_KEY), autoAttack: q.get(AA_KEY), rotationId: q.get(R_KEY), forcedSpells: (q.get(FS_KEY) ?? '').split(SEP), forcedStage2: (q.get(FS2_KEY) ?? '').split(SEP), forcedRevelations, stance: q.get(ST_KEY), customRotation, excludedSpells: (q.get(XS_KEY) ?? '').split(SEP) },
     rotationIds,
     spells,
     stances,
@@ -223,5 +233,7 @@ export function spellPrefsToQuery(prefs: SpellPrefs, search = ''): string {
   else q.delete(TG_KEY);
   if (prefs.minVessels) q.set(MV_KEY, String(prefs.minVessels));
   else q.delete(MV_KEY);
+  if (prefs.autoAttack !== null && prefs.autoAttack !== undefined) q.set(AA_KEY, String(prefs.autoAttack));
+  else q.delete(AA_KEY);
   return `?${q.toString()}`;
 }

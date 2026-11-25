@@ -133,6 +133,12 @@ export const MITIGATION_SHIELDING_FACTOR: Record<Vocation, number> = {
 };
 
 /**
+ * D122: share of rotation turns with an auto-attack (%), default per vocation: not every knight attacks while
+ * casting, mages rarely do. The player can set their own (`autoAttackPct`).
+ */
+export const AUTO_ATTACK_UPTIME: Record<Vocation, number> = { knight: 60, paladin: 100, sorcerer: 10, druid: 10, monk: 40 };
+
+/**
  * D119: the Cyclopedia's vocation multiplier on the base mitigation (the row the combat modes used to fill): monk 160 %,
  * others 100 %. It multiplies shielding + defense; the wheel multiplier applies on top.
  */

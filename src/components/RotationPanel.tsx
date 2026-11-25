@@ -24,6 +24,8 @@ interface RotationPanelProps {
   revelations: RevelationOption[];
   /** D116: gem vessels of the wheel; unlocked in the shown build. */
   maxVessels: number;
+  /** D122: default share of turns with an auto-attack (%). */
+  autoAttackDefault: number;
   shownVessels?: number;
   value: SpellPrefs;
   onChange: (patch: Partial<SpellPrefs>) => void;
@@ -37,7 +39,7 @@ interface RotationPanelProps {
 const AUTO = '*';
 
 /** Rotation choice (auto / preset), the rotation the viewed build is based on, and forced spell augments. */
-export function RotationPanel({ presets, customSpells, spells, excludable, targetSpells, stanceOptions, revelations, maxVessels, shownVessels, value, onChange, usage, stances }: RotationPanelProps) {
+export function RotationPanel({ presets, customSpells, spells, excludable, targetSpells, stanceOptions, revelations, maxVessels, shownVessels, autoAttackDefault, value, onChange, usage, stances }: RotationPanelProps) {
   const t = useT();
   const id = useId();
   const selected = presets.find((p) => p.id === value.rotationId);
@@ -143,6 +145,24 @@ export function RotationPanel({ presets, customSpells, spells, excludable, targe
           </ul>
         )}
         <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.excludedHint')}</p>
+      </div>
+
+      <div className="mt-3 text-xs">
+        <label className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 text-parchment-300">{t('rotation.autoAttackShare')}</span>
+          <PercentInput value={value.autoAttack} placeholder={autoAttackDefault} onChange={(autoAttack) => onChange({ autoAttack })} />
+          <button
+            type="button"
+            aria-label={t('rotation.autoAttackReset')}
+            title={t('rotation.autoAttackReset')}
+            disabled={value.autoAttack === null}
+            onClick={() => onChange({ autoAttack: null })}
+            className="w-3 text-parchment-400 hover:text-parchment-50 disabled:invisible"
+          >
+            ↺
+          </button>
+        </label>
+        <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.autoAttackHint', { n: autoAttackDefault })}</p>
       </div>
 
       {usage && (
@@ -415,6 +435,35 @@ function RotationDamage({ usage, window: w, targets }: { usage: RotationUsage; w
         </button>
       )}
     </details>
+  );
+}
+
+/** D122: whole percent 0–100; empty = default (placeholder). */
+function PercentInput({ value, placeholder, onChange }: { value: number | null; placeholder: number; onChange: (v: number | null) => void }) {
+  const [draft, setDraft] = useState<{ text: string; value: number | null } | null>(null);
+  const text = draft && draft.value === value ? draft.text : (value?.toString() ?? '');
+  return (
+    <span className="inline-flex shrink-0 items-center gap-0.5">
+      <input
+        type="number"
+        inputMode="numeric"
+        min={0}
+        max={100}
+        step={5}
+        placeholder={String(placeholder)}
+        value={text}
+        onChange={(e) => {
+          const raw = e.target.value;
+          const n = Number(raw);
+          const next = raw.trim() === '' ? null : Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : value;
+          setDraft({ text: raw, value: next });
+          if (next !== value) onChange(next);
+        }}
+        onBlur={() => setDraft(null)}
+        className="field w-14 py-0.5 text-right text-xs tabular-nums placeholder:text-parchment-500"
+      />
+      <span className="text-parchment-400">%</span>
+    </span>
   );
 }
 

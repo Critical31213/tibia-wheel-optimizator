@@ -242,7 +242,7 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
       critChance + pc + pp((p) => p.kind === 'autoCritChance') + (gear?.critChance ?? 0) + (model.charms?.critChance ?? 0),
       critExtra + pd + pp((p) => p.kind === 'autoCritDamage') + (gear?.critExtra ?? 0) + (model.charms?.critExtra ?? 0),
     );
-    base = hit * targets * autoMix * crit * (model.damageMult ?? 1) * mult * (gear?.mult ?? 1);
+    base = (model.autoShare ?? 1) * hit * targets * autoMix * crit * (model.damageMult ?? 1) * mult * (gear?.mult ?? 1);
   }
   for (const p of perks) {
     if (p.kind !== 'homingMissile' || !p.element) continue;

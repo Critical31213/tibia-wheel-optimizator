@@ -28,7 +28,7 @@ import {
   weaponBracket,
   type DamageSpell,
 } from '../data/damage';
-import { maxHitPoints, maxMana, resolveCharacterStats } from '../data/character';
+import { AUTO_ATTACK_UPTIME, maxHitPoints, maxMana, resolveCharacterStats } from '../data/character';
 import { CARNAGE_NEIGHBOURS, getCharm } from '../data/charms';
 import { getEngineWheel } from './wheel/build';
 
@@ -193,8 +193,10 @@ export interface SpellModel {
   wheelSpells: string[];
   /** Revelation passive name → domain index. */
   passives: Map<string, number>;
-  /** Auto-attack damage per turn. */
+  /** Auto-attack damage per turn (× the auto-attack share, D122). */
   base: number;
+  /** D122: share (0–1) of turns with an auto-attack. */
+  autoShare?: number;
   /** T0: damage per turn without wheel bonuses and revelations. */
   total: number;
   /** Δ% total damage per +1 flat damage bonus (at T0). */
@@ -244,7 +246,12 @@ export interface ModelExtras {
   charms?: readonly CharmAssign[];
   /** D107: the player's average targets per cast when hunting, replacing the community average. */
   targets?: Readonly<Record<string, number>>;
+  /** D122: share of turns with an auto-attack (%), default AUTO_ATTACK_UPTIME. */
+  autoAttackPct?: number;
 }
+
+/** D122: share (0–1) of rotation turns with an auto-attack. */
+export const autoAttackShare = (vocation: Vocation, pct?: number) => Math.min(100, Math.max(0, pct ?? AUTO_ATTACK_UPTIME[vocation])) / 100;
 
 /** D93: charm effects of an assignment over the spot (undefined = none). */
 export function charmModel(vocation: Vocation, level: number, context: FightContext, spot: { monster: Monster; weight: number }[], picks: readonly CharmAssign[] | undefined): CharmModel | undefined {
@@ -393,7 +400,7 @@ export type ElementMagicLevel = Partial<Record<Element, number>>;
 
 function cacheKey(vocation: Vocation, ctx: FightContext, monsters: { monster: Monster; weight: number }[], c: Required<CharacterStats>, eml: ElementMagicLevel, attack?: number, gear?: GearModel, extras: ModelExtras = {}) {
   const m = monsters.map((x) => `${x.monster.id}:${x.weight.toFixed(6)}`).join(',');
-  return `${vocation}|${ctx.mode}|${m}|${c.level}|${c.mainSkill}|${c.magicLevel}|${c.shielding}|${JSON.stringify(eml)}|${attack ?? ''}|${gear ? JSON.stringify(gear) : ''}|${[...(extras.excluded ?? [])].sort().join(',')}|${(extras.charms ?? []).map((p) => `${p.monsterId}:${p.id}:${p.stage}`).join(',')}|${Object.entries(extras.targets ?? {}).sort(([a], [b]) => a.localeCompare(b)).map(([n, v]) => `${n}:${v}`).join(',')}`;
+  return `${vocation}|${ctx.mode}|${m}|${c.level}|${c.mainSkill}|${c.magicLevel}|${c.shielding}|${JSON.stringify(eml)}|${attack ?? ''}|${gear ? JSON.stringify(gear) : ''}|${[...(extras.excluded ?? [])].sort().join(',')}|${(extras.charms ?? []).map((p) => `${p.monsterId}:${p.id}:${p.stage}`).join(',')}|${Object.entries(extras.targets ?? {}).sort(([a], [b]) => a.localeCompare(b)).map(([n, v]) => `${n}:${v}`).join(',')}|${extras.autoAttackPct ?? ''}`;
 }
 
 export function buildSpellModel(
@@ -495,7 +502,8 @@ export function buildSpellModel(
   const autoTargets = context.mode === 'boss' ? 1 : AUTO_ATTACK_TARGETS[vocation];
   const mage = vocation === 'sorcerer' || vocation === 'druid';
   const autoElem = mage ? spotElementMultiplier(spot, 'physical') : convertedPhysical(spot, gear?.conversion);
-  const base = autoHit * autoTargets * autoElem * critEV((gear?.critChance ?? 0) + (charms?.critChance ?? 0), (gear?.critExtra ?? 0) + (charms?.critExtra ?? 0)) * (gear?.mult ?? 1);
+  const autoShare = autoAttackShare(vocation, extras.autoAttackPct);
+  const base = autoShare * autoHit * autoTargets * autoElem * critEV((gear?.critChance ?? 0) + (charms?.critChance ?? 0), (gear?.critExtra ?? 0) + (charms?.critExtra ?? 0)) * (gear?.mult ?? 1);
 
   const model: SpellModel = {
     vocation,
@@ -508,6 +516,7 @@ export function buildSpellModel(
     wheelSpells,
     passives,
     base,
+    autoShare,
     total: 1,
     flatOffPerPoint: 0,
     flatHealPerPoint: 0,

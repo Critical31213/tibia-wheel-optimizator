@@ -426,6 +426,8 @@ export interface OptimizerInput {
   excludedSpells?: string[];
   /** D107: the player's average targets per cast when hunting (spell name → targets), replacing the community average. */
   spellTargets?: Record<string, number>;
+  /** D122: share of rotation turns with an auto-attack (0–100 %); default `AUTO_ATTACK_UPTIME` of the vocation. */
+  autoAttackPct?: number;
   /** D93: offensive charms the player has unlocked; the engine assigns them to the spot's creatures. */
   charms?: OwnedCharm[];
   /** D93: the assignment (set by the engine from `charms`). */

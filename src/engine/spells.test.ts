@@ -192,3 +192,20 @@ describe('avatar, cooldowns, effects', () => {
     expect(bossII.off).toBe(0);
   });
 });
+
+describe('D122: auto-attack share of rotation turns', () => {
+  const hunt: FightContext = { mode: 'hunt' };
+  it('defaults per vocation and follows the player value', () => {
+    for (const [v, pct] of [['knight', 60], ['paladin', 100], ['sorcerer', 10], ['druid', 10], ['monk', 40]] as const) {
+      const full = buildSpellModel(v, hunt, null, { level: 600 }, {}, undefined, undefined, { autoAttackPct: 100 }).base;
+      expect(buildSpellModel(v, hunt, null, { level: 600 }).base).toBeCloseTo((full * pct) / 100, 6);
+    }
+    expect(buildSpellModel('knight', hunt, null, { level: 600 }, {}, undefined, undefined, { autoAttackPct: 0 }).base).toBe(0);
+  });
+
+  it('the rotation table follows it', () => {
+    const run = (autoAttackPct?: number) => optimize({ vocation: 'knight', points: 800, monster: null, priority: 0, context: { mode: 'hunt' }, alternatives: 0, autoAttackPct }).rotation!.window!.autoAttack;
+    expect(run(100)).toBeGreaterThan(run());
+    expect(run(0)).toBe(0);
+  });
+});

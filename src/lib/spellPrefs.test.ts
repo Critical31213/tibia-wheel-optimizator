@@ -25,6 +25,7 @@ describe('spell prefs', () => {
       excludedSpells: [],
       targets: {},
       minVessels: 0,
+      autoAttack: null,
     });
     const many = Array.from({ length: 20 }, (_, i) => `s${i}`);
     expect(sanitizeSpellPrefs({ forcedSpells: many }, IDS, many).forcedSpells).toHaveLength(MAX_FORCED_SPELLS);
@@ -43,6 +44,7 @@ describe('spell prefs', () => {
       excludedSpells: ['Great Energy Beam', "Hell's Core"],
       targets: { "Hell's Core": 9.5, 'Great Fire Wave': 4 },
       minVessels: 5,
+      autoAttack: null,
     };
     const XS = getExcludableSpells('sorcerer');
     const ST = getStanceOptions('sorcerer');
@@ -69,6 +71,9 @@ describe('spell prefs', () => {
     expect(spellPrefsFromQuery('?fs2=Hell%27s+Core&fr=Nope:2,Beam+Mastery:4', IDS, SPELLS, ST, RV)).toMatchObject({ forcedStage2: [], forcedRevelations: [] });
     // D116: forced vessels: whole numbers 0..8, anything else auto.
     expect(spellPrefsFromQuery('?mv=9', IDS, SPELLS)?.minVessels).toBe(0);
+    expect(spellPrefsFromQuery('?aa=101', IDS, SPELLS)?.autoAttack).toBeNull();
+    expect(spellPrefsFromQuery('?aa=0', IDS, SPELLS)?.autoAttack).toBe(0);
+    expect(spellPrefsFromQuery('?aa=35', IDS, SPELLS)?.autoAttack).toBe(35);
     expect(spellPrefsFromQuery('?mv=2.5', IDS, SPELLS)?.minVessels).toBe(0);
     expect(spellPrefsFromQuery('?mv=3', IDS, SPELLS)?.minVessels).toBe(3);
     expect(spellPrefsFromQuery('?st=', IDS, SPELLS, ST)?.stance).toBe('');
