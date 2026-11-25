@@ -186,7 +186,13 @@ function Optimizer({ onReset }: { onReset: () => void }) {
             {showOwn && current && shown?.comparison && (
               <p className="mb-2 text-center text-xs font-medium text-gold-300">{t('compare.ownWheel')}</p>
             )}
-            <WheelChart wheel={resultWheel} result={showOwn && current && shown?.comparison ? shown.comparison : shown} />
+            <WheelChart
+              wheel={resultWheel}
+              variant={resultVariant}
+              result={showOwn && current && shown?.comparison ? shown.comparison : shown}
+              vessels={shown?.vessels}
+              mods={resultWheel.mods}
+            />
           </Panel>
           <Panel title={t('rotation.title')} headingId="rotation-heading">
             <RotationPanel

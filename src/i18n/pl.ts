@@ -471,7 +471,11 @@ export const pl: Dictionary = {
   'wheel.ring': 'pierścień {ring}',
   'wheel.revelations': 'Aktywne perki revelation',
   'wheel.revelationPts': '{n} pkt',
-  'wheel.hint': 'Najedź lub ustaw fokus na polu, aby zobaczyć szczegóły.',
+  'wheel.hint': 'Najedź na pole, narożnik lub gem, aby zobaczyć szczegóły.',
+  'wheel.pointsUsed': 'Wydane punkty: {n}',
+  'wheel.credit': 'Grafika koła © CipSoft GmbH.',
+  'wheel.imagesFailed': 'Nie udało się wczytać grafiki koła.',
+  'wheel.gems': 'Gemy w vesselach',
 
   'results.pointsUsed': 'Wykorzystano {used} z {total} pkt.',
   'results.damage': 'Obrażenia',

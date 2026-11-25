@@ -477,7 +477,11 @@ export const en = {
   'wheel.ring': 'ring {ring}',
   'wheel.revelations': 'Active revelation perks',
   'wheel.revelationPts': '{n} pts',
-  'wheel.hint': 'Hover or focus a slice for details.',
+  'wheel.pointsUsed': 'Points spent: {n}',
+  'wheel.credit': 'Wheel art © CipSoft GmbH.',
+  'wheel.imagesFailed': 'The wheel graphics could not be loaded.',
+  'wheel.gems': 'Gems in the vessels',
+  'wheel.hint': 'Hover a slice, corner or gem for details.',
 
   'results.pointsUsed': '{used} of {total} points used.',
   'results.damage': 'Damage',
