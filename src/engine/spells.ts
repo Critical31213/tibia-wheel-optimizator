@@ -205,6 +205,8 @@ export interface SpellModel {
   damageMult?: number;
   /** D24: active stances. */
   stances?: string[];
+  /** D120: Harmony builder casts per spender of the stance (else HARMONY_BUILDERS). */
+  harmonyBuilders?: number;
   /** D24: damage type of the elemental stance (Lord of Destruction). */
   stanceElement?: Element;
   /** D24: pierce % of the stances (all damage spells). */
@@ -736,14 +738,14 @@ function presetRotation(model: SpellModel, r: RotationInput): RotationResult {
     total += waterFill(items, left, rates);
     return { total, rates };
   }
-  // D68: a Harmony spender needs HARMONY_BUILDERS builder casts before it; turns a builder's cooldown frees go to builders.
+  // D68: a Harmony spender needs HARMONY_BUILDERS builder casts before it (D120: 4 in Virtue of Harmony); turns a builder's cooldown frees go to builders.
   const ratioS = spenders.reduce((a, x) => a + x.ratio, 0);
   const ratioB = builders.reduce((a, x) => a + x.ratio, 0);
   const slot = Math.min(spenders.reduce((a, x) => a + x.cap, 0), (left * ratioS) / (ratioS + ratioB));
   const probe = new Map<string, { rate: number; perCast: number }>();
   waterFill(builders, left - slot, probe);
   const built = [...probe.values()].reduce((a, x) => a + x.rate, 0);
-  const spend = Math.min(slot, built / HARMONY_BUILDERS);
+  const spend = Math.min(slot, built / (model.harmonyBuilders ?? HARMONY_BUILDERS));
   total += waterFill(builders, left - spend, rates);
   total += waterFill(spenders, spend, rates);
   return { total, rates };

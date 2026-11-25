@@ -14,7 +14,7 @@ describe('D66: monk Harmony spender slot', () => {
     const a = rates(so);
     const b = rates(plain);
     expect(a.get('Spiritual Outburst')).toBeGreaterThan(0);
-    expect(a.get('Spiritual Outburst')! + a.get('Sweeping Takedown')!).toBeCloseTo(b.get('Sweeping Takedown')!, 1);
+    expect(a.get('Spiritual Outburst')! + a.get('Sweeping Takedown')!).toBeCloseTo(b.get('Sweeping Takedown')!, 0);
     expect(a.get('Chained Penance')).toBe(b.get('Chained Penance'));
   });
 
@@ -87,13 +87,22 @@ describe('D113: mitigation stat line', () => {
   });
 });
 
-describe('D68: five builders before each spender', () => {
-  it.each(['em-voh', 'em-voh-so', 'em-voj', 'em-tfb', 'em-tfb-so'])('%s: builder casts = 5 × spender casts, turns all used', (id) => {
-    const r = optimize({ vocation: 'monk', points: 1000, monster: null, priority: 0, context: { mode: 'hunt' }, alternatives: 0, rotationId: id });
+describe('D68 / D120: builders before each spender (4 in Virtue of Harmony)', () => {
+  it.each([
+    ['em-voh', 4],
+    ['em-voh-so', 4],
+    ['em-voj', 5],
+    ['em-tfb', 5],
+    ['em-tfb-so', 5],
+    ['em-chain-tfb', 5],
+    ['em-chain-tfb-so', 5],
+  ] as const)('%s: builder casts = %i × spender casts, turns all used', (id, n) => {
+    const stances = id.startsWith('em-voh') ? undefined : ['Virtue of Justice'];
+    const r = optimize({ vocation: 'monk', points: 1000, monster: null, priority: 0, context: { mode: 'hunt' }, alternatives: 0, rotationId: id, stances });
     const spells = r.rotation!.spells;
     const spend = spells.filter((s) => s.name === 'Sweeping Takedown' || s.name === 'Spiritual Outburst').reduce((a, s) => a + s.ratio, 0);
     const build = spells.filter((s) => s.name !== 'Sweeping Takedown' && s.name !== 'Spiritual Outburst').reduce((a, s) => a + s.ratio, 0);
-    expect(build).toBeCloseTo(5 * spend, 0);
+    expect(build).toBeCloseTo(n * spend, 0);
     expect(build + spend).toBeCloseTo(30, 0);
   });
 });

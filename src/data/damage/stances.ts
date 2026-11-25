@@ -28,6 +28,8 @@ export interface StanceDef {
   piercePct?: number;
   /** Monk: Harmony base bonus +percentage points. */
   harmonyBasePct?: number;
+  /** D120: Harmony builder casts before each spender in this stance (default HARMONY_BUILDERS). */
+  harmonyBuilders?: number;
   /** Monk virtues: effect doubled while serene. */
   serene?: boolean;
   /** No solo value (party healing only). */
@@ -58,7 +60,7 @@ export const STANCES: readonly StanceDef[] = [
   { name: 'Channeled Preservation', vocation: 'druid', group: 'main', partyOnly: true },
 
   { name: 'Virtue of Justice', vocation: 'monk', group: 'main', skillPct: 8, serene: true },
-  { name: 'Virtue of Harmony', vocation: 'monk', group: 'main', harmonyBasePct: 3, serene: true },
+  { name: 'Virtue of Harmony', vocation: 'monk', group: 'main', harmonyBasePct: 3, harmonyBuilders: 4, serene: true },
   { name: 'Virtue of Sustain', vocation: 'monk', group: 'main', healingPct: 35, healingAll: true, serene: true },
 ];
 

@@ -79,7 +79,8 @@ export function applyStanceSpells(model: SpellModel, stances: readonly StanceDef
     }
     spells.set(n, s);
   }
-  let out: SpellModel = { ...model, spells, damageMult, base: model.base * damageMult, stances: stances.map((s) => s.name), stanceElement: el?.element ?? undefined, pierce };
+  const builders = stances.find((s) => s.harmonyBuilders)?.harmonyBuilders;
+  let out: SpellModel = { ...model, spells, damageMult, base: model.base * damageMult, stances: stances.map((s) => s.name), stanceElement: el?.element ?? undefined, pierce, ...(builders ? { harmonyBuilders: builders } : {}) };
   if (el) out = convert(out, el.element, preset, pierce);
   return out;
 }
