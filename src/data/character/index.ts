@@ -117,7 +117,8 @@ export function resolveCharacterStats(vocation: Vocation, stats: CharacterStats)
 //   RP shielding 108 + quiver → 1.18 %; RP shielding 110 + Gnome Shield → 1.21 % shielding + 1.28 % shield;
 //   ED shielding 36 → 0.38 %, + Spellbook of Mind Control (def 26) 0.61 %;
 //   EK shielding 103 → 1.13 %, + Dragon Shield (def 41) 1.04 % (D111); monk shielding 72 → 0.77 %, + Soulkamas
-//   (two-handed, def 21) 0.51 % (D117). The Cyclopedia truncates to 0.01.
+//   (two-handed, def 21) 0.51 % (D117); sorcerer shielding 35 → 0.37 %, + spellbook (def 23) 0.54 % (D118).
+//   The Cyclopedia truncates to 0.01.
 // See docs/modules/character-formulas.md (inference + uncertainty).
 
 export type Offhand = 'shield' | 'spellbook' | 'quiver' | 'none';
@@ -126,12 +127,12 @@ export type Offhand = 'shield' | 'spellbook' | 'quiver' | 'none';
 export const MITIGATION_SHIELDING_FACTOR: Record<Vocation, number> = {
   knight: 1.1,
   paladin: 1.1,
-  sorcerer: 1.07, // not measured; follows the druid
+  sorcerer: 1.07, // D118: 35 → 0.37 % bounds it to 1.057–1.085
   druid: 1.07,
   monk: 1.07, // D117: 72 → 0.77 % bounds it to 1.069–1.083
 };
 
-/** % per 100 offhand defense (shields: Gnome Shield 50 → 1.28 %, Dragon Shield 41 → 1.04 %; spellbook: Mind Control 26 → 0.61 %). */
+/** % per 100 offhand defense (shields: Gnome Shield 50 → 1.28 %, Dragon Shield 41 → 1.04 %; spellbook: Mind Control 26 → 0.61 %, def 23 → 0.54 %). */
 export const MITIGATION_DEFENSE_FACTOR: Record<'shield' | 'spellbook', number> = { shield: 2.56, spellbook: 2.36 };
 
 /**

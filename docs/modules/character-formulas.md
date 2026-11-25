@@ -71,6 +71,8 @@ spellbook). The Cyclopedia **truncates** to 0.01 (D111): only then do all readin
 | EK level 52, shielding 103: shielding part | 1.13 % | 1.133 % | 103 × 1.1/100 |
 | Same EK, Dragon Shield only (no weapon): shield part | 1.04 % | 1.0496 % | defense 41 × 2.56/100 |
 | Same EK, Fire Sword only (one-handed): weapon part | 0.50 % | 0.506 % | defense 20 × 2.53/100 |
+| Sorcerer 12, shielding 35: shielding part | 0.37 % | 0.3745 % | 35 × 1.07/100 |
+| Same sorcerer, spellbook (defense 23): spellbook part | 0.54 % | 0.5428 % | defense 23 × 2.36/100 |
 | Monk, shielding 72: shielding part | 0.77 % | 0.770 % | 72 × 1.07/100 |
 | Same monk, Soulkamas (two-handed): weapon part | 0.51 % | 0.5145 % | defense 21 × 2.45/100 |
 
@@ -78,12 +80,13 @@ How the constants were inferred:
 
 - **Shielding factor.** With truncation, RP 108 → 1.18 %, RP 110 → 1.21 % and EK 103 → 1.13 % bound the knight
   and paladin factor to 1.100–1.102 %/100 points; 1.1 is used for both. The druid's 0.38 % at 36 bounds its factor
-  to 1.056–1.083 and the monk's 0.77 % at 72 to 1.069–1.083 (D117); 1.07 is used for both (the sorcerer follows, not
-  measured). An older EK
+  to 1.056–1.083, the sorcerer's 0.37 % at 35 to 1.057–1.085 (D118) and the monk's 0.77 % at 72 to 1.069–1.083
+  (D117); 1.07 is used for all three. An older EK
   reading (119 → 1.34 %) does not fit and probably included a wheel Mitigation Multiplier.
 - **No quiver factor (D108).** A quiver does not change mitigation (checked in-game).
 - **Offhand factor per 100 defense:** shields 2.56 (Gnome Shield, defense 50 → 1.28 %; Dragon Shield, defense 41 →
-  1.04 %; together 2.560–2.561), spellbooks 2.36 (Spellbook of Mind Control, defense 26 → 0.61 %, bounds 2.346–2.385). Item defense values come from the TibiaWiki item data
+  1.04 %; together 2.560–2.561), spellbooks 2.36 (Spellbook of Mind Control, defense 26 → 0.61 %, bounds 2.346–2.385; a sorcerer's spellbook, defense 23 → 0.54 %,
+  bounds 2.348–2.391; D118). Item defense values come from the TibiaWiki item data
   (`scripts/.cache/damage-api/meta/shields.json`).
 - **Weapon defense (D112)** counts only without a shield or spellbook: one-handed 2.53 %/100 defense (EK readings:
   Fire Sword, defense 20, alone 0.50 %; Dragon Shield alone 1.04 %; both 1.09 %, so with a shield the weapon adds
@@ -96,9 +99,9 @@ How the constants were inferred:
 - **Mage default shielding** is 34/35/36/38/38/39/40 (levels 200…1500): a level 96 ED already has 36, and an older
   level 781 ED reading (0.40 %) implies about 38.
 
-**Uncertainty.** The spellbook factor rests on one item (Spellbook of Mind Control).
-Whether the offhand part depends on the vocation or the shielding is not known; the model uses one factor per item
-type. The sorcerer is not measured; the two-handed weapon factor rests on one item (Soulkamas).
+**Uncertainty.** The spellbook factor fits a druid and a sorcerer reading (D118), so it does not seem to depend on the
+mage vocation. Whether the offhand part depends on the shielding is not known; the model uses one factor per item
+type. The two-handed weapon factor rests on one item (Soulkamas).
 
 **Defaults (`DEFAULT_OFFHAND`)**
 - Paladin: quiver, both for the hunt bow and the boss crossbow.
