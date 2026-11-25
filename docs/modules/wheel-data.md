@@ -113,7 +113,7 @@ templates). Wheel facts: official Tibia Wheel of Destiny planner (CipSoft). The 
 - Values come from the **test server** and may change before release; re-run the extraction after updates.
 - The planner uses grade IV for all mods; lower grades come from the strings file only.
 - community builds predate the new layout (`legacyCode`).
-- D73 quadrant layout: Revelation Mastery takes the ring 2 leech slot, the leech takes the central ring 3 slot; spell augments stay. Chain range (+0/1/2/2, capped at double the base) is not modelled; chain targets add to hunt targets, total capped at 12. Lightning is single-target in the spell data, so its chain mod is valued 0 until its chain behaviour is known.
+- D73 quadrant layout: Revelation Mastery takes the ring 2 leech slot, the leech takes the central ring 3 slot; spell augments stay. Chain range (+0/1/2/2, capped at double the base) is not modelled; chain targets add to hunt targets, total capped at 12. Lightning is single-target in the spell data, so its chain mod is valued 0 until its chain behaviour is known. The test-phase summary also lists a Lightning critical extra damage buff (22.5 → 30 %) while the chain mod replaces that same mod; the model keeps the chain mod and the old base damage mod until the released planner shows which is right.
 - The planner export keeps the slice ids; on the live planner the perks of moved slots differ until the update ships.
 
 ## Live variant (D88)

@@ -65,6 +65,8 @@ import {
   NEW_GEM_GRADE,
   placedRmPoints,
   placeGems,
+  placedResist,
+  withGemResist,
   recommendations,
   withRoom,
   round1,
@@ -108,14 +110,17 @@ import {
   convictionParts,
   dedicationParts,
   flatParts,
+  GEM_RESIST_CAP,
   hpParts,
   incomingShares,
+  isCappedResist,
   K,
   leechEhp,
   mitigationParts,
   type OffhandChoice,
   type Parts,
   parseEffects,
+  RESIST_EFFECT,
   revelationIndex,
   revelationParts,
   type SpellEffect,
@@ -675,7 +680,7 @@ const POOLED = new Set(['Hit Points', 'Mana', 'Capacity']);
 function gemStatLines(env: GemEnv, vessels: OptimizerResult['vessels']): { lines: StatLine[]; pooled: Record<string, number>; mitMult?: number } {
   const lines: StatLine[] = [];
   const pooled: Record<string, number> = {};
-  const sums = new Map<string, { value: number; unit: string; category: StatLine['category'] }>();
+  const sums = new Map<string, { value: number; unit: string; category: StatLine['category']; cap?: boolean }>();
   for (const vs of vessels) {
     if (vs.source !== 'owned' || !vs.gem) continue;
     for (const slot of activeSlots(vs.gem.quality, vs.quality, env.wheel.gemSystem === 'resonance')) {
@@ -693,14 +698,17 @@ function gemStatLines(env: GemEnv, vessels: OptimizerResult['vessels']): { lines
           continue;
         }
         const unit = /resistance|mitigation/i.test(e.name) ? '%' : '';
-        const cur = sums.get(e.name) ?? { value: 0, unit, category: unit ? 'defense' : 'utility' };
+        const el = RESIST_EFFECT[e.effectId];
+        const cur = sums.get(e.name) ?? { value: 0, unit, category: unit ? 'defense' : 'utility', cap: el !== undefined && isCappedResist(el) };
         cur.value += e.values[ref.grade - 1] ?? 0;
         sums.set(e.name, cur);
       }
     }
   }
   for (const [name, s] of [...sums].sort((a, b) => a[0].localeCompare(b[0]))) {
-    lines.push(stat('stat.gemMod', `${s.value >= 0 ? '+' : ''}${fmt(s.value, 2)}${s.unit}`, s.category, { name }));
+    // D114: gem resistance per element is capped.
+    const value = s.cap ? Math.min(s.value, GEM_RESIST_CAP) : s.value;
+    lines.push(stat('stat.gemMod', `${value >= 0 ? '+' : ''}${fmt(value, 2)}${s.unit}`, s.category, { name }));
   }
   return { lines, pooled, mitMult: sums.get('Mitigation Multiplier')?.value };
 }
@@ -1708,6 +1716,7 @@ function assemble(p: Prepared, best: State): BuildResult {
   const wheelEffects = wheelEffectsFor(wheel, best.alloc);
   let env: GemEnv = { v, wheel, blend, facts: factsFor(gridRev, wheelEffects), grades: modGrades(p.gems) };
   const placed = placeGems(env, gems, spots);
+  env = withGemResist(env, placedResist(env, spots, placed));
   let vessels = vesselAssignments(env, spots, placed);
   const rmGem = placedRmPoints(env, vessels);
   const finalRev = gridRev.map((x, d) => x + rmGem[d]);
@@ -2215,8 +2224,10 @@ function vesselsAt(p: Prepared, st: State): { env: GemEnv; vessels: VesselAssign
   const spots = vesselSpots(wheel, vesselKeyOf(wheel, st.alloc));
   const gridRev = DOMAIN_ORDER.map((_, d) => st.domainPts[d] + RM_SLICE_POINTS * st.rmFull[d]);
   const effects = wheelEffectsFor(wheel, st.alloc);
-  const env: GemEnv = { v, wheel, blend, facts: factsFor(gridRev, effects), grades: modGrades(gems) };
-  const vessels = vesselAssignments(env, spots, placeGems(env, gems, spots));
+  const env0: GemEnv = { v, wheel, blend, facts: factsFor(gridRev, effects), grades: modGrades(gems) };
+  const placed = placeGems(env0, gems, spots);
+  const env = withGemResist(env0, placedResist(env0, spots, placed));
+  const vessels = vesselAssignments(env, spots, placed);
   // Same facts as the shown build: placed RM gems' points included (placedValue subtracts them per gem).
   const rm = placedRmPoints(env, vessels);
   return { env: { ...env, facts: factsFor(gridRev.map((x, d) => x + rm[d]), effects) }, vessels };

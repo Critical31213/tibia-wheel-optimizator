@@ -56,6 +56,10 @@ export const K = {
   AVATAR_DURATION_S: 15,
 } as const;
 
+/** D114: total gem resistance against one element is capped (drain resistances are not elements). */
+export const GEM_RESIST_CAP = 30;
+export const isCappedResist = (e: Element) => e !== 'manaDrain' && e !== 'lifeDrain';
+
 /** Basic-mod effect ids (planner) → resistance element. */
 export const RESIST_EFFECT: Record<number, Element> = {
   0: 'physical',
@@ -106,6 +110,8 @@ export interface ValuationContext {
   incoming: Partial<Record<Element, number>>;
   /** D74: resistances % of the user's equipment (undefined = none known). */
   resist?: Partial<Record<Element, number>>;
+  /** D114: resistance % of the other placed gems (and earlier mods of the same gem), for the gem cap. */
+  gemResist?: Partial<Record<Element, number>>;
   /** Δ% damage of +1 main skill / magic level (skill boost convictions). */
   skillOff: number;
   /** D24: % EHP (× threat) of the active stances beyond shielding (damage taken, dodge, healing). */
@@ -539,6 +545,12 @@ function passiveRevelation(v: ValuationContext, name: string, stage: number): Pa
 // ---------------------------------------------------------------------------
 // Gem mods
 
+/** D114: the part of `x` % resistance that counts under the gem cap, given the other gems' resistance. */
+export function cappedResist(v: Pick<ValuationContext, 'gemResist'>, e: Element, x: number): number {
+  const used = v.gemResist?.[e] ?? 0;
+  return isCappedResist(e) ? Math.min(used + x, GEM_RESIST_CAP) - Math.min(used, GEM_RESIST_CAP) : x;
+}
+
 /** Value of a basic mod at grade 1..4. */
 export function basicModParts(
   v: ValuationContext,
@@ -549,7 +561,7 @@ export function basicModParts(
   for (const e of mod.effects) {
     const x = e.values[grade - 1] ?? 0;
     const el = RESIST_EFFECT[e.effectId];
-    if (el) p = add(p, resistParts(v, el, x));
+    if (el) p = add(p, resistParts(v, el, cappedResist(v, el, x)));
     else if (e.effectId === EFFECT_MITIGATION) p = add(p, mitigationParts(v, x));
     else if (e.effectId === EFFECT_HP) p = add(p, hpParts(v, x));
     // EFFECT_MANA / EFFECT_CAPACITY: no value (D18)

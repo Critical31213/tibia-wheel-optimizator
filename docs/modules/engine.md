@@ -127,7 +127,7 @@ Every source yields `Parts = { off, def, util }`. They are blended as `score = w
 | +x max HP | `100 · x / HP` |
 | +pp mitigation or dodge | `100 · pp / (100 − m)` (m = current mitigation) |
 | Mitigation Multiplier | multiplies the real base mitigation, then valued as above |
-| resistance | the same × `incomingShare(element)` (spot damage types; physical when unknown) |
+| resistance | the same × `incomingShare(element)` (spot damage types; physical when unknown); D114: gem resistance per element counts up to 30 % (`GEM_RESIST_CAP`, drains excluded) |
 | capacity, max mana | 0 |
 | healing | healed HP × `HEAL_EHP` (0.5), as % of HP |
 | Avatar damage reduction (boss) | `100 · uptime · r / (1 − r)` |
@@ -251,6 +251,7 @@ slices (dedication + conviction), revelation stages and the vessel state, each w
   - `gain = blend(grade + 1) − blend(grade)`, with momentum included for cooldown mods, sorted descending.
   - `gainToMax = blend(IV) − blend(grade)`.
 - **Chain mods (D73).** `augChain` supreme mods add chain targets (`jumps` effect → `extraTargets` in hunt; support spells count as utility); `targetsAt` caps chain spells at `MAX_CHAIN_TARGETS` (12). Shield Slam / Shield Bash use the weapon's elements (`weaponElement`).
+- **Gem resistance cap (D114).** The placed gems' resistance against one element counts up to 30 % (equipment not included). `v.gemResist` holds the other gems' resistance: `placeGems` re-places on top of it when the first assignment passes the cap, and recommendations, swaps, upgrades and idle mods value a resistance only within the room left. The stats show the capped total. The search tables ignore the cap (it needs about five same-element gems).
 - **`VesselAssignment.idle` (D72).** Active mods of a placed owned gem worth ~0 in the build, with a reason: an RM below the next stage (points with the gem vs threshold), an RM already at the last stage, a resistance the spot does not deal, an avatar augment while hunting, a spell augment the rotation does not gain from.
 - **`modSwaps` (D71).**
   - Per active basic slot of each placed owned gem (D72: supreme mods are not swapped; a better supreme comes as a replacement gem in `gemRecommendations`): the best other mod for that slot (same slot rules as new gems, never the gem's other basic mod), at the character's grade on it (`GemEnv.grades`, else I).

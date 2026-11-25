@@ -10,6 +10,7 @@
  * D23: vessels hold only owned gems; recommendations are advice and never fill a vessel.
  */
 import type {
+  Element,
   EngineMessage,
   GainEffect,
   GemModRef,
@@ -32,7 +33,9 @@ import {
   type BuildFacts,
   EFFECT_HP,
   EFFECT_MITIGATION,
+  GEM_RESIST_CAP,
   incomingShare,
+  isCappedResist,
   type Parts,
   RESIST_EFFECT,
   revelationIndex,
@@ -117,11 +120,59 @@ export function modParts(env: GemEnv, slot: GemSlot, modId: number, grade: numbe
   return m ? basicModParts(env.v, m, grade) : ZERO;
 }
 
-export function gemParts(env: GemEnv, gem: OwnedGem, vessel: GemQuality): Parts {
-  let p = ZERO;
+type Resist = Partial<Record<Element, number>>;
+
+/** D114: signed resistance % of a basic mod at a grade (null without any). */
+function modResist(env: GemEnv, slot: GemSlot, ref: { modId: number; grade: number }): Resist | null {
+  if (slot === 'supreme') return null;
+  let out: Resist | null = null;
+  for (const e of findBasic(env.wheel, ref.modId)?.effects ?? []) {
+    const el = RESIST_EFFECT[e.effectId];
+    if (el) (out ??= {})[el] = (out[el] ?? 0) + (e.values[ref.grade - 1] ?? 0);
+  }
+  return out;
+}
+
+const addResist = (a: Resist | undefined, b: Resist, k = 1): Resist => {
+  const o: Resist = { ...a };
+  for (const [e, x] of Object.entries(b) as [Element, number][]) o[e] = (o[e] ?? 0) + k * x;
+  return o;
+};
+
+export const withGemResist = (env: GemEnv, r: Resist | undefined): GemEnv => ({ ...env, v: { ...env.v, gemResist: r } });
+
+/** D114: resistance of a gem's active basic mods. */
+export function gemResist(env: GemEnv, gem: OwnedGem, vessel: GemQuality): Resist {
+  let r: Resist = {};
   for (const slot of activeSlots(gem.quality, vessel, isRes(env))) {
     const ref = gem[slot];
-    if (ref) p = add(p, modParts(env, slot, ref.modId, ref.grade));
+    const x = ref && modResist(env, slot, ref);
+    if (x) r = addResist(r, x);
+  }
+  return r;
+}
+
+/** D114: resistance of all gems placed in unlocked vessels. */
+export function placedResist(env: GemEnv, spots: readonly VesselSpot[], placed: readonly (OwnedGem | null)[]): Resist {
+  let r: Resist = {};
+  placed.forEach((g, i) => {
+    if (g && spots[i].unlocked) r = addResist(r, gemResist(env, g, spots[i].quality));
+  });
+  return r;
+}
+
+const overCap = (r: Resist) => (Object.entries(r) as [Element, number][]).some(([e, x]) => isCappedResist(e) && x > GEM_RESIST_CAP + 1e-9);
+
+export function gemParts(env: GemEnv, gem: OwnedGem, vessel: GemQuality): Parts {
+  let p = ZERO;
+  let e = env;
+  for (const slot of activeSlots(gem.quality, vessel, isRes(env))) {
+    const ref = gem[slot];
+    if (!ref) continue;
+    p = add(p, modParts(e, slot, ref.modId, ref.grade));
+    // D114: the gem's own earlier mods count toward the cap too.
+    const r = modResist(e, slot, ref);
+    if (r) e = withGemResist(e, addResist(e.v.gemResist, r));
   }
   const flat = matchBonus(gem.quality, vessel, isRes(env));
   return flat ? add(p, flatParts(env.v, flat)) : p;
@@ -185,12 +236,28 @@ export function assign(weights: number[][]): number[] {
 
 /** Places owned gems into the unlocked vessels (`spots`, see `vesselSpots`) maximising the blended value. */
 export function placeGems(env: GemEnv, gems: OwnedGem[], spots: readonly VesselSpot[]): (OwnedGem | null)[] {
-  // +ε: an owned gem worth 0 here (e.g. a resistance the spot does not need) still beats an empty vessel.
-  const w = spots.map((vs) =>
-    gems.map((g) => (vs.unlocked && fits(g.quality, vs.quality, isRes(env)) ? env.blend(gemParts(env, g, vs.quality)) + 1e-6 : 0)),
-  );
-  const cols = assign(w);
-  return spots.map((_, i) => (cols[i] >= 0 ? gems[cols[i]] : null));
+  const solve = (others: (g: OwnedGem) => Resist | undefined) => {
+    // +ε: an owned gem worth 0 here (e.g. a resistance the spot does not need) still beats an empty vessel.
+    const w = spots.map((vs) =>
+      gems.map((g) =>
+        vs.unlocked && fits(g.quality, vs.quality, isRes(env)) ? env.blend(gemParts(withGemResist(env, others(g)), g, vs.quality)) + 1e-6 : 0,
+      ),
+    );
+    const cols = assign(w);
+    return spots.map((_, i) => (cols[i] >= 0 ? gems[cols[i]] : null));
+  };
+  let placed = solve(() => env.v.gemResist);
+  // D114: past the gem resistance cap, value each gem on top of the other placed gems' resistance and place again.
+  for (let k = 0; k < 3; k++) {
+    const total = placedResist(env, spots, placed);
+    if (!overCap(total)) break;
+    const own = new Map<OwnedGem, Resist>();
+    placed.forEach((g, i) => g && own.set(g, gemResist(env, g, spots[i].quality)));
+    const next = solve((g) => (own.has(g) ? addResist(total, own.get(g)!, -1) : total));
+    if (next.every((g, i) => g === placed[i])) break;
+    placed = next;
+  }
+  return placed;
 }
 
 // ---------------------------------------------------------------------------
@@ -379,7 +446,7 @@ export function recommendations(env: GemEnv): GemRecommendation[] {
  * the stage with vs without its own points (valued on top of them it would look worthless and always replaceable).
  */
 function placedParts(env: GemEnv, gem: OwnedGem, vessel: GemQuality): Parts {
-  return gemParts(withoutOwnRm(env, gem, vessel), gem, vessel);
+  return gemParts(placedEnv(env, gem, vessel), gem, vessel);
 }
 
 export function withRoom(env: GemEnv, vessels: readonly VesselAssignment[], recs: GemRecommendation[]): GemRecommendation[] {
@@ -428,7 +495,7 @@ export function vesselAssignments(
 
 /** D72: active mods of a placed gem worth ~0 here (an RM below the next stage, a resistance nobody deals, ...). */
 function idleMods(env: GemEnv, gem: OwnedGem, vessel: GemQuality): NonNullable<VesselAssignment['idle']> {
-  const base = withoutOwnRm(env, gem, vessel);
+  const base = placedEnv(env, gem, vessel);
   const out: NonNullable<VesselAssignment['idle']> = [];
   for (const slot of activeSlots(gem.quality, vessel, isRes(env))) {
     const ref = gem[slot];
@@ -485,7 +552,23 @@ export function upgrades(env: GemEnv, vessels: VesselAssignment[]): UpgradeRecom
   for (const [key, m] of byMod) {
     if (m.grade >= 4) continue;
     const to = (m.grade + 1) as ModGrade;
-    const atP = (grade: number) => uses.filter((u) => u.key === key).reduce((a, u) => add(a, modParts(env, u.slot, u.modId, grade)), ZERO);
+    const mine = uses.filter((u) => u.key === key);
+    // D114: valued on top of the other gems' resistance (this mod's own current share removed).
+    const own = mine.reduce<Resist>((r, u) => {
+      const x = modResist(env, u.slot, { modId: u.modId, grade: m.grade });
+      return x ? addResist(r, x) : r;
+    }, {});
+    const base = env.v.gemResist ? withGemResist(env, addResist(env.v.gemResist, own, -1)) : env;
+    const atP = (grade: number) => {
+      let e = base;
+      let p = ZERO;
+      for (const u of mine) {
+        p = add(p, modParts(e, u.slot, u.modId, grade));
+        const x = modResist(e, u.slot, { modId: u.modId, grade });
+        if (x) e = withGemResist(e, addResist(e.v.gemResist, x));
+      }
+      return p;
+    };
     const curP = atP(m.grade);
     const nextP = sub(atP(to), curP);
     const maxP = to === 4 ? nextP : sub(atP(4), curP);
@@ -521,6 +604,12 @@ function withoutOwnRm(env: GemEnv, gem: OwnedGem, vessel: GemQuality): GemEnv {
   return { ...env, facts: { ...env.facts, revPoints: env.facts.revPoints.map((p, i) => (i === d ? p - x : p)) } };
 }
 
+/** D43 + D114: env for a gem already placed: without its own RM points and its own resistance. */
+function placedEnv(env: GemEnv, gem: OwnedGem, vessel: GemQuality): GemEnv {
+  const e = withoutOwnRm(env, gem, vessel);
+  return e.v.gemResist ? withGemResist(e, addResist(e.v.gemResist, gemResist(e, gem, vessel), -1)) : e;
+}
+
 /**
  * D71: per active basic slot of each placed owned gem, the best replacement mod (slot rules as for new gems, not the gem's
  * other basic mod) at the character's grade on that mod. Gain only; the swap cost is not judged.
@@ -530,7 +619,7 @@ export function modSwaps(env: GemEnv, vessels: readonly VesselAssignment[]): Mod
   for (const vs of vessels) {
     const gem = vs.gem;
     if (vs.source !== 'owned' || !gem || !vs.unlocked) continue;
-    const base = withoutOwnRm(env, gem, vs.quality);
+    const base = placedEnv(env, gem, vs.quality);
     const beforeParts = gemParts(base, gem, vs.quality);
     const before = base.blend(beforeParts);
     for (const slot of activeSlots(gem.quality, vs.quality, isRes(env))) {

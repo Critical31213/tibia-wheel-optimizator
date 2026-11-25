@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { type GemQuality, type OwnedGem, VOCATIONS } from '../types';
 import { optimize } from './index';
-import { activeSlots, assign, bestGems, type GemEnv, gemParts, placeGems, toOwnedGem, upgrades } from './gems';
+import { activeSlots, assign, bestGems, type GemEnv, gemParts, placedResist, placeGems, toOwnedGem, upgrades, withGemResist } from './gems';
 import { blendWith, valuationFor, weightsFor } from './optimizer';
 import { getEngineWheel, vesselSpots } from './wheel/build';
-import { mitigationGain, mitigationParts } from './values';
+import { cappedResist, mitigationGain, mitigationParts } from './values';
 
 function env(vocation: (typeof VOCATIONS)[number] = 'knight', points = 2000): GemEnv {
   return {
@@ -162,5 +162,36 @@ describe('mitigation multiplier', () => {
     const r = optimize({ vocation: 'sorcerer', points: 2000, monster: null, priority: 0 });
     const lesser = r.gemRecommendations.find((g) => g.quality === 'lesser');
     expect(lesser?.mods[0].name).not.toBe('Mitigation Multiplier');
+  });
+});
+
+describe('D114: gem resistance cap', () => {
+  it('counts gem resistance only up to 30 % per element (not drains)', () => {
+    expect(cappedResist({ gemResist: { fire: 28 } }, 'fire', 4.5)).toBeCloseTo(2, 9);
+    expect(cappedResist({ gemResist: { fire: 32 } }, 'fire', -2)).toBe(0);
+    expect(cappedResist({}, 'fire', 3)).toBe(3);
+    expect(cappedResist({ gemResist: { manaDrain: 40 } }, 'manaDrain', 3)).toBe(3);
+  });
+
+  it('a fire gem past the cap is worth nothing; placement prefers other gems', () => {
+    const base = env('knight', 2000);
+    const e: GemEnv = { ...base, v: { ...base.v, incoming: { fire: 1 } } };
+    const gem = (id: string, quality: GemQuality, mod: number, second: number | null): OwnedGem => ({
+      id,
+      quality,
+      basic1: { modId: mod, grade: 4 },
+      basic2: quality === 'lesser' || second === null ? null : { modId: second, grade: 4 },
+      supreme: null,
+    });
+    const fire = (id: string, q: GemQuality = 'regular') => gem(id, q, 3, 15); // 3 + 4.5 % fire
+    expect(e.blend(gemParts(withGemResist(e, { fire: 30 }), fire('x'), 'regular'))).toBeLessThanOrEqual(0);
+    expect(e.blend(gemParts(withGemResist(e, { fire: 27 }), fire('x'), 'regular'))).toBeLessThan(e.blend(gemParts(e, fire('x'), 'regular')));
+    const spots = vesselSpots(e.wheel, e.wheel.definition.vessels.length);
+    const gems = spots.flatMap((s, i) => [fire(`f${i}`, s.quality), gem(`h${i}`, s.quality, 31, null)]);
+    // All fire gems would give well over 30 % fire.
+    expect(placedResist(e, spots, gems.filter((g) => g.id.startsWith('f'))).fire ?? 0).toBeGreaterThan(30);
+    const placed = placeGems(e, gems, spots);
+    expect(placedResist(e, spots, placed).fire ?? 0).toBeLessThanOrEqual(30 + 7.5);
+    expect(placed.some((g) => g?.id.startsWith('h'))).toBe(true);
   });
 });
