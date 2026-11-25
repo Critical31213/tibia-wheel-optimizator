@@ -59,31 +59,33 @@ Generic server constants (multiplier S/D 1.26, P/M 1.28, K 1.3; primaryShield 2.
 secondaryShield 1.2–1.25, applied to spellbooks and as a ×1.2 *bonus* for quivers) do **not** reproduce the
 in-game Cyclopedia values. These values (no wheel) are used for calibration and take priority (D108 replaced an
 older paladin pair that suggested a quiver penalty; D110 replaced an older druid pair with unknown shielding and
-spellbook):
+spellbook). The Cyclopedia **truncates** to 0.01 (D111): only then do all readings fit one set of constants.
 
 | Point | Cyclopedia | Model | Inputs |
 |---|---|---|---|
-| RP level 855, shielding 108, quiver | 1.18 % | 1.18 % | 108 × 1.096/100 |
-| Same RP, shielding 110, Gnome Shield: shielding part | 1.21 % | 1.21 % | 110 × 1.096/100 |
+| RP level 855, shielding 108, quiver | 1.18 % | 1.188 % | 108 × 1.1/100 |
+| Same RP, shielding 110, Gnome Shield: shielding part | 1.21 % | 1.21 % | 110 × 1.1/100 |
 | Same RP with the shield: shield part | 1.28 % | 1.28 % | defense 50 × 2.56/100 |
-| ED level 96, shielding 36, no offhand | 0.38 % | 0.38 % | 36 × 1.056/100 |
-| Same ED with a Spellbook of Mind Control: spellbook part | 0.61 % | 0.61 % | defense 26 × 2.346/100 |
-| EK shielding 119, no shield | 1.34 % | 1.34 % | 119 × 1.126/100 |
+| ED level 96, shielding 36, no offhand | 0.38 % | 0.385 % | 36 × 1.07/100 |
+| Same ED with a Spellbook of Mind Control: spellbook part | 0.61 % | 0.614 % | defense 26 × 2.36/100 |
+| EK level 52, shielding 103: shielding part | 1.13 % | 1.133 % | 103 × 1.1/100 |
+| Same EK, Dragon Shield only (no weapon): shield part | 1.04 % | 1.0496 % | defense 41 × 2.56/100 |
 
 How the constants were inferred:
 
-- **Shielding factor.** 1.18 % at 108 and 1.21 % at 110 shielding (both rounded to 0.01) bound the paladin factor
-  to 1.0955–1.0972 %/100 points; 1.096 is used. The druid's 0.38 % at 36 bounds its factor to 1.042–1.069;
-  1.056 is used. The knight (1.126) is fitted on its own reading. The sorcerer follows the druid and the monk the
-  paladin (not measured).
+- **Shielding factor.** With truncation, RP 108 → 1.18 %, RP 110 → 1.21 % and EK 103 → 1.13 % bound the knight
+  and paladin factor to 1.100–1.102 %/100 points; 1.1 is used for both (and the monk, not measured). The druid's
+  0.38 % at 36 bounds its factor to 1.056–1.083; 1.07 is used (the sorcerer follows, not measured). An older EK
+  reading (119 → 1.34 %) does not fit and probably included a wheel Mitigation Multiplier.
 - **No quiver factor (D108).** A quiver does not change mitigation (checked in-game).
-- **Offhand factor per 100 defense:** shields 2.56 (Gnome Shield, defense 50 → 1.28 %), spellbooks 2.346
-  (Spellbook of Mind Control, defense 26 → 0.61 %, bounds 2.327–2.365). Item defense values come from the TibiaWiki
+- **Offhand factor per 100 defense:** shields 2.56 (Gnome Shield, defense 50 → 1.28 %; Dragon Shield, defense 41 →
+  1.04 %; together 2.560–2.561), spellbooks 2.36 (Spellbook of Mind Control, defense 26 → 0.61 %, bounds 2.346–2.385).
+- **Weapon defense** is not modelled yet. EK readings: Fire Sword alone 0.50 %, Dragon Shield alone 1.04 %, both 1.09 %; with a shield the weapon adds only ~0.05 %. Item defense values come from the TibiaWiki
   item data (`scripts/.cache/damage-api/meta/shields.json`).
 - **Mage default shielding** is 34/35/36/38/38/39/40 (levels 200…1500): a level 96 ED already has 36, and an older
   level 781 ED reading (0.40 %) implies about 38.
 
-**Uncertainty.** Both offhand factors are fitted on one known item each (Gnome Shield, Spellbook of Mind Control).
+**Uncertainty.** The spellbook factor rests on one item (Spellbook of Mind Control).
 Whether the offhand part depends on the vocation or the shielding is not known; the model uses one factor per item
 type. Sorcerer and monk are not measured. Monk weapon defense is ignored.
 

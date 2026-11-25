@@ -44,28 +44,30 @@ describe('character formulas', () => {
 
 describe('mitigation (D19, calibrated on in-game Cyclopedia values)', () => {
   const near = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThanOrEqual(0.05);
+  /** D111: the Cyclopedia truncates to 0.01. */
+  const shows = (a: number, b: number) => expect(Math.floor(a * 100 + 1e-9) / 100).toBeCloseTo(b, 6);
 
   it('D108: Royal Paladin 108 shielding + quiver 1.18 %; 110 shielding + Gnome Shield 1.21 % + 1.28 %', () => {
-    const near2 = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThan(0.005);
-    near2(mitigationBreakdown('paladin', 855, { shielding: 108, offhand: 'quiver' }).total, 1.18);
+    shows(mitigationBreakdown('paladin', 855, { shielding: 108, offhand: 'quiver' }).total, 1.18);
     const s = mitigationBreakdown('paladin', 855, { shielding: 110, offhand: 'shield', offhandDefense: 50 });
-    near2(s.shielding, 1.21);
-    near2(s.offhand, 1.28);
+    shows(s.shielding, 1.21);
+    shows(s.offhand, 1.28);
   });
 
   it('D110: Elder Druid 36 shielding 0.38 %; Spellbook of Mind Control (def 26) adds 0.61 %; level 781 defaults 0.40 %', () => {
-    const near2 = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThan(0.005);
-    near2(mitigationBreakdown('druid', 96, { shielding: 36, offhand: 'none' }).total, 0.38);
+    shows(mitigationBreakdown('druid', 96, { shielding: 36, offhand: 'none' }).total, 0.38);
     const d = mitigationBreakdown('druid', 96, { shielding: 36, offhand: 'spellbook', offhandDefense: 26 });
-    near2(d.shielding, 0.38);
-    near2(d.offhand, 0.61);
+    shows(d.shielding, 0.38);
+    shows(d.offhand, 0.61);
     near(mitigationBreakdown('druid', 781).shielding, 0.4);
     expect(mitigationPercent('druid', 781)).toBeCloseTo(mitigationBreakdown('druid', 781).total, 10);
   });
 
-  it("Elite Knight 119 shielding: 1.34 %; Ectoplasmic Shield (def 49) adds 1.27 %", () => {
-    near(mitigationBreakdown("knight", 1000, { shielding: 119, offhand: "none" }).shielding, 1.34);
-    near(mitigationBreakdown("knight", 1000, { shielding: 119, offhand: "shield", offhandDefense: 49 }).offhand, 1.27);
+  it('D111: Elite Knight 103 shielding 1.13 %; Dragon Shield (def 41) adds 1.04 %', () => {
+    const k = mitigationBreakdown('knight', 52, { shielding: 103, offhand: 'shield', offhandDefense: 41 });
+    shows(k.shielding, 1.13);
+    shows(k.offhand, 1.04);
+    near(mitigationBreakdown('knight', 1000, { shielding: 119, offhand: 'shield', offhandDefense: 49 }).offhand, 1.27);
   });
 
   it('defaults: paladin quiver, mages spellbook, knight/monk none; bracket offhand defense', () => {

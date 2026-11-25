@@ -115,22 +115,23 @@ export function resolveCharacterStats(vocation: Vocation, stats: CharacterStats)
 //   (shielding × vocFactor + offhandFactor × defense) / 100, then × (1 + wheel%/100); a quiver changes nothing (D108).
 // Constants fitted on in-game Cyclopedia values (no wheel):
 //   RP shielding 108 + quiver → 1.18 %; RP shielding 110 + Gnome Shield → 1.21 % shielding + 1.28 % shield;
-//   ED shielding 36 → 0.38 %, + Spellbook of Mind Control (def 26) 0.61 %; EK shielding 119 → 1.34 %.
+//   ED shielding 36 → 0.38 %, + Spellbook of Mind Control (def 26) 0.61 %;
+//   EK shielding 103 → 1.13 %, + Dragon Shield (def 41) 1.04 % (D111). The Cyclopedia truncates to 0.01.
 // See docs/modules/character-formulas.md (inference + uncertainty).
 
 export type Offhand = 'shield' | 'spellbook' | 'quiver' | 'none';
 
-/** % per 100 shielding (D108: RP 108 → 1.18 %, 110 → 1.21 %; D110: ED 36 → 0.38 %). */
+/** % per 100 shielding (D111: one value fits RP 108 / 110 and EK 103; ED 36 → 0.38 %). */
 export const MITIGATION_SHIELDING_FACTOR: Record<Vocation, number> = {
-  knight: 1.126, // EK Cyclopedia: 119 shielding → 1.34 %
-  paladin: 1.096,
-  sorcerer: 1.056, // not measured; follows the druid
-  druid: 1.056,
-  monk: 1.096, // not measured; follows the paladin
+  knight: 1.1,
+  paladin: 1.1,
+  sorcerer: 1.07, // not measured; follows the druid
+  druid: 1.07,
+  monk: 1.1, // not measured; follows knight and paladin
 };
 
-/** % per 100 offhand defense (shield: RP Gnome Shield 50 → 1.28 %; D110 spellbook: ED Spellbook of Mind Control 26 → 0.61 %). */
-export const MITIGATION_DEFENSE_FACTOR: Record<'shield' | 'spellbook', number> = { shield: 2.56, spellbook: 2.346 };
+/** % per 100 offhand defense (shields: Gnome Shield 50 → 1.28 %, Dragon Shield 41 → 1.04 %; spellbook: Mind Control 26 → 0.61 %). Weapon defense is ignored (~0.05 %). */
+export const MITIGATION_DEFENSE_FACTOR: Record<'shield' | 'spellbook', number> = { shield: 2.56, spellbook: 2.36 };
 
 /** Level brackets of the typical best-in-slot offhand defense (TibiaWiki item data). */
 export const OFFHAND_LEVELS = [200, 400, 600, 800, 1000, 1250, 1500] as const;
