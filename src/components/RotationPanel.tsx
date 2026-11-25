@@ -22,6 +22,9 @@ interface RotationPanelProps {
   stanceOptions: string[];
   /** D35: revelations and how reachable each stage is. */
   revelations: RevelationOption[];
+  /** D116: gem vessels of the wheel; unlocked in the shown build. */
+  maxVessels: number;
+  shownVessels?: number;
   value: SpellPrefs;
   onChange: (patch: Partial<SpellPrefs>) => void;
   /** Rotation used by the viewed build. */
@@ -34,7 +37,7 @@ interface RotationPanelProps {
 const AUTO = '*';
 
 /** Rotation choice (auto / preset), the rotation the viewed build is based on, and forced spell augments. */
-export function RotationPanel({ presets, customSpells, spells, excludable, targetSpells, stanceOptions, revelations, value, onChange, usage, stances }: RotationPanelProps) {
+export function RotationPanel({ presets, customSpells, spells, excludable, targetSpells, stanceOptions, revelations, maxVessels, shownVessels, value, onChange, usage, stances }: RotationPanelProps) {
   const t = useT();
   const id = useId();
   const selected = presets.find((p) => p.id === value.rotationId);
@@ -273,6 +276,25 @@ export function RotationPanel({ presets, customSpells, spells, excludable, targe
             })}
           </ul>
           <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.forcedRevHint')}</p>
+          <label className="mt-3 flex items-center gap-2 text-xs">
+            <span className="min-w-0 flex-1 truncate text-parchment-300">{t('rotation.minVessels')}</span>
+            <select
+              value={Math.min(value.minVessels, maxVessels)}
+              onChange={(e) => onChange({ minVessels: Number(e.target.value) })}
+              className="field w-40 shrink-0 py-1 text-xs"
+            >
+              <option value={0}>{t('rotation.forcedRevNone')}</option>
+              {Array.from({ length: maxVessels }, (_, i) => (
+                <option key={i} value={i + 1}>
+                  {i + 1}
+                </option>
+              ))}
+            </select>
+          </label>
+          {value.minVessels > 0 && shownVessels !== undefined && shownVessels < Math.min(value.minVessels, maxVessels) && (
+            <p className="mt-0.5 text-[11px] text-amber-300">{t('rotation.minVesselsShort', { n: shownVessels })}</p>
+          )}
+          <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.minVesselsHint')}</p>
         </div>
       </div>
     </div>

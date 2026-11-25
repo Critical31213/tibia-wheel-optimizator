@@ -88,7 +88,7 @@ function Optimizer({ onReset }: { onReset: () => void }) {
   );
   const character = useMemo(() => characterOf(deferred), [deferred]);
   const { mode } = deferred;
-  const { rotationId, forcedSpells, forcedStage2, forcedRevelations, stance, customRotation, excludedSpells, targets: spellTargets } = deferredPrefs;
+  const { rotationId, forcedSpells, forcedStage2, forcedRevelations, stance, customRotation, excludedSpells, targets: spellTargets, minVessels } = deferredPrefs;
   const revelationReach = useMemo(
     () => revelationOptions({ vocation: deferred.vocation, points, gems: deferredGems, character, wheelVariant: deferred.wheel }),
     [deferred.vocation, points, deferredGems, character, deferred.wheel],
@@ -114,6 +114,7 @@ function Optimizer({ onReset }: { onReset: () => void }) {
             forcedSpells: forcedSpells.length ? forcedSpells : undefined,
             forcedStage2: forcedStage2.length ? forcedStage2 : undefined,
             forcedRevelations: forcedRevelations.length ? forcedRevelations : undefined,
+            minVessels: minVessels ? Math.min(minVessels, wheel.vessels.length) : undefined,
             excludedSpells: excludedSpells.length ? excludedSpells : undefined,
             spellTargets: mode === 'hunt' && Object.keys(spellTargets).length ? spellTargets : undefined,
             stances: stance === null ? undefined : stanceNames(stance),
@@ -125,7 +126,7 @@ function Optimizer({ onReset }: { onReset: () => void }) {
             compareWith: deferredCompare,
           }
         : null,
-    [deferredCompare, deferred.wheel, deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, meleeSkill, rotationId, customRotation, forcedSpells, forcedStage2, forcedRevelations, excludedSpells, spellTargets, stance, deferredWeapons, gearRequest, deferredGear.charms],
+    [deferredCompare, deferred.wheel, deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, meleeSkill, rotationId, customRotation, forcedSpells, forcedStage2, forcedRevelations, minVessels, wheel, excludedSpells, spellTargets, stance, deferredWeapons, gearRequest, deferredGear.charms],
   );
   const optimized = useOptimizer(request);
   // The shown build may lag the inputs while the worker computes; everything below follows its own vocation.
@@ -211,6 +212,8 @@ function Optimizer({ onReset }: { onReset: () => void }) {
               targetSpells={inputs.mode === 'hunt' ? targetSpells : []}
               stanceOptions={stanceOptions}
               revelations={revelationReach}
+              maxVessels={wheel.vessels.length}
+              shownVessels={current ? shown?.vessels.filter((v) => v.unlocked).length : undefined}
               value={spellPrefs}
               onChange={updateSpellPrefs}
               usage={current ? shown?.rotation : undefined}

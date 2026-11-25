@@ -24,6 +24,7 @@ describe('spell prefs', () => {
       customRotation: [],
       excludedSpells: [],
       targets: {},
+      minVessels: 0,
     });
     const many = Array.from({ length: 20 }, (_, i) => `s${i}`);
     expect(sanitizeSpellPrefs({ forcedSpells: many }, IDS, many).forcedSpells).toHaveLength(MAX_FORCED_SPELLS);
@@ -41,6 +42,7 @@ describe('spell prefs', () => {
       customRotation: [{ name: 'Great Fire Wave', ratio: 3 }, { name: 'Energy Wave', ratio: 1 }],
       excludedSpells: ['Great Energy Beam', "Hell's Core"],
       targets: { "Hell's Core": 9.5, 'Great Fire Wave': 4 },
+      minVessels: 5,
     };
     const XS = getExcludableSpells('sorcerer');
     const ST = getStanceOptions('sorcerer');
@@ -65,6 +67,10 @@ describe('spell prefs', () => {
     ]);
     // Stage II only for forced spells; unknown revelations / stages dropped.
     expect(spellPrefsFromQuery('?fs2=Hell%27s+Core&fr=Nope:2,Beam+Mastery:4', IDS, SPELLS, ST, RV)).toMatchObject({ forcedStage2: [], forcedRevelations: [] });
+    // D116: forced vessels: whole numbers 0..8, anything else auto.
+    expect(spellPrefsFromQuery('?mv=9', IDS, SPELLS)?.minVessels).toBe(0);
+    expect(spellPrefsFromQuery('?mv=2.5', IDS, SPELLS)?.minVessels).toBe(0);
+    expect(spellPrefsFromQuery('?mv=3', IDS, SPELLS)?.minVessels).toBe(3);
     expect(spellPrefsFromQuery('?st=', IDS, SPELLS, ST)?.stance).toBe('');
     expect(spellPrefsFromQuery('?st=Blood+Rage', IDS, SPELLS, ST)?.stance).toBeNull();
     expect(spellPrefsToQuery(EMPTY_SPELL_PREFS, search)).toBe('?v=sorcerer&p=100');

@@ -1563,10 +1563,30 @@ const ROMAN_STAGE = ['', 'I', 'II', 'III'];
 /** D35: revelation value below a forced stage. */
 const FORCED_PENALTY = 1e4;
 
-/** D35: tables with a penalty on revelation stages below the forced ones, graded per missing stage (D38) so the search sees progress. */
-function forceTables(t: Tables, min: readonly number[]): Tables {
-  if (min.every((x) => x === 0)) return t;
-  return { ...t, rev: t.rev.map((r, d) => Float64Array.from(r, (x, k) => (k < min[d] ? x - FORCED_PENALTY * (min[d] - k) : x))) };
+/** D116: forced minimum of unlocked gem vessels; `counts` = unlocked vessels per vessel state. */
+interface VesselForce {
+  min: number;
+  counts: number[];
+}
+
+function vesselForce(input: OptimizerInput, wheel: EngineWheel): VesselForce | undefined {
+  const min = Math.min(wheel.definition.vessels.length, Math.max(0, Math.floor(input.minVessels ?? 0)));
+  if (!min) return undefined;
+  return { min, counts: Array.from({ length: wheel.vesselStates }, (_, k) => vesselSpots(wheel, k).filter((s) => s.unlocked).length) };
+}
+
+/**
+ * D35: tables with a penalty on revelation stages below the forced ones, graded per missing stage (D38) so the search
+ * sees progress. D116: the same per missing gem vessel.
+ */
+function forceTables(t: Tables, min: readonly number[], mv?: VesselForce): Tables {
+  const revOk = min.every((x) => x === 0);
+  if (revOk && !mv) return t;
+  return {
+    ...t,
+    rev: revOk ? t.rev : t.rev.map((r, d) => Float64Array.from(r, (x, k) => (k < min[d] ? x - FORCED_PENALTY * (min[d] - k) : x))),
+    vessel: mv ? Float64Array.from(t.vessel, (x, k) => (mv.counts[k] < mv.min ? x - FORCED_PENALTY * (mv.min - mv.counts[k]) : x)) : t.vessel,
+  };
 }
 
 interface Prepared {
@@ -1585,6 +1605,8 @@ interface Prepared {
   /** D35: forced minimum revelation stage per domain; forced stages out of reach. */
   minStages: number[];
   revBlocked: string[];
+  /** D116: forced minimum of unlocked gem vessels. */
+  minVessels?: VesselForce;
   /** D45: the plan this was prepared from (weapon re-choice). */
   spec?: PlanSpec;
   weapon?: WeaponChoice;
@@ -1617,6 +1639,7 @@ function prepare(input: OptimizerInput, priority = input.priority, base?: Prepar
   const vesselP = vesselTable(preEnv, gems);
   const parts = base ? { ...base.parts, vesselP } : partTables(wheel, v, vesselP);
   const fs = base ? { min: base.minStages, blocked: base.revBlocked } : forcedStages(input, wheel);
+  const mv = base ? base.minVessels : vesselForce(input, wheel);
   return {
     input,
     wheel,
@@ -1626,11 +1649,12 @@ function prepare(input: OptimizerInput, priority = input.priority, base?: Prepar
     gemRm: base?.gemRm ?? ownedRmOffsets(wheel, gems),
     parts,
     blend,
-    tables: forceTables(blendTables(parts, blend), fs.min),
+    tables: forceTables(blendTables(parts, blend), fs.min, mv),
     forced: base?.forced ?? spec?.forced ?? forcedSeed(wheel, input.forcedSpells ?? [], budget, input.forcedStage2),
     auto: base?.auto ?? spec?.auto ?? false,
     minStages: fs.min,
     revBlocked: fs.blocked,
+    minVessels: mv,
     spec: base?.spec ?? spec,
     weapon: base?.weapon ?? spec?.weapon,
   };
@@ -1702,7 +1726,7 @@ function searchGated(p: Prepared, opts: SearchOpts): State {
   const st = runSearch(p, p.tables, opts);
   const d = revelationIndex(p.wheel.revelations, p.v.model.plan.requires);
   if (d < 0 || planValid(p, gridStages(p, st))) return st;
-  const boosted = runSearch(p, forceTables(blendTables(p.parts, p.blend, [0, 1, 2, 3].map((x) => (x === d ? GATED_BOOST : 1))), p.minStages), FULL_SEARCH);
+  const boosted = runSearch(p, forceTables(blendTables(p.parts, p.blend, [0, 1, 2, 3].map((x) => (x === d ? GATED_BOOST : 1))), p.minStages, p.minVessels), FULL_SEARCH);
   return planValid(p, gridStages(p, boosted)) ? boosted : st;
 }
 
@@ -1867,7 +1891,7 @@ function alternatives(p: Prepared, plans: Prepared[], main: State, count: number
   for (const c of cands) {
     if (found.length >= count) break;
     const q = c.priority === prio ? base : prepare(base.input, c.priority, base);
-    const st = runSearch(base, c.revScale.every((x) => x === 1) ? q.tables : forceTables(blendTables(q.parts, q.blend, c.revScale), q.minStages), LIGHT_SEARCH);
+    const st = runSearch(base, c.revScale.every((x) => x === 1) ? q.tables : forceTables(blendTables(q.parts, q.blend, c.revScale), q.minStages, q.minVessels), LIGHT_SEARCH);
     const plan = bestPlan(plans, st);
     if (plan.obj > mainObj + 1e-9) {
       main = st;
@@ -1925,7 +1949,7 @@ function refine(p: Prepared, best: State): State {
   const stages = gridStages(p, best);
   for (let d = 0; d < 4; d++) {
     if (stages[d] < 1 || stages[d] > 2) continue;
-    const st = runSearch(p, forceTables(blendTables(p.parts, p.blend, [0, 1, 2, 3].map((x) => (x === d ? 0.2 : 1))), p.minStages), LIGHT_SEARCH);
+    const st = runSearch(p, forceTables(blendTables(p.parts, p.blend, [0, 1, 2, 3].map((x) => (x === d ? 0.2 : 1))), p.minStages, p.minVessels), LIGHT_SEARCH);
     const obj = objective(p, st);
     if (obj > bestObj + 1e-9 && (!p.auto || planValid(p, gridStages(p, st)))) {
       best = st;

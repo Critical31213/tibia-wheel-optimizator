@@ -66,6 +66,17 @@ describe('D107: own average targets', () => {
   });
 });
 
+describe('D116: forced number of gem vessels', () => {
+  it('unlocks at least the forced vessels when the points allow, otherwise as many as possible', () => {
+    const run = (points: number, minVessels?: number) =>
+      optimize({ vocation: 'knight', points, monster: null, priority: 50, context: { mode: 'hunt' }, alternatives: 0, minVessels }).vessels.filter((v) => v.unlocked).length;
+    expect(run(800)).toBeLessThan(4);
+    expect(run(800, 4)).toBeGreaterThanOrEqual(4);
+    expect(run(2500, 8)).toBe(8);
+    expect(run(200, 8)).toBeGreaterThan(run(200));
+  });
+});
+
 describe('D113: mitigation stat line', () => {
   it('shows the Cyclopedia split with the wheel multiplier, truncated to 0.01', () => {
     const r = optimize({ vocation: 'druid', points: 1000, monster: null, priority: 100, context: { mode: 'hunt' }, alternatives: 0, character: { level: 96, shielding: 36 } });
