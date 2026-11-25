@@ -145,8 +145,6 @@ export function RotationPanel({ presets, customSpells, spells, excludable, targe
         <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.excludedHint')}</p>
       </div>
 
-      {targetSpells.length > 0 && <SpellTargets spells={targetSpells.filter((s) => !excluded.includes(s.name))} value={value.targets} onChange={(targets) => onChange({ targets })} />}
-
       {usage && (
         <div className="mt-3" aria-live="polite">
           <p className="text-xs text-parchment-300">
@@ -183,7 +181,13 @@ export function RotationPanel({ presets, customSpells, spells, excludable, targe
           {usage.spells.some((s) => s.fromRevelation) && (
             <p className="mt-1 text-[11px] text-parchment-400">★ {t('rotation.fromRevelation')}</p>
           )}
-          {usage.window && <RotationDamage usage={usage} window={usage.window} />}
+          {usage.window && (
+            <RotationDamage
+              usage={usage}
+              window={usage.window}
+              targets={targetSpells.length ? { spells: targetSpells, value: value.targets, onChange: (targets) => onChange({ targets }) } : undefined}
+            />
+          )}
         </div>
       )}
 
@@ -301,15 +305,57 @@ export function RotationPanel({ presets, customSpells, spells, excludable, targe
   );
 }
 
-/** D67: average damage of the whole rotation over the engine's window (test view). */
-function RotationDamage({ usage, window: w }: { usage: RotationUsage; window: NonNullable<RotationUsage['window']> }) {
+interface TargetEdit {
+  spells: { name: string; avg: number; max: number }[];
+  value: Record<string, number>;
+  onChange: (v: Record<string, number>) => void;
+}
+
+/**
+ * D67: average damage of the whole rotation over the engine's window (test view). D121: in hunts the Targets column
+ * holds the player's average targets per cast (D107; empty = community average).
+ */
+function RotationDamage({ usage, window: w, targets }: { usage: RotationUsage; window: NonNullable<RotationUsage['window']>; targets?: TargetEdit }) {
   const t = useT();
+  const id = useId();
   const rows = usage.spells.filter((s) => s.damage);
   const num = (n: number) => formatNumber(Math.round(n));
   const cell = 'px-1.5 py-0.5 text-right tabular-nums';
+  const custom = targets ? Object.keys(targets.value).length : 0;
+  const editable = targets && rows.some((s) => targets.spells.some((x) => x.name === s.name));
+  const reset = (name: string) => targets?.onChange(Object.fromEntries(Object.entries(targets.value).filter(([n]) => n !== name)));
+  const targetCell = (name: string, shown: number) => {
+    const spec = targets?.spells.find((x) => x.name === name);
+    if (!targets || !spec) return shown.toFixed(1);
+    return (
+      <span className="inline-flex items-center justify-end gap-0.5">
+        <TargetInput
+          id={`${id}-${name}`}
+          label={t('rotation.targetsOf', { name })}
+          avg={spec.avg}
+          max={Math.min(spec.max, MAX_SPELL_TARGETS)}
+          value={targets.value[name]}
+          onChange={(v) => (v === undefined ? reset(name) : targets.onChange({ ...targets.value, [name]: v }))}
+        />
+        <button
+          type="button"
+          aria-label={t('rotation.targetsReset', { name })}
+          title={t('rotation.targetsReset', { name })}
+          disabled={targets.value[name] === undefined}
+          onClick={() => reset(name)}
+          className="w-3 text-parchment-400 hover:text-parchment-50 disabled:invisible"
+        >
+          ↺
+        </button>
+      </span>
+    );
+  };
   return (
-    <details className="mt-2 text-xs">
-      <summary className="cursor-pointer text-parchment-300">{t('rotation.damageTitle', { seconds: w.seconds })}</summary>
+    <details className="mt-2 text-xs" open={custom > 0 || undefined}>
+      <summary className="cursor-pointer text-parchment-300">
+        {t('rotation.damageTitle', { seconds: w.seconds })}
+        {custom > 0 && <span className="text-gold-300"> ({t('rotation.targetsCustom', { n: custom })})</span>}
+      </summary>
       <div className="mt-1 overflow-x-auto">
         <table className="w-full text-parchment-200">
           <thead className="text-parchment-400">
@@ -329,7 +375,7 @@ function RotationDamage({ usage, window: w }: { usage: RotationUsage; window: No
               <tr key={s.name} className="border-t border-ink-700">
                 <td className="px-1.5 py-0.5">{s.name}</td>
                 <td className={cell}>{s.damage!.casts.toFixed(1)}</td>
-                <td className={cell}>{s.damage!.targets.toFixed(1)}</td>
+                <td className={cell}>{targetCell(s.name, s.damage!.targets)}</td>
                 <td className={cell}>{s.damage!.minHit !== undefined ? num(s.damage!.minHit) : '—'}</td>
                 <td className={cell}>{s.damage!.maxHit !== undefined ? num(s.damage!.maxHit) : '—'}</td>
                 <td className={cell}>{s.damage!.avgHit !== undefined ? num(s.damage!.avgHit) : '—'}</td>
@@ -362,45 +408,9 @@ function RotationDamage({ usage, window: w }: { usage: RotationUsage; window: No
         </table>
       </div>
       <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.damageNote')}</p>
-    </details>
-  );
-}
-
-/** D107: the player's average targets per cast when hunting; empty = community average. */
-function SpellTargets({ spells, value, onChange }: { spells: { name: string; avg: number; max: number }[]; value: Record<string, number>; onChange: (v: Record<string, number>) => void }) {
-  const t = useT();
-  const id = useId();
-  const custom = Object.keys(value).length;
-  const reset = (name: string) => onChange(Object.fromEntries(Object.entries(value).filter(([n]) => n !== name)));
-  return (
-    <details className="mt-3 text-xs" open={custom > 0 || undefined}>
-      <summary className="cursor-pointer text-parchment-300">
-        {t('rotation.targets')}
-        {custom > 0 && <span className="text-gold-300"> ({custom})</span>}
-      </summary>
-      <ul className="mt-1 grid gap-x-4 gap-y-1 sm:grid-cols-2">
-        {spells.map((s) => (
-          <li key={s.name} className="flex items-center gap-2">
-            <label htmlFor={`${id}-${s.name}`} className="min-w-0 flex-1 truncate text-parchment-200">
-              {s.name}
-            </label>
-            <TargetInput id={`${id}-${s.name}`} avg={s.avg} max={Math.min(s.max, MAX_SPELL_TARGETS)} value={value[s.name]} onChange={(v) => (v === undefined ? reset(s.name) : onChange({ ...value, [s.name]: v }))} />
-            <button
-              type="button"
-              aria-label={t('rotation.targetsReset', { name: s.name })}
-              title={t('rotation.targetsReset', { name: s.name })}
-              disabled={value[s.name] === undefined}
-              onClick={() => reset(s.name)}
-              className="w-4 text-parchment-400 hover:text-parchment-50 disabled:invisible"
-            >
-              ↺
-            </button>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.targetsHint')}</p>
+      {editable && <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.targetsHint')}</p>}
       {custom > 0 && (
-        <button type="button" onClick={() => onChange({})} className="mt-1 text-[11px] text-gold-300 hover:text-gold-200">
+        <button type="button" onClick={() => targets!.onChange({})} className="mt-1 text-[11px] text-gold-300 hover:text-gold-200">
           {t('rotation.targetsResetAll')}
         </button>
       )}
@@ -409,12 +419,13 @@ function SpellTargets({ spells, value, onChange }: { spells: { name: string; avg
 }
 
 /** Number field that keeps the typed text and commits valid values (empty = default). */
-function TargetInput({ id, avg, max, value, onChange }: { id: string; avg: number; max: number; value: number | undefined; onChange: (v: number | undefined) => void }) {
+function TargetInput({ id, label, avg, max, value, onChange }: { id: string; label: string; avg: number; max: number; value: number | undefined; onChange: (v: number | undefined) => void }) {
   const [draft, setDraft] = useState<{ text: string; value: number | undefined } | null>(null);
   const text = draft && draft.value === value ? draft.text : (value?.toString() ?? '');
   return (
     <input
       id={id}
+      aria-label={label}
       type="number"
       inputMode="decimal"
       min={1}
@@ -430,7 +441,7 @@ function TargetInput({ id, avg, max, value, onChange }: { id: string; avg: numbe
         if (next !== value) onChange(next);
       }}
       onBlur={() => setDraft(null)}
-      className="field w-16 shrink-0 py-0.5 text-right text-xs tabular-nums placeholder:text-parchment-500"
+      className="field w-14 shrink-0 py-0 text-right text-xs tabular-nums placeholder:text-parchment-500"
     />
   );
 }
