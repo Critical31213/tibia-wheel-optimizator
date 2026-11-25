@@ -79,9 +79,14 @@ How the constants were inferred:
   reading (119 → 1.34 %) does not fit and probably included a wheel Mitigation Multiplier.
 - **No quiver factor (D108).** A quiver does not change mitigation (checked in-game).
 - **Offhand factor per 100 defense:** shields 2.56 (Gnome Shield, defense 50 → 1.28 %; Dragon Shield, defense 41 →
-  1.04 %; together 2.560–2.561), spellbooks 2.36 (Spellbook of Mind Control, defense 26 → 0.61 %, bounds 2.346–2.385).
-- **Weapon defense** is not modelled yet. EK readings: Fire Sword alone 0.50 %, Dragon Shield alone 1.04 %, both 1.09 %; with a shield the weapon adds only ~0.05 %. Item defense values come from the TibiaWiki
-  item data (`scripts/.cache/damage-api/meta/shields.json`).
+  1.04 %; together 2.560–2.561), spellbooks 2.36 (Spellbook of Mind Control, defense 26 → 0.61 %, bounds 2.346–2.385). Item defense values come from the TibiaWiki item data
+  (`scripts/.cache/damage-api/meta/shields.json`).
+- **Weapon defense (D112)** counts only without a shield or spellbook: 2.53 %/100 defense (EK readings: Fire
+  Sword, defense 20, alone 0.50 %; Dragon Shield alone 1.04 %; both 1.09 %, so with a shield the weapon adds only
+  ~0.05 % and is ignored). Without a known weapon the typical defense of the level is used (`WEAPON_DEFENSE`:
+  knight 30–36, monk 17–22; bows, wands and rods have none).
+- **Utamo Tempo** (not modelled, temporary): the same EK with 133 shielding showed 1.48 % from shielding and
+  1.06 % / 0.51 % / 1.12 % from shield / sword / both, i.e. the raised shielding times about 1.018 on every part.
 - **Mage default shielding** is 34/35/36/38/38/39/40 (levels 200…1500): a level 96 ED already has 36, and an older
   level 781 ED reading (0.40 %) implies about 38.
 
@@ -107,11 +112,11 @@ Spellbooks: Spellbook of Lost Souls, Stag Spellbook/Eldritch Folio, Arboreal Tom
 
 **Results with the defaults**
 
-| Level | EK (none) | EK (shield) | RP (quiver) | Mage (spellbook) | Monk |
+| Level | EK (weapon) | EK (shield) | RP (quiver) | Mage (spellbook) | Monk |
 |---|---|---|---|---|---|
-| 200 | 0.99 % | 2.17 % | 0.79 % | 1.11 % | 0.66 % |
-| 800 | 1.23 % | 2.56 % | 0.99 % | 1.25 % | 0.80 % |
-| 1500 | 1.36 % | 2.77 % | 1.12 % | 1.27 % | 0.90 % |
+| 200 | 1.73 % | 2.15 % | 0.79 % | 1.12 % | 1.09 % |
+| 800 | 2.03 % | 2.53 % | 0.99 % | 1.26 % | 1.31 % |
+| 1500 | 2.24 % | 2.74 % | 1.12 % | 1.28 % | 1.46 % |
 
 `effectiveHp(hp, m) = hp / (1 − m/100)` (D18).
 

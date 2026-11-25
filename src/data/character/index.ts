@@ -130,8 +130,23 @@ export const MITIGATION_SHIELDING_FACTOR: Record<Vocation, number> = {
   monk: 1.1, // not measured; follows knight and paladin
 };
 
-/** % per 100 offhand defense (shields: Gnome Shield 50 → 1.28 %, Dragon Shield 41 → 1.04 %; spellbook: Mind Control 26 → 0.61 %). Weapon defense is ignored (~0.05 %). */
+/** % per 100 offhand defense (shields: Gnome Shield 50 → 1.28 %, Dragon Shield 41 → 1.04 %; spellbook: Mind Control 26 → 0.61 %). */
 export const MITIGATION_DEFENSE_FACTOR: Record<'shield' | 'spellbook', number> = { shield: 2.56, spellbook: 2.36 };
+
+/**
+ * D112: % per 100 weapon defense without a shield or spellbook (Fire Sword, defense 20 → 0.50 %; 0.51 % under Utamo
+ * Tempo). With a shield the weapon adds only ~0.05 % and is ignored.
+ */
+export const WEAPON_DEFENSE_FACTOR = 2.53;
+
+/** D112: typical weapon defense per OFFHAND_LEVELS (melee weapons of the level; bows, wands and rods have none). */
+export const WEAPON_DEFENSE: Record<Vocation, number[]> = {
+  knight: [30, 32, 33, 33, 35, 36, 36],
+  paladin: [0, 0, 0, 0, 0, 0, 0],
+  sorcerer: [0, 0, 0, 0, 0, 0, 0],
+  druid: [0, 0, 0, 0, 0, 0, 0],
+  monk: [17, 20, 20, 20, 22, 22, 22],
+};
 
 /** Level brackets of the typical best-in-slot offhand defense (TibiaWiki item data). */
 export const OFFHAND_LEVELS = [200, 400, 600, 800, 1000, 1250, 1500] as const;
@@ -153,17 +168,23 @@ export const DEFAULT_OFFHAND: Record<Vocation, Offhand> = {
   monk: 'none',
 };
 
+const bracket = (level: number) => OFFHAND_LEVELS.reduce((acc, l, k) => (level >= l ? k : acc), 0);
+
 export function defaultOffhandDefense(offhand: Offhand, level: number): number {
   if (offhand !== 'shield' && offhand !== 'spellbook') return 0;
-  const i = OFFHAND_LEVELS.reduce((acc, l, k) => (level >= l ? k : acc), 0);
-  return OFFHAND_DEFENSE[offhand][i];
+  return OFFHAND_DEFENSE[offhand][bracket(level)];
 }
+
+/** D112: typical weapon defense of the vocation at a level. */
+export const defaultWeaponDefense = (vocation: Vocation, level: number) => WEAPON_DEFENSE[vocation][bracket(level)];
 
 export interface MitigationOptions {
   shielding?: number;
   offhand?: Offhand;
   /** Shield/spellbook defense; defaults to the level-bracket typical value. */
   offhandDefense?: number;
+  /** D112: weapon defense, counted without a shield / spellbook; defaults to the typical value of the level. */
+  weaponDefense?: number;
   /** Wheel "Mitigation Multiplier" in % (dedication 0.075 %/point + gem mods). */
   wheelMultiplierPct?: number;
 }
@@ -182,7 +203,9 @@ export function mitigationBreakdown(vocation: Vocation, level: number, opts: Mit
   const defense = hasDefense ? (opts.offhandDefense ?? defaultOffhandDefense(offhand, level)) : 0;
   const k = 1 + (opts.wheelMultiplierPct ?? 0) / 100;
   const s = (shielding * MITIGATION_SHIELDING_FACTOR[vocation] * k) / 100;
-  const o = hasDefense ? (defense * MITIGATION_DEFENSE_FACTOR[offhand] * k) / 100 : 0;
+  const o = hasDefense
+    ? (defense * MITIGATION_DEFENSE_FACTOR[offhand] * k) / 100
+    : ((opts.weaponDefense ?? defaultWeaponDefense(vocation, level)) * WEAPON_DEFENSE_FACTOR * k) / 100;
   return { shielding: s, offhand: o, total: s + o };
 }
 

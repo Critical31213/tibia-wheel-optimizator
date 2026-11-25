@@ -70,16 +70,22 @@ describe('mitigation (D19, calibrated on in-game Cyclopedia values)', () => {
     near(mitigationBreakdown('knight', 1000, { shielding: 119, offhand: 'shield', offhandDefense: 49 }).offhand, 1.27);
   });
 
+  it('D112: weapon alone (Fire Sword, def 20) 0.50 %; ignored with a shield; typical weapon by default', () => {
+    shows(mitigationBreakdown('knight', 52, { shielding: 103, offhand: 'none', weaponDefense: 20 }).offhand, 0.5);
+    expect(mitigationBreakdown('knight', 52, { offhand: 'shield', offhandDefense: 41, weaponDefense: 20 }).offhand).toBeCloseTo(41 * 0.0256, 10);
+    expect(mitigationBreakdown('knight', 800).offhand).toBeCloseTo(0.33 * 2.53, 6);
+    expect(mitigationBreakdown('sorcerer', 800, { offhand: 'none' }).offhand).toBe(0);
+  });
+
   it('defaults: paladin quiver, mages spellbook, knight/monk none; bracket offhand defense', () => {
     expect(DEFAULT_OFFHAND).toEqual({ knight: 'none', paladin: 'quiver', sorcerer: 'spellbook', druid: 'spellbook', monk: 'none' });
-    expect(mitigationBreakdown('knight', 800).offhand).toBe(0);
     expect(mitigationBreakdown('paladin', 800).offhand).toBe(0);
     expect(mitigationBreakdown('sorcerer', 800).offhand).toBeGreaterThan(0.8);
     expect(defaultOffhandDefense('shield', 150)).toBe(46);
     expect(defaultOffhandDefense('shield', 1500)).toBe(55);
     expect(defaultOffhandDefense('spellbook', 799)).toBe(34);
     expect(defaultOffhandDefense('quiver', 800)).toBe(0);
-    expect(mitigationPercent('knight', 1000, { offhand: 'shield' })).toBeGreaterThan(mitigationPercent('knight', 1000) + 1);
+    expect(mitigationPercent('knight', 1000, { offhand: 'shield' })).toBeGreaterThan(mitigationPercent('knight', 1000) + 0.4);
   });
 
   it('small at 200-1500 and grows slowly with level', () => {
