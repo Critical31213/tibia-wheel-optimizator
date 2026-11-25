@@ -74,6 +74,13 @@ describe('mitigation (D19, calibrated on in-game Cyclopedia values)', () => {
     shows(mitigationBreakdown('knight', 52, { shielding: 103, offhand: 'none', weaponDefense: 20 }).offhand, 0.5);
     expect(mitigationBreakdown('knight', 52, { offhand: 'shield', offhandDefense: 41, weaponDefense: 20 }).offhand).toBeCloseTo(41 * 0.0256, 10);
     expect(mitigationBreakdown('knight', 800).offhand).toBeCloseTo(0.33 * 2.53, 6);
+  });
+
+  it('D117: monk shielding 72 → 0.77 %; two-handed Soulkamas (def 21) → 0.51 %', () => {
+    const m = mitigationBreakdown('monk', 400, { shielding: 72, weaponDefense: 21 });
+    shows(m.shielding, 0.77);
+    shows(m.offhand, 0.51);
+    shows(mitigationBreakdown('knight', 52, { shielding: 103, offhand: 'none', weaponDefense: 20, weaponTwoHanded: false }).offhand, 0.5);
     expect(mitigationBreakdown('sorcerer', 800, { offhand: 'none' }).offhand).toBe(0);
   });
 

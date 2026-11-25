@@ -116,7 +116,8 @@ export function resolveCharacterStats(vocation: Vocation, stats: CharacterStats)
 // Constants fitted on in-game Cyclopedia values (no wheel):
 //   RP shielding 108 + quiver → 1.18 %; RP shielding 110 + Gnome Shield → 1.21 % shielding + 1.28 % shield;
 //   ED shielding 36 → 0.38 %, + Spellbook of Mind Control (def 26) 0.61 %;
-//   EK shielding 103 → 1.13 %, + Dragon Shield (def 41) 1.04 % (D111). The Cyclopedia truncates to 0.01.
+//   EK shielding 103 → 1.13 %, + Dragon Shield (def 41) 1.04 % (D111); monk shielding 72 → 0.77 %, + Soulkamas
+//   (two-handed, def 21) 0.51 % (D117). The Cyclopedia truncates to 0.01.
 // See docs/modules/character-formulas.md (inference + uncertainty).
 
 export type Offhand = 'shield' | 'spellbook' | 'quiver' | 'none';
@@ -127,17 +128,21 @@ export const MITIGATION_SHIELDING_FACTOR: Record<Vocation, number> = {
   paladin: 1.1,
   sorcerer: 1.07, // not measured; follows the druid
   druid: 1.07,
-  monk: 1.1, // not measured; follows knight and paladin
+  monk: 1.07, // D117: 72 → 0.77 % bounds it to 1.069–1.083
 };
 
 /** % per 100 offhand defense (shields: Gnome Shield 50 → 1.28 %, Dragon Shield 41 → 1.04 %; spellbook: Mind Control 26 → 0.61 %). */
 export const MITIGATION_DEFENSE_FACTOR: Record<'shield' | 'spellbook', number> = { shield: 2.56, spellbook: 2.36 };
 
 /**
- * D112: % per 100 weapon defense without a shield or spellbook (Fire Sword, defense 20 → 0.50 %; 0.51 % under Utamo
- * Tempo). With a shield the weapon adds only ~0.05 % and is ignored.
+ * D112: % per 100 weapon defense without a shield or spellbook. One-handed: Fire Sword, defense 20 → 0.50 % (0.51 % under
+ * Utamo Tempo). D117: two-handed weapons give less (TibiaWiki): Soulkamas, defense 21 → 0.51 % (bounds 2.43–2.47).
+ * With a shield the weapon adds only ~0.05 % and is ignored.
  */
-export const WEAPON_DEFENSE_FACTOR = 2.53;
+export const WEAPON_DEFENSE_FACTOR: Record<'oneHanded' | 'twoHanded', number> = { oneHanded: 2.53, twoHanded: 2.45 };
+
+/** D117: whether the vocation's typical weapon is two-handed (monk fist weapons; knights assumed one-handed). */
+export const TWO_HANDED_WEAPON: Record<Vocation, boolean> = { knight: false, paladin: true, sorcerer: false, druid: false, monk: true };
 
 /** D112: typical weapon defense per OFFHAND_LEVELS (melee weapons of the level; bows, wands and rods have none). */
 export const WEAPON_DEFENSE: Record<Vocation, number[]> = {
@@ -185,6 +190,8 @@ export interface MitigationOptions {
   offhandDefense?: number;
   /** D112: weapon defense, counted without a shield / spellbook; defaults to the typical value of the level. */
   weaponDefense?: number;
+  /** D117: two-handed weapon (lower factor); defaults to the vocation's typical weapon. */
+  weaponTwoHanded?: boolean;
   /** Wheel "Mitigation Multiplier" in % (dedication 0.075 %/point + gem mods). */
   wheelMultiplierPct?: number;
 }
@@ -205,7 +212,7 @@ export function mitigationBreakdown(vocation: Vocation, level: number, opts: Mit
   const s = (shielding * MITIGATION_SHIELDING_FACTOR[vocation] * k) / 100;
   const o = hasDefense
     ? (defense * MITIGATION_DEFENSE_FACTOR[offhand] * k) / 100
-    : ((opts.weaponDefense ?? defaultWeaponDefense(vocation, level)) * WEAPON_DEFENSE_FACTOR * k) / 100;
+    : ((opts.weaponDefense ?? defaultWeaponDefense(vocation, level)) * WEAPON_DEFENSE_FACTOR[(opts.weaponTwoHanded ?? TWO_HANDED_WEAPON[vocation]) ? 'twoHanded' : 'oneHanded'] * k) / 100;
   return { shielding: s, offhand: o, total: s + o };
 }
 

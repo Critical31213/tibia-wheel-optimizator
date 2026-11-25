@@ -70,21 +70,27 @@ spellbook). The Cyclopedia **truncates** to 0.01 (D111): only then do all readin
 | Same ED with a Spellbook of Mind Control: spellbook part | 0.61 % | 0.614 % | defense 26 × 2.36/100 |
 | EK level 52, shielding 103: shielding part | 1.13 % | 1.133 % | 103 × 1.1/100 |
 | Same EK, Dragon Shield only (no weapon): shield part | 1.04 % | 1.0496 % | defense 41 × 2.56/100 |
+| Same EK, Fire Sword only (one-handed): weapon part | 0.50 % | 0.506 % | defense 20 × 2.53/100 |
+| Monk, shielding 72: shielding part | 0.77 % | 0.770 % | 72 × 1.07/100 |
+| Same monk, Soulkamas (two-handed): weapon part | 0.51 % | 0.5145 % | defense 21 × 2.45/100 |
 
 How the constants were inferred:
 
 - **Shielding factor.** With truncation, RP 108 → 1.18 %, RP 110 → 1.21 % and EK 103 → 1.13 % bound the knight
-  and paladin factor to 1.100–1.102 %/100 points; 1.1 is used for both (and the monk, not measured). The druid's
-  0.38 % at 36 bounds its factor to 1.056–1.083; 1.07 is used (the sorcerer follows, not measured). An older EK
+  and paladin factor to 1.100–1.102 %/100 points; 1.1 is used for both. The druid's 0.38 % at 36 bounds its factor
+  to 1.056–1.083 and the monk's 0.77 % at 72 to 1.069–1.083 (D117); 1.07 is used for both (the sorcerer follows, not
+  measured). An older EK
   reading (119 → 1.34 %) does not fit and probably included a wheel Mitigation Multiplier.
 - **No quiver factor (D108).** A quiver does not change mitigation (checked in-game).
 - **Offhand factor per 100 defense:** shields 2.56 (Gnome Shield, defense 50 → 1.28 %; Dragon Shield, defense 41 →
   1.04 %; together 2.560–2.561), spellbooks 2.36 (Spellbook of Mind Control, defense 26 → 0.61 %, bounds 2.346–2.385). Item defense values come from the TibiaWiki item data
   (`scripts/.cache/damage-api/meta/shields.json`).
-- **Weapon defense (D112)** counts only without a shield or spellbook: 2.53 %/100 defense (EK readings: Fire
-  Sword, defense 20, alone 0.50 %; Dragon Shield alone 1.04 %; both 1.09 %, so with a shield the weapon adds only
-  ~0.05 % and is ignored). Without a known weapon the typical defense of the level is used (`WEAPON_DEFENSE`:
-  knight 30–36, monk 17–22; bows, wands and rods have none).
+- **Weapon defense (D112)** counts only without a shield or spellbook: one-handed 2.53 %/100 defense (EK readings:
+  Fire Sword, defense 20, alone 0.50 %; Dragon Shield alone 1.04 %; both 1.09 %, so with a shield the weapon adds
+  only ~0.05 % and is ignored). Two-handed weapons give less, as TibiaWiki states (D117): Soulkamas, defense 21 →
+  0.51 %, bounds 2.429–2.476; 2.45 is used (`weaponTwoHanded`, default by vocation in `TWO_HANDED_WEAPON`: monk
+  yes, knight no). Without a known weapon the typical defense of the level is used (`WEAPON_DEFENSE`: knight 30–36,
+  monk 17–22; bows, wands and rods have none).
 - **Utamo Tempo** (not modelled, temporary): the same EK with 133 shielding showed 1.48 % from shielding and
   1.06 % / 0.51 % / 1.12 % from shield / sword / both, i.e. the raised shielding times about 1.018 on every part.
 - **Mage default shielding** is 34/35/36/38/38/39/40 (levels 200…1500): a level 96 ED already has 36, and an older
@@ -92,7 +98,7 @@ How the constants were inferred:
 
 **Uncertainty.** The spellbook factor rests on one item (Spellbook of Mind Control).
 Whether the offhand part depends on the vocation or the shielding is not known; the model uses one factor per item
-type. Sorcerer and monk are not measured. Monk weapon defense is ignored.
+type. The sorcerer is not measured; the two-handed weapon factor rests on one item (Soulkamas).
 
 **Defaults (`DEFAULT_OFFHAND`)**
 - Paladin: quiver, both for the hunt bow and the boss crossbow.
@@ -117,9 +123,9 @@ wheel's and gems' Mitigation Multiplier applied and truncated like the Cyclopedi
 
 | Level | EK (weapon) | EK (shield) | RP (quiver) | Mage (spellbook) | Monk |
 |---|---|---|---|---|---|
-| 200 | 1.73 % | 2.15 % | 0.79 % | 1.12 % | 1.09 % |
-| 800 | 2.03 % | 2.53 % | 0.99 % | 1.26 % | 1.31 % |
-| 1500 | 2.24 % | 2.74 % | 1.12 % | 1.28 % | 1.46 % |
+| 200 | 1.73 % | 2.15 % | 0.79 % | 1.12 % | 1.06 % |
+| 800 | 2.03 % | 2.53 % | 0.99 % | 1.26 % | 1.27 % |
+| 1500 | 2.24 % | 2.74 % | 1.12 % | 1.28 % | 1.42 % |
 
 `effectiveHp(hp, m) = hp / (1 − m/100)` (D18).
 
