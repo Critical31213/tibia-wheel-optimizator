@@ -76,6 +76,14 @@ describe('mitigation (D19, calibrated on in-game Cyclopedia values)', () => {
     expect(mitigationBreakdown('knight', 800).offhand).toBeCloseTo(0.33 * 2.53, 6);
   });
 
+  it('D119: monk vocation multiplier 160 % on shielding + defense', () => {
+    const m = mitigationBreakdown('monk', 400, { shielding: 72, weaponDefense: 21 });
+    expect(m.multiplier).toBe(1.6);
+    shows(m.total, 2.05);
+    expect(mitigationBreakdown('knight', 400).multiplier).toBe(1);
+    expect(mitigationPercent('monk', 400, { shielding: 72, weaponDefense: 21, wheelMultiplierPct: 30 })).toBeCloseTo(m.total * 1.3, 10);
+  });
+
   it('D118: sorcerer shielding 35 → 0.37 %; spellbook (def 23) → 0.54 %', () => {
     const m = mitigationBreakdown('sorcerer', 12, { shielding: 35, offhand: 'spellbook', offhandDefense: 23 });
     shows(m.shielding, 0.37);

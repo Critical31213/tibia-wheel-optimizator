@@ -52,7 +52,7 @@ monk 70, mages 30.
 There are no fight modes in the current game. The structure follows the in-game mitigation:
 
 ```
-mitigation % = (shielding × vocFactor + offhandFactor × defense) / 100 × (1 + wheelMultiplier%/100)
+mitigation % = (shielding × vocFactor + offhandFactor × defense) / 100 × vocMultiplier × (1 + wheelMultiplier%/100)
 ```
 
 Generic server constants (multiplier S/D 1.26, P/M 1.28, K 1.3; primaryShield 2.0–2.08;
@@ -83,6 +83,10 @@ How the constants were inferred:
   to 1.056–1.083, the sorcerer's 0.37 % at 35 to 1.057–1.085 (D118) and the monk's 0.77 % at 72 to 1.069–1.083
   (D117); 1.07 is used for all three. An older EK
   reading (119 → 1.34 %) does not fit and probably included a wheel Mitigation Multiplier.
+- **Vocation multiplier (D119).** The Cyclopedia lists a multiplier on shielding + defense in the row the combat
+  modes used to fill: 160 % for the monk (in-game, no wheel), 100 % for the other vocations
+  (`MITIGATION_VOCATION_MULTIPLIER`). The wheel and gem Mitigation Multiplier are applied on top of it. The source of
+  the monk's 160 % is not documented on TibiaWiki; the shielding and defense parts above are read without it.
 - **No quiver factor (D108).** A quiver does not change mitigation (checked in-game).
 - **Offhand factor per 100 defense:** shields 2.56 (Gnome Shield, defense 50 → 1.28 %; Dragon Shield, defense 41 →
   1.04 %; together 2.560–2.561), spellbooks 2.36 (Spellbook of Mind Control, defense 26 → 0.61 %, bounds 2.346–2.385; a sorcerer's spellbook, defense 23 → 0.54 %,
@@ -120,15 +124,15 @@ Shields: Demon Shield, Great/Gnome Shield, Eldritch Shield, Falcon Escutcheon, R
 Spellbooks: Spellbook of Lost Souls, Stag Spellbook/Eldritch Folio, Arboreal Tome/Arcanomancer Folio.
 
 The build's stats show this split (`stat.mitigationTotal`, D113): shielding and defense part, total, with the
-wheel's and gems' Mitigation Multiplier applied and truncated like the Cyclopedia.
+wheel's and gems' Mitigation Multiplier (and the monk's 160 %, D119) applied and truncated like the Cyclopedia.
 
 **Results with the defaults**
 
 | Level | EK (weapon) | EK (shield) | RP (quiver) | Mage (spellbook) | Monk |
 |---|---|---|---|---|---|
-| 200 | 1.73 % | 2.15 % | 0.79 % | 1.12 % | 1.06 % |
-| 800 | 2.03 % | 2.53 % | 0.99 % | 1.26 % | 1.27 % |
-| 1500 | 2.24 % | 2.74 % | 1.12 % | 1.28 % | 1.42 % |
+| 200 | 1.73 % | 2.15 % | 0.79 % | 1.12 % | 1.69 % |
+| 800 | 2.03 % | 2.53 % | 0.99 % | 1.26 % | 2.03 % |
+| 1500 | 2.24 % | 2.74 % | 1.12 % | 1.28 % | 2.26 % |
 
 `effectiveHp(hp, m) = hp / (1 − m/100)` (D18).
 

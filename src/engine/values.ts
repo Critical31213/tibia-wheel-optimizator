@@ -99,7 +99,7 @@ export interface ValuationContext {
   /** Base mitigation (%) with the vocation's default offhand (EHP reference across rotations). */
   mitigationRef: number;
   /** D113: base mitigation split as in the Cyclopedia (shielding / defense part, %). */
-  mitigationSplit?: { shielding: number; offhand: number };
+  mitigationSplit?: { shielding: number; offhand: number; multiplier?: number };
   /** D21: forced spells (utility augments keep their value). */
   forced: ReadonlySet<string>;
   /** D69: cooldown cuts (s) already in the model (the plan's rotation augments): their augments' cooldown effect counts 0. */

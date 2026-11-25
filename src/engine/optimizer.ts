@@ -644,7 +644,7 @@ function statLines(wheel: EngineWheel, alloc: Int32Array, stages: number[], env:
   // D113: the character's mitigation as in the Cyclopedia (wheel and gem Mitigation Multiplier applied, truncated).
   const split = env.v.mitigationSplit;
   if (split) {
-    const k = 1 + (mit * 0.075 + (gemLines.mitMult ?? 0)) / 100;
+    const k = (split.multiplier ?? 1) * (1 + (mit * 0.075 + (gemLines.mitMult ?? 0)) / 100);
     const cut = (x: number) => (Math.floor(x * k * 100 + 1e-9) / 100).toFixed(2);
     lines.push(stat('stat.mitigationTotal', `${cut(split.shielding + split.offhand)}%`, 'defense', { shielding: cut(split.shielding), defense: cut(split.offhand) }));
   }

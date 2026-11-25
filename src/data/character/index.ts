@@ -132,6 +132,12 @@ export const MITIGATION_SHIELDING_FACTOR: Record<Vocation, number> = {
   monk: 1.07, // D117: 72 → 0.77 % bounds it to 1.069–1.083
 };
 
+/**
+ * D119: the Cyclopedia's vocation multiplier on the base mitigation (the row the combat modes used to fill): monk 160 %,
+ * others 100 %. It multiplies shielding + defense; the wheel multiplier applies on top.
+ */
+export const MITIGATION_VOCATION_MULTIPLIER: Record<Vocation, number> = { knight: 1, paladin: 1, sorcerer: 1, druid: 1, monk: 1.6 };
+
 /** % per 100 offhand defense (shields: Gnome Shield 50 → 1.28 %, Dragon Shield 41 → 1.04 %; spellbook: Mind Control 26 → 0.61 %, def 23 → 0.54 %). */
 export const MITIGATION_DEFENSE_FACTOR: Record<'shield' | 'spellbook', number> = { shield: 2.56, spellbook: 2.36 };
 
@@ -200,10 +206,12 @@ export interface MitigationOptions {
 export interface MitigationBreakdown {
   shielding: number;
   offhand: number;
+  /** D119: vocation multiplier (1.6 monk). */
+  multiplier: number;
   total: number;
 }
 
-/** Mitigation split as in the Cyclopedia (both parts include the wheel multiplier). */
+/** Mitigation split as in the Cyclopedia (both parts include the wheel multiplier, not the vocation one). */
 export function mitigationBreakdown(vocation: Vocation, level: number, opts: MitigationOptions = {}): MitigationBreakdown {
   const offhand = opts.offhand ?? DEFAULT_OFFHAND[vocation];
   const shielding = opts.shielding ?? defaultCharacterStats(vocation, level).shielding;
@@ -214,7 +222,8 @@ export function mitigationBreakdown(vocation: Vocation, level: number, opts: Mit
   const o = hasDefense
     ? (defense * MITIGATION_DEFENSE_FACTOR[offhand] * k) / 100
     : ((opts.weaponDefense ?? defaultWeaponDefense(vocation, level)) * WEAPON_DEFENSE_FACTOR[(opts.weaponTwoHanded ?? TWO_HANDED_WEAPON[vocation]) ? 'twoHanded' : 'oneHanded'] * k) / 100;
-  return { shielding: s, offhand: o, total: s + o };
+  const multiplier = MITIGATION_VOCATION_MULTIPLIER[vocation];
+  return { shielding: s, offhand: o, multiplier, total: (s + o) * multiplier };
 }
 
 /** Character mitigation in % (e.g. 1.0 = 1 % damage reduction). */
