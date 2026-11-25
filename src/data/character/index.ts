@@ -63,12 +63,12 @@ export const DEFAULT_SKILLS: Record<Vocation, SkillRow> = {
   sorcerer: {
     mainSkill: [0, 0, 0, 0, 0, 0, 0],
     magicLevel: [85, 100, 110, 117, 122, 128, 133],
-    shielding: [28, 31, 33, 36, 37, 39, 40],
+    shielding: [34, 35, 36, 38, 38, 39, 40],
   },
   druid: {
     mainSkill: [0, 0, 0, 0, 0, 0, 0],
     magicLevel: [85, 100, 110, 117, 122, 128, 133],
-    shielding: [28, 31, 33, 36, 37, 39, 40],
+    shielding: [34, 35, 36, 38, 38, 39, 40],
   },
   monk: {
     mainSkill: [95, 105, 111, 116, 120, 124, 128],
@@ -115,22 +115,22 @@ export function resolveCharacterStats(vocation: Vocation, stats: CharacterStats)
 //   (shielding × vocFactor + offhandFactor × defense) / 100, then × (1 + wheel%/100); a quiver changes nothing (D108).
 // Constants fitted on in-game Cyclopedia values (no wheel):
 //   RP shielding 108 + quiver → 1.18 %; RP shielding 110 + Gnome Shield → 1.21 % shielding + 1.28 % shield;
-//   ED level 781 → shielding part 0.40 %, spellbook part 0.87 %; EK shielding 119 → 1.34 %.
+//   ED shielding 36 → 0.38 %, + Spellbook of Mind Control (def 26) 0.61 %; EK shielding 119 → 1.34 %.
 // See docs/modules/character-formulas.md (inference + uncertainty).
 
 export type Offhand = 'shield' | 'spellbook' | 'quiver' | 'none';
 
-/** % per 100 shielding (D108: RP 108 → 1.18 %, 110 → 1.21 %). */
+/** % per 100 shielding (D108: RP 108 → 1.18 %, 110 → 1.21 %; D110: ED 36 → 0.38 %). */
 export const MITIGATION_SHIELDING_FACTOR: Record<Vocation, number> = {
   knight: 1.126, // EK Cyclopedia: 119 shielding → 1.34 %
   paladin: 1.096,
-  sorcerer: 1.112,
-  druid: 1.112,
+  sorcerer: 1.056, // not measured; follows the druid
+  druid: 1.056,
   monk: 1.096, // not measured; follows the paladin
 };
 
-/** % per 100 offhand defense, shields and spellbooks alike (RP shield 50 → 1.28 %, ED spellbook 34 → 0.87 %). */
-export const MITIGATION_DEFENSE_FACTOR = 2.56;
+/** % per 100 offhand defense (shield: RP Gnome Shield 50 → 1.28 %; D110 spellbook: ED Spellbook of Mind Control 26 → 0.61 %). */
+export const MITIGATION_DEFENSE_FACTOR: Record<'shield' | 'spellbook', number> = { shield: 2.56, spellbook: 2.346 };
 
 /** Level brackets of the typical best-in-slot offhand defense (TibiaWiki item data). */
 export const OFFHAND_LEVELS = [200, 400, 600, 800, 1000, 1250, 1500] as const;
@@ -181,7 +181,7 @@ export function mitigationBreakdown(vocation: Vocation, level: number, opts: Mit
   const defense = hasDefense ? (opts.offhandDefense ?? defaultOffhandDefense(offhand, level)) : 0;
   const k = 1 + (opts.wheelMultiplierPct ?? 0) / 100;
   const s = (shielding * MITIGATION_SHIELDING_FACTOR[vocation] * k) / 100;
-  const o = (defense * MITIGATION_DEFENSE_FACTOR * k) / 100;
+  const o = hasDefense ? (defense * MITIGATION_DEFENSE_FACTOR[offhand] * k) / 100 : 0;
   return { shielding: s, offhand: o, total: s + o };
 }
 

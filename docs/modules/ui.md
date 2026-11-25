@@ -13,7 +13,7 @@ screens it is two columns (controls left, results right).
 | File | Role |
 |------|------|
 | `src/App.tsx` | Layout, state wiring, memoized `optimize` call. |
-| `src/components/Panel.tsx` | Bordered section card with numbered heading. |
+| `src/components/Panel.tsx` | Bordered section card with numbered heading; D109: a "?" next to the heading shows the section tutorial (`help.<headingId without -heading>`) on hover / focus, under the heading across the panel width. |
 | `src/components/VocationPicker.tsx` | 5 toggle cards, `radiogroup`. |
 | `src/components/VocationIcon.tsx` | Stroke icon per vocation. |
 | `src/components/CharacterPanel.tsx` | One row: level, extra points (D54: scrolls, weekly, bounty, gem upgrades; 0–1000, `scrolls` field), points (override); per-vocation skills in 3 columns (empty = "auto"); knights: a separate "trained skill" segmented row (any / sword / axe / club icons, D51/D54, `meleeSkill`, other weapon types skipped). |

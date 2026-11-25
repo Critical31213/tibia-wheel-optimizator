@@ -58,33 +58,34 @@ mitigation % = (shielding × vocFactor + offhandFactor × defense) / 100 × (1 +
 Generic server constants (multiplier S/D 1.26, P/M 1.28, K 1.3; primaryShield 2.0–2.08;
 secondaryShield 1.2–1.25, applied to spellbooks and as a ×1.2 *bonus* for quivers) do **not** reproduce the
 in-game Cyclopedia values. These values (no wheel) are used for calibration and take priority (D108 replaced an
-older paladin pair that suggested a quiver penalty):
+older paladin pair that suggested a quiver penalty; D110 replaced an older druid pair with unknown shielding and
+spellbook):
 
 | Point | Cyclopedia | Model | Inputs |
 |---|---|---|---|
 | RP level 855, shielding 108, quiver | 1.18 % | 1.18 % | 108 × 1.096/100 |
 | Same RP, shielding 110, Gnome Shield: shielding part | 1.21 % | 1.21 % | 110 × 1.096/100 |
 | Same RP with the shield: shield part | 1.28 % | 1.28 % | defense 50 × 2.56/100 |
-| ED level 781: shielding part | 0.40 % | 0.40 % | default shielding 36 × 1.112/100 |
-| ED level 781: spellbook part | 0.87 % | 0.87 % | default defense 34 × 2.56/100 |
+| ED level 96, shielding 36, no offhand | 0.38 % | 0.38 % | 36 × 1.056/100 |
+| Same ED with a Spellbook of Mind Control: spellbook part | 0.61 % | 0.61 % | defense 26 × 2.346/100 |
+| EK shielding 119, no shield | 1.34 % | 1.34 % | 119 × 1.126/100 |
 
 How the constants were inferred:
 
 - **Shielding factor.** 1.18 % at 108 and 1.21 % at 110 shielding (both rounded to 0.01) bound the paladin factor
-  to 1.0955–1.0972 %/100 points; 1.096 is used. Knight (1.126) and mages (1.112) are fitted on their own readings;
-  the monk follows the paladin (not measured).
+  to 1.0955–1.0972 %/100 points; 1.096 is used. The druid's 0.38 % at 36 bounds its factor to 1.042–1.069;
+  1.056 is used. The knight (1.126) is fitted on its own reading. The sorcerer follows the druid and the monk the
+  paladin (not measured).
 - **No quiver factor (D108).** A quiver does not change mitigation (checked in-game).
-- **Offhand factor 2.56 %/100 defense**, the same for shields and spellbooks. Item defense values come from the
-  TibiaWiki item data (`scripts/.cache/damage-api/meta/shields.json`). tibiopedia.pl only
-  serves a JS "setup" page to scripts, so it could not be scraped. A typical ~50-defense shield (Great/Gnome
-  Shield) gives 1.28 %. A typical ~34-defense spellbook at level 781 (Stag Spellbook, Eldritch Folio) gives 0.87 %:
-  0.87/34 = 0.0256 = 1.28/50. Generic per-item factors would need defenses of 62–72, which no item has.
-- **Mage default shielding** was raised to 28/31/33/36/37/39/40 (levels 200…1500). The ED's 0.40 % implies about
-  36 shielding at level 781.
+- **Offhand factor per 100 defense:** shields 2.56 (Gnome Shield, defense 50 → 1.28 %), spellbooks 2.346
+  (Spellbook of Mind Control, defense 26 → 0.61 %, bounds 2.327–2.365). Item defense values come from the TibiaWiki
+  item data (`scripts/.cache/damage-api/meta/shields.json`).
+- **Mage default shielding** is 34/35/36/38/38/39/40 (levels 200…1500): a level 96 ED already has 36, and an older
+  level 781 ED reading (0.40 %) implies about 38.
 
-**Uncertainty.** The RP shield is a **Gnome Shield (defense 50, damage API meta), confirmed in-game**, so the offhand factor 2.56 is
-fitted on a known item. The RP level and the ED shielding are still unknown (the fit uses the default ED stats).
-Monk weapon defense is ignored.
+**Uncertainty.** Both offhand factors are fitted on one known item each (Gnome Shield, Spellbook of Mind Control).
+Whether the offhand part depends on the vocation or the shielding is not known; the model uses one factor per item
+type. Sorcerer and monk are not measured. Monk weapon defense is ignored.
 
 **Defaults (`DEFAULT_OFFHAND`)**
 - Paladin: quiver, both for the hunt bow and the boss crossbow.
@@ -106,9 +107,9 @@ Spellbooks: Spellbook of Lost Souls, Stag Spellbook/Eldritch Folio, Arboreal Tom
 
 | Level | EK (none) | EK (shield) | RP (quiver) | Mage (spellbook) | Monk |
 |---|---|---|---|---|---|
-| 200 | 0.99 % | 2.17 % | 0.79 % | 1.13 % | 0.66 % |
-| 800 | 1.23 % | 2.56 % | 0.99 % | 1.32 % | 0.80 % |
-| 1500 | 1.36 % | 2.77 % | 1.12 % | 1.37 % | 0.90 % |
+| 200 | 0.99 % | 2.17 % | 0.79 % | 1.11 % | 0.66 % |
+| 800 | 1.23 % | 2.56 % | 0.99 % | 1.25 % | 0.80 % |
+| 1500 | 1.36 % | 2.77 % | 1.12 % | 1.27 % | 0.90 % |
 
 `effectiveHp(hp, m) = hp / (1 − m/100)` (D18).
 

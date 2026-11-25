@@ -53,11 +53,14 @@ describe('mitigation (D19, calibrated on in-game Cyclopedia values)', () => {
     near2(s.offhand, 1.28);
   });
 
-  it('Elder Druid level 781 (defaults): shielding 0.40 %, spellbook 0.87 %', () => {
-    const d = mitigationBreakdown('druid', 781);
-    near(d.shielding, 0.4);
-    near(d.offhand, 0.87);
-    expect(mitigationPercent('druid', 781)).toBeCloseTo(d.shielding + d.offhand, 10);
+  it('D110: Elder Druid 36 shielding 0.38 %; Spellbook of Mind Control (def 26) adds 0.61 %; level 781 defaults 0.40 %', () => {
+    const near2 = (a: number, b: number) => expect(Math.abs(a - b)).toBeLessThan(0.005);
+    near2(mitigationBreakdown('druid', 96, { shielding: 36, offhand: 'none' }).total, 0.38);
+    const d = mitigationBreakdown('druid', 96, { shielding: 36, offhand: 'spellbook', offhandDefense: 26 });
+    near2(d.shielding, 0.38);
+    near2(d.offhand, 0.61);
+    near(mitigationBreakdown('druid', 781).shielding, 0.4);
+    expect(mitigationPercent('druid', 781)).toBeCloseTo(mitigationBreakdown('druid', 781).total, 10);
   });
 
   it("Elite Knight 119 shielding: 1.34 %; Ectoplasmic Shield (def 49) adds 1.27 %", () => {
