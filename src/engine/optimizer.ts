@@ -984,9 +984,9 @@ const pointsOf = (input: Pick<OptimizerInput, 'points'>) =>
   Math.max(0, Math.floor(Number.isFinite(input.points) ? input.points : 0));
 
 type ValuationInput = Pick<OptimizerInput, 'vocation' | 'points' | 'monster' | 'context' | 'character' | 'monsters' | 'equipment' | 'equipmentTwoHanded' | 'wornPieces' | 'weapons' | 'gear'> &
-  Partial<Pick<OptimizerInput, 'rotationId' | 'forcedSpells' | 'customRotation' | 'excludedSpells' | 'charmPicks'>>;
+  Partial<Pick<OptimizerInput, 'rotationId' | 'forcedSpells' | 'customRotation' | 'excludedSpells' | 'charmPicks' | 'spellTargets'>>;
 
-const extrasOf = (input: Pick<OptimizerInput, 'excludedSpells' | 'charmPicks'>): ModelExtras => ({ excluded: input.excludedSpells, charms: input.charmPicks });
+const extrasOf = (input: Pick<OptimizerInput, 'excludedSpells' | 'charmPicks' | 'spellTargets'>): ModelExtras => ({ excluded: input.excludedSpells, charms: input.charmPicks, targets: input.spellTargets });
 
 /** Level used for valuation: `character.level`, else points + 50. */
 export function levelFor(input: Pick<OptimizerInput, 'points' | 'character'>): number {

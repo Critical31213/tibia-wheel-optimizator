@@ -20,6 +20,15 @@ import { STANCE_SEP } from './spellPrefs';
 export type BuildResult = Omit<OptimizerResult, 'alternatives'>;
 
 export { getWheel, MAX_EXTRA_POINTS, optimize, pointsForLevel, revelationOptions } from '../engine';
+import { huntTargetsDefault } from '../engine';
+
+/** D107: area / chain / beam damage spells of the vocation with their community average targets (hunt) and cap. */
+export function getTargetSpells(vocation: Vocation): { name: string; avg: number; max: number }[] {
+  return getExcludableSpells(vocation).flatMap((name) => {
+    const d = huntTargetsDefault(name);
+    return d ? [{ name, ...d }] : [];
+  });
+}
 
 /** D35: revelation perk names of the vocation (domain order). */
 export function getRevelationNames(vocation: Vocation): string[] {

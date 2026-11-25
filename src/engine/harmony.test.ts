@@ -48,6 +48,24 @@ describe('D67: rotation damage window', () => {
   });
 });
 
+describe('D107: own average targets', () => {
+  const run = (spellTargets?: Record<string, number>, mode: 'hunt' | 'boss' = 'hunt') =>
+    optimize({ vocation: 'druid', points: 1000, monster: null, priority: 0, context: { mode }, alternatives: 0, rotationId: 'custom', customRotation: [{ name: 'Terra Wave', ratio: 1 }], spellTargets });
+  const dmg = (r: ReturnType<typeof optimize>) => r.rotation!.spells.find((s) => s.name === 'Terra Wave')!.damage!;
+
+  it('hunt: more targets → more per cast; the default value equals no override', () => {
+    const base = dmg(run());
+    const more = dmg(run({ 'Terra Wave': 10 }));
+    expect(more.targets).toBeGreaterThan(base.targets);
+    expect(more.perCast).toBeGreaterThan(base.perCast);
+    expect(dmg(run({ 'Terra Wave': 5.8 })).perCast).toBeCloseTo(base.perCast, 6);
+  });
+
+  it('boss: ignored', () => {
+    expect(dmg(run({ 'Terra Wave': 10 }, 'boss')).targets).toBe(dmg(run(undefined, 'boss')).targets);
+  });
+});
+
 describe('D68: five builders before each spender', () => {
   it.each(['em-voh', 'em-voh-so', 'em-voj', 'em-tfb', 'em-tfb-so'])('%s: builder casts = 5 × spender casts, turns all used', (id) => {
     const r = optimize({ vocation: 'monk', points: 1000, monster: null, priority: 0, context: { mode: 'hunt' }, alternatives: 0, rotationId: id });

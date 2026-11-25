@@ -1,7 +1,7 @@
-import { useId } from 'react';
+import { useId, useState } from 'react';
 import { CUSTOM_ROTATION_ID, GREEDY_ROTATION_ID, type RotationPreset, type RotationSpell, type RotationUsage } from '../types';
 import { useT } from '../i18n';
-import { MAX_CUSTOM_RATIO, MAX_CUSTOM_SPELLS, MAX_FORCED_SPELLS, stanceNames } from '../lib/spellPrefs';
+import { MAX_CUSTOM_RATIO, MAX_CUSTOM_SPELLS, MAX_FORCED_SPELLS, MAX_SPELL_TARGETS, stanceNames } from '../lib/spellPrefs';
 import { cx, formatNumber, ROMAN } from '../lib/labels';
 import type { RevelationOption, RevelationReach } from '../types';
 
@@ -16,6 +16,8 @@ interface RotationPanelProps {
   spells: string[];
   /** D92: spells that can be excluded. */
   excludable: string[];
+  /** D107: area spells with editable average targets (hunt; empty = hidden). */
+  targetSpells: { name: string; avg: number; max: number }[];
   /** Selectable stance set keys (D32). */
   stanceOptions: string[];
   /** D35: revelations and how reachable each stage is. */
@@ -32,7 +34,7 @@ interface RotationPanelProps {
 const AUTO = '*';
 
 /** Rotation choice (auto / preset), the rotation the viewed build is based on, and forced spell augments. */
-export function RotationPanel({ presets, customSpells, spells, excludable, stanceOptions, revelations, value, onChange, usage, stances }: RotationPanelProps) {
+export function RotationPanel({ presets, customSpells, spells, excludable, targetSpells, stanceOptions, revelations, value, onChange, usage, stances }: RotationPanelProps) {
   const t = useT();
   const id = useId();
   const selected = presets.find((p) => p.id === value.rotationId);
@@ -139,6 +141,8 @@ export function RotationPanel({ presets, customSpells, spells, excludable, stanc
         )}
         <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.excludedHint')}</p>
       </div>
+
+      {targetSpells.length > 0 && <SpellTargets spells={targetSpells.filter((s) => !excluded.includes(s.name))} value={value.targets} onChange={(targets) => onChange({ targets })} />}
 
       {usage && (
         <div className="mt-3" aria-live="polite">
@@ -337,6 +341,75 @@ function RotationDamage({ usage, window: w }: { usage: RotationUsage; window: No
       </div>
       <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.damageNote')}</p>
     </details>
+  );
+}
+
+/** D107: the player's average targets per cast when hunting; empty = community average. */
+function SpellTargets({ spells, value, onChange }: { spells: { name: string; avg: number; max: number }[]; value: Record<string, number>; onChange: (v: Record<string, number>) => void }) {
+  const t = useT();
+  const id = useId();
+  const custom = Object.keys(value).length;
+  const reset = (name: string) => onChange(Object.fromEntries(Object.entries(value).filter(([n]) => n !== name)));
+  return (
+    <details className="mt-3 text-xs" open={custom > 0 || undefined}>
+      <summary className="cursor-pointer text-parchment-300">
+        {t('rotation.targets')}
+        {custom > 0 && <span className="text-gold-300"> ({custom})</span>}
+      </summary>
+      <ul className="mt-1 grid gap-x-4 gap-y-1 sm:grid-cols-2">
+        {spells.map((s) => (
+          <li key={s.name} className="flex items-center gap-2">
+            <label htmlFor={`${id}-${s.name}`} className="min-w-0 flex-1 truncate text-parchment-200">
+              {s.name}
+            </label>
+            <TargetInput id={`${id}-${s.name}`} avg={s.avg} max={Math.min(s.max, MAX_SPELL_TARGETS)} value={value[s.name]} onChange={(v) => (v === undefined ? reset(s.name) : onChange({ ...value, [s.name]: v }))} />
+            <button
+              type="button"
+              aria-label={t('rotation.targetsReset', { name: s.name })}
+              title={t('rotation.targetsReset', { name: s.name })}
+              disabled={value[s.name] === undefined}
+              onClick={() => reset(s.name)}
+              className="w-4 text-parchment-400 hover:text-parchment-50 disabled:invisible"
+            >
+              ↺
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-1 text-[11px] text-parchment-400">{t('rotation.targetsHint')}</p>
+      {custom > 0 && (
+        <button type="button" onClick={() => onChange({})} className="mt-1 text-[11px] text-gold-300 hover:text-gold-200">
+          {t('rotation.targetsResetAll')}
+        </button>
+      )}
+    </details>
+  );
+}
+
+/** Number field that keeps the typed text and commits valid values (empty = default). */
+function TargetInput({ id, avg, max, value, onChange }: { id: string; avg: number; max: number; value: number | undefined; onChange: (v: number | undefined) => void }) {
+  const [draft, setDraft] = useState<{ text: string; value: number | undefined } | null>(null);
+  const text = draft && draft.value === value ? draft.text : (value?.toString() ?? '');
+  return (
+    <input
+      id={id}
+      type="number"
+      inputMode="decimal"
+      min={1}
+      max={max}
+      step={0.1}
+      placeholder={avg.toFixed(1)}
+      value={text}
+      onChange={(e) => {
+        const raw = e.target.value;
+        const n = Number(raw);
+        const next = raw.trim() === '' ? undefined : Number.isFinite(n) && n >= 1 ? Math.min(max, Math.round(n * 10) / 10) : value;
+        setDraft({ text: raw, value: next });
+        if (next !== value) onChange(next);
+      }}
+      onBlur={() => setDraft(null)}
+      className="field w-16 shrink-0 py-0.5 text-right text-xs tabular-nums placeholder:text-parchment-500"
+    />
   );
 }
 

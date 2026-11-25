@@ -422,6 +422,8 @@ export interface OptimizerInput {
   forcedRevelations?: ForcedRevelation[];
   /** D92: spells the player does not cast (e.g. no time to stand still at the spot); never in the rotation, no value. */
   excludedSpells?: string[];
+  /** D107: the player's average targets per cast when hunting (spell name → targets), replacing the community average. */
+  spellTargets?: Record<string, number>;
   /** D93: offensive charms the player has unlocked; the engine assigns them to the spot's creatures. */
   charms?: OwnedCharm[];
   /** D93: the assignment (set by the engine from `charms`). */

@@ -180,6 +180,10 @@ export const pl: Dictionary = {
   'rotation.excluded': 'Wykluczone spelle',
   'rotation.excludedAdd': 'Wyklucz spell…',
   'rotation.excludedRemove': 'Przywróć {name}',
+  'rotation.targets': 'Średnia liczba trafianych celów (polowanie)',
+  'rotation.targetsHint': 'Puste = średnia społeczności (szara), liczona z augmentem obszaru jak dane społeczności. Wyczyszczenie spotu przywraca domyślne.',
+  'rotation.targetsReset': 'Domyślne cele {name}',
+  'rotation.targetsResetAll': 'Przywróć wszystkie domyślne',
   'rotation.excludedHint': 'Spelle, których nie rzucasz (np. na spocie bez postoju): silnik pomija je w rotacji, ich augmentach, gemach i Revelation.',
 
   'priority.title': 'Priorytet',

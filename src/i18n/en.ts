@@ -186,6 +186,10 @@ export const en = {
   'rotation.excluded': 'Excluded spells',
   'rotation.excludedAdd': 'Exclude a spell…',
   'rotation.excludedRemove': 'Restore {name}',
+  'rotation.targets': 'Average targets per cast (hunt)',
+  'rotation.targetsHint': 'Empty = community average (shown greyed), counted with the area augment like the community data. Clearing the spot restores the defaults.',
+  'rotation.targetsReset': 'Default targets of {name}',
+  'rotation.targetsResetAll': 'Restore all defaults',
   'rotation.excludedHint': "Spells you don't cast (e.g. at a spot where you never stand still): the engine leaves them out of the rotation, their augments, gems and revelations.",
 
   'priority.title': 'Priority',

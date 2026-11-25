@@ -131,6 +131,8 @@ export interface SpellEval {
   area: SpellMeta['area'];
   singleTarget: boolean;
   maxTargets: number;
+  /** Hunt: average targets per cast (D107: the player's value, else the community average). */
+  avgHits?: number;
   targets: number;
   /** Beams: extra targets on the outer tiles (Beam Mastery). */
   outerTargets: number;
@@ -238,6 +240,8 @@ export interface ModelExtras {
   excluded?: readonly string[];
   /** D93: charms per creature. */
   charms?: readonly CharmAssign[];
+  /** D107: the player's average targets per cast when hunting, replacing the community average. */
+  targets?: Readonly<Record<string, number>>;
 }
 
 /** D93: charm effects of an assignment over the spot (undefined = none). */
@@ -387,7 +391,7 @@ export type ElementMagicLevel = Partial<Record<Element, number>>;
 
 function cacheKey(vocation: Vocation, ctx: FightContext, monsters: { monster: Monster; weight: number }[], c: Required<CharacterStats>, eml: ElementMagicLevel, attack?: number, gear?: GearModel, extras: ModelExtras = {}) {
   const m = monsters.map((x) => `${x.monster.id}:${x.weight.toFixed(6)}`).join(',');
-  return `${vocation}|${ctx.mode}|${m}|${c.level}|${c.mainSkill}|${c.magicLevel}|${c.shielding}|${JSON.stringify(eml)}|${attack ?? ''}|${gear ? JSON.stringify(gear) : ''}|${[...(extras.excluded ?? [])].sort().join(',')}|${(extras.charms ?? []).map((p) => `${p.monsterId}:${p.id}:${p.stage}`).join(',')}`;
+  return `${vocation}|${ctx.mode}|${m}|${c.level}|${c.mainSkill}|${c.magicLevel}|${c.shielding}|${JSON.stringify(eml)}|${attack ?? ''}|${gear ? JSON.stringify(gear) : ''}|${[...(extras.excluded ?? [])].sort().join(',')}|${(extras.charms ?? []).map((p) => `${p.monsterId}:${p.id}:${p.stage}`).join(',')}|${Object.entries(extras.targets ?? {}).sort(([a], [b]) => a.localeCompare(b)).map(([n, v]) => `${n}:${v}`).join(',')}`;
 }
 
 export function buildSpellModel(
@@ -449,7 +453,8 @@ export function buildSpellModel(
     const element = meta?.element ?? dmg?.element ?? null;
     const revDef = REVELATION_SPELLS[name];
     const maxTargets = revDef?.maxTargets?.[2] ?? meta?.maxTargets ?? MAX_TARGETS_FALLBACK[area];
-    const shape = { kind, area, maxTargets, avgHitsHunt: meta?.avgHitsHunt ?? dmg?.avgTargetsHunt ?? undefined };
+    const avgHits = extras.targets?.[name] ?? meta?.avgHitsHunt ?? dmg?.avgTargetsHunt ?? undefined;
+    const shape = { kind, area, maxTargets, avgHitsHunt: avgHits };
     const revelation = revOf.get(name) ?? -1;
     const ml = (element && elementMl[element]) || 0;
     const hits = [0, 1, 2, 3].map((st) => ({
@@ -466,6 +471,7 @@ export function buildSpellModel(
       area,
       singleTarget,
       maxTargets,
+      avgHits,
       areaGap: context.mode === 'hunt' && !singleTarget && areaAug.has(name) ? AREA_AUGMENT_GAP : 0,
       targets: singleTarget ? 1 : Math.max(1, expectedTargets(shape, context) - (context.mode === 'hunt' && areaAug.has(name) ? AREA_AUGMENT_GAP : 0)),
       outerTargets: outerBeamTargets({ area, avgHitsHuntOuter: meta?.avgHitsHuntOuter ?? dmg?.avgTargetsHuntOuter }, context),
@@ -577,6 +583,16 @@ export function cooldownGain(base: number, reduction: number): number {
   return base / reducedCooldown(base, reduction) - 1;
 }
 
+/** D107: community average targets per cast when hunting and the cap, or null for single-target / non-damage spells. */
+export function huntTargetsDefault(name: string): { avg: number; max: number } | null {
+  const meta = getSpell(name);
+  const dmg = getDamageSpell(name);
+  const area: SpellMeta['area'] = meta?.area ?? (dmg?.area as SpellMeta['area'] | undefined) ?? 'single';
+  if ((meta?.kind ?? (dmg ? 'damage' : null)) !== 'damage' || (dmg?.singleTarget ?? area === 'single')) return null;
+  const max = REVELATION_SPELLS[name]?.maxTargets?.[2] ?? meta?.maxTargets ?? MAX_TARGETS_FALLBACK[area];
+  return { avg: Math.min(max, meta?.avgHitsHunt ?? dmg?.avgTargetsHunt ?? SOLO_FALLBACK[area]), max };
+}
+
 /** Targets of a spell at a revelation stage (revelation spells cap targets by stage) plus extra targets. */
 export function targetsAt(model: SpellModel, s: SpellEval, stage: number, extra = 0): number {
   const def = REVELATION_SPELLS[s.name];
@@ -585,7 +601,7 @@ export function targetsAt(model: SpellModel, s: SpellEval, stage: number, extra 
   const max = s.area === 'chain' ? Math.min(raw, Math.max(s.maxTargets, MAX_CHAIN_TARGETS)) : raw;
   if (s.singleTarget) return 1;
   if (!extra && !(def?.maxTargets && stage >= 1)) return s.targets;
-  const shape = { kind: s.kind, area: s.area, maxTargets: max, avgHitsHunt: s.meta?.avgHitsHunt ?? s.dmg?.avgTargetsHunt ?? undefined };
+  const shape = { kind: s.kind, area: s.area, maxTargets: max, avgHitsHunt: s.avgHits };
   const t = expectedTargets(shape, model.context, max);
   return model.context.mode === 'hunt' ? Math.max(1, Math.min(max, t - s.areaGap + extra * 0.5)) : t;
 }

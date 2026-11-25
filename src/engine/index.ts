@@ -33,5 +33,5 @@ export function pointsForLevel(level: number, scrollPoints = 0): number {
 }
 
 export { ENGINE_MESSAGES, renderMessage, type EngineMessageKey } from './messages';
-export { DEFAULT_CONTEXT } from './spells';
+export { DEFAULT_CONTEXT, huntTargetsDefault } from './spells';
 export { getEngineWheel, isAvailable } from './wheel/build';

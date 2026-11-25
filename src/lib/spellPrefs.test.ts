@@ -23,6 +23,7 @@ describe('spell prefs', () => {
       stance: null,
       customRotation: [],
       excludedSpells: [],
+      targets: {},
     });
     const many = Array.from({ length: 20 }, (_, i) => `s${i}`);
     expect(sanitizeSpellPrefs({ forcedSpells: many }, IDS, many).forcedSpells).toHaveLength(MAX_FORCED_SPELLS);
@@ -39,6 +40,7 @@ describe('spell prefs', () => {
       stance: 'Master of Flames+Aura of Exposed Weakness',
       customRotation: [{ name: 'Great Fire Wave', ratio: 3 }, { name: 'Energy Wave', ratio: 1 }],
       excludedSpells: ['Great Energy Beam', "Hell's Core"],
+      targets: { "Hell's Core": 9.5, 'Great Fire Wave': 4 },
     };
     const XS = getExcludableSpells('sorcerer');
     const ST = getStanceOptions('sorcerer');
@@ -50,6 +52,12 @@ describe('spell prefs', () => {
     expect(parseSpellPrefs(JSON.stringify(prefs), IDS, SPELLS, ST, RV, CS, XS)).toEqual(prefs);
     // D92: excluded spells: known only, canonical casing, unique.
     expect(spellPrefsFromQuery('?xs=great+energy+beam,Nope,Great+Energy+Beam', IDS, SPELLS, ST, RV, CS, XS)?.excludedSpells).toEqual(['Great Energy Beam']);
+    // D107: targets: known spells, canonical casing, 0.1 steps within 1..50.
+    expect(spellPrefsFromQuery('?tg=great+fire+wave:3.14,Nope:3,Energy+Wave:0.2,Hell%27s+Core:99,Great+Energy+Beam:x', IDS, SPELLS, ST, RV, CS, XS)?.targets).toEqual({
+      'Great Fire Wave': 3.1,
+      'Energy Wave': 1,
+      "Hell's Core": 50,
+    });
     // Custom rotation: unknown / duplicate spells dropped, casts rounded and clamped.
     expect(spellPrefsFromQuery('?cr=great+fire+wave:2.6,Nope:3,Great+Fire+Wave:1,Energy+Wave:99,Energy+Beam:0', IDS, SPELLS, ST, RV, CS)?.customRotation).toEqual([
       { name: 'Great Fire Wave', ratio: 3 },
