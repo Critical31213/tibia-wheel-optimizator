@@ -418,13 +418,6 @@ function RotationDamage({ usage, window: w, targets, auto }: { usage: RotationUs
                 <td className={cell}>{num(w.autoAttack)}</td>
               </tr>
             )}
-            {(w.charms ?? 0) > 0 && (
-              <tr className="border-t border-ink-700">
-                <td className="px-1.5 py-0.5 italic">{t('rotation.charms')}</td>
-                <td className={cell} colSpan={6} />
-                <td className={cell}>{num(w.charms!)}</td>
-              </tr>
-            )}
             <tr className="border-t border-ink-600 font-semibold text-parchment-100">
               <td className="px-1.5 py-0.5">{t('rotation.damageSum')}</td>
               <td className={cell} colSpan={6}>

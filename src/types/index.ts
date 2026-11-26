@@ -199,7 +199,7 @@ export interface RotationUsage {
   /** D51: auto-attack share of the damage (%), not in `spells`. */
   autoAttack?: number;
   /** D67: average damage of the whole rotation over `seconds` (with the build's revelations, augments and flat bonus). */
-  window?: { seconds: number; autoAttack: number; total: number; /** D93: charm damage. */ charms?: number };
+  window?: { seconds: number; autoAttack: number; total: number };
 }
 
 /** D67: average damage of one spell over `RotationUsage.window`. */

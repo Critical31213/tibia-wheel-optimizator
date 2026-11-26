@@ -843,7 +843,8 @@ function rotationUsage(p: Prepared, stages: number[], alloc: ArrayLike<number>, 
   }
   spells.sort((a, b) => b.share - a.share || a.name.localeCompare(b.name));
   const autoAttack = round1((100 * v.model.base) / rot.total);
-  const window = { seconds: DAMAGE_WINDOW, autoAttack: Math.round(v.model.base * turns), total: Math.round(rot.total * turns), ...(rot.charms ? { charms: Math.round(rot.charms * turns) } : {}) };
+  // D124: the table leaves out charm procs (crit charms stay in the spell and auto-attack hits).
+  const window = { seconds: DAMAGE_WINDOW, autoAttack: Math.round(v.model.base * turns), total: Math.round((rot.total - (rot.charms ?? 0)) * turns) };
   return { presetId: v.model.plan.id, auto: p.auto, spells, ...(autoAttack > 0 ? { autoAttack } : {}), window };
 }
 

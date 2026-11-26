@@ -22,8 +22,8 @@ describe('D93: charms', () => {
     expect(new Set(picks.map((p) => p.id)).size).toBe(picks.length);
     expect(new Set(picks.map((p) => p.monsterId)).size).toBe(picks.length);
     expect(picks.every((p) => p.gain > 0)).toBe(true);
-    expect(r.rotation!.window!.charms).toBeGreaterThan(0);
-    expect(r.rotation!.window!.total).toBeGreaterThan(optimize(base).rotation!.window!.total);
+    // D124: the damage table leaves out charm procs.
+    expect(r.rotation!.window).not.toHaveProperty('charms');
     expect(r.rationaleMsgs?.some((m) => m.key === 'rationale.charms')).toBe(true);
   });
 

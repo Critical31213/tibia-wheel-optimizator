@@ -281,7 +281,6 @@ export const pl: Dictionary = {
   'gear.ownedCount': "Posiadane itemy: {n}",
   'gear.close': "Zamknij",
   'charm.title': "Charmy",
-  'rotation.charms': "Charmy",
   'charm.button': "Charmy: {n} odblokowanych",
   'charm.hint': "Zaznacz odblokowane charmy ofensywne i ich stopień. Optymalizator przypisze je do potworów ze spota (każdy charm do jednego potwora) tak, by dawały najwięcej obrażeń, i uwzględni je w kole.",
   'charm.picked': "Dobrane do spota",

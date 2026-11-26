@@ -287,7 +287,6 @@ export const en = {
   'gear.ownedCount': "{n} owned items",
   'gear.close': "Close",
   'charm.title': "Charms",
-  'rotation.charms': "Charms",
   'charm.button': "Charms: {n} unlocked",
   'charm.hint': "Mark your unlocked offensive charms and their stage. The optimizer assigns them to the creatures of the spot (each charm to one creature) for the most damage and includes them in the wheel.",
   'charm.picked': "Assigned for the spot",
