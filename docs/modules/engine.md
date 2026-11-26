@@ -298,8 +298,13 @@ The blended `gain` / `delta` stays the ranking value. Replacement gems subtract 
 re-optimized Revelation Mastery gems add the regular basics' effect to the with/without wheel difference
 (`objectiveParts`). Weapons use `loadoutValuer` (unblended `loadoutScorer`).
 
-D58: `BuildResult.wheelEffect` = `effectOf(v, rawTotals(..., withBase = false))`, i.e. what the wheel and its gems add over an
-empty wheel. `offenseScore` / `defenseScore` (share of the full-wheel maximum) stay for alternatives only.
+D58: `BuildResult.wheelEffect` = what the wheel and its gems add over an empty wheel. `offenseScore` / `defenseScore` (share
+of the full-wheel maximum) stay for alternatives only. D130: `dmg` is the exact gain of the rotation damage table: the built
+rotation (`wheelRotation`, on `v.boosted(skill)` = the model with the skill boost slices' main skill / magic level) over the
+same model without wheel bonuses, charm procs left out (`hitTotal`); the table and the spell list use the same boosted model.
+`other` = offense the build value counts outside that table (`otherOff`: mana leech and unique convictions, augments of
+non-rotation spells, passive revelations / avatars, gem momentum and mana leech), shown as a separate line. `ehp` stays
+`effectOf(v, rawTotals(..., withBase = false))`. The search itself still ranks with the additive part tables.
 
 D60: after a full beam search, `improveSwaps` tries 1-for-1 swaps of a full slice for an empty slice of the same
 capacity (rebuilt with `replay`, must stay connected) and keeps strict improvements (up to 4 rounds). Fixes e.g. a

@@ -506,6 +506,7 @@ export const pl: Dictionary = {
   'results.pointsUsed': 'Wykorzystano {used} z {total} pkt.',
   'results.damage': 'Obrażenia',
   'results.ehp': 'Efektywne HP',
+  'results.otherOffense': 'Poza tabelą rotacji: ok. +{n}% obrażeń (mana leech, momentum, perki unikalne, pasywne objawienia).',
   'results.vsEmpty': 'Względem pustego koła, przy tej rotacji i spocie.',
   'results.stage': 'Etap {stage} z {total}',
   'results.nextStage': ' · następny etap od {points}',

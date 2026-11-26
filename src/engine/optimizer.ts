@@ -124,6 +124,9 @@ import {
   RESIST_EFFECT,
   revelationIndex,
   revelationParts,
+  revelationOtherOff,
+  augmentOtherOff,
+  supremeOtherOff,
   type SpellEffect,
   supremeCritExtra,
   supremeEffects,
@@ -832,8 +835,9 @@ function wheelRotation(p: Prepared, stages: number[], alloc: ArrayLike<number>, 
   return { stages, mods: augmentMods(v, augments, gems.spells), flat: wheelFlat(wheel, stages, alloc, vessels), ...(gems.critExtra ? { critExtra: gems.critExtra } : {}) };
 }
 
-function rotationUsage(p: Prepared, wr: ReturnType<typeof wheelRotation>): RotationUsage {
-  const { v, wheel } = p;
+function rotationUsage(p: Prepared, wr: ReturnType<typeof wheelRotation>, model: SpellModel): RotationUsage {
+  const { wheel } = p;
+  const v = { ...p.v, model };
   const stages = wr.stages;
   const mods = wr.mods;
   const rot = rotation(v.model, wr);
@@ -1306,6 +1310,7 @@ export function valuationFor(
     incoming: incomingShares(monsters),
     ...(input.equipment ? { resist: input.equipment.resist } : {}),
     skillOff: Math.max(0, skillOff),
+    boosted: (n) => withPlan(build(mage ? { ...character, magicLevel: character.magicLevel + n } : { ...character, mainSkill: character.mainSkill + n }), preset, reference),
     forced: new Set(input.forcedSpells ?? []),
     ...(preCd ? { preCd } : {}),
     unique: input.vocation === 'paladin' ? paladinUniques(mi, model, preset, threat, build) : {},
@@ -1779,11 +1784,47 @@ function placedBuild(p: Prepared, st: State) {
   return { env, vessels, finalRev, stages: env.facts.stages };
 }
 
+/** D130: main skill / magic level of the build's full skill boost slices. */
+const skillBoost = (wheel: EngineWheel, alloc: ArrayLike<number>) =>
+  wheel.slices.reduce((a, sl) => a + (sl.kind === 'skill' && isFull(wheel, alloc, sl.idx) ? (sl.tile.conviction.numericValue ?? 1) : 0), 0);
+
+/** D130: offense of the build outside the rotation table (% equivalent, as the build value counts it). */
+function otherOff(p: Prepared, alloc: ArrayLike<number>, env: GemEnv, vessels: readonly VesselAssignment[]): number {
+  const { wheel, v } = p;
+  let off = 0;
+  for (const sl of wheel.slices) {
+    if (!isFull(wheel, alloc, sl.idx)) continue;
+    if (sl.kind === 'manaLeech' || sl.kind === 'unique') off += p.parts.convP[sl.idx].off;
+    else if (sl.kind === 'augment' && !(sl.twin >= 0 && isFull(wheel, alloc, sl.twin) && sl.twin < sl.idx)) {
+      off += augmentOtherOff(v, sl.tile, sl.twin >= 0 && isFull(wheel, alloc, sl.twin));
+    }
+  }
+  wheel.revelations.forEach((r, d) => (off += revelationOtherOff(v, r, env.facts.stages[d])));
+  for (const vs of vessels) {
+    if (vs.source !== 'owned' || !vs.gem?.supreme || !activeSlots(vs.gem.quality, vs.quality, wheel.gemSystem === 'resonance').includes('supreme')) continue;
+    const m = wheel.supremeMods.find((x) => x.id === vs.gem!.supreme!.modId);
+    if (m) off += supremeOtherOff(v, wheel.revelations, env.facts, m, vs.gem.supreme.grade);
+  }
+  return off;
+}
+
 function assemble(p: Prepared, best: State): BuildResult {
   const { input, wheel, v } = p;
   const vesselSlices = wheel.vesselTiles.filter((i) => isFull(wheel, best.alloc, i)).length;
   const { env, vessels, finalRev, stages } = placedBuild(p, best);
   const wr = wheelRotation(p, stages, best.alloc, vessels);
+  // D130: the table and the build's damage % use the same model (skill boost included) and rotation.
+  const boost = skillBoost(wheel, best.alloc);
+  const tableModel = boost && v.boosted ? v.boosted(boost) : v.model;
+  const r2 = (x: number) => Math.round(x * 100) / 100 || 0;
+  const plainTotal = hitTotal(rotation(v.model, NO_BONUS));
+  const linear = effectOf(v, rawTotals(wheel, p.parts, best.alloc, stages, false));
+  const other = r2(otherOff(p, best.alloc, env, vessels));
+  const wheelEffect: GainEffect = {
+    dmg: plainTotal > 0 ? r2(100 * (hitTotal(rotation(tableModel, wr)) / plainTotal - 1)) : linear.dmg,
+    ehp: linear.ehp,
+    ...(other > 0 ? { other } : {}),
+  };
 
   const allocation: Record<string, number> = {};
   wheel.slices.forEach((s, i) => {
@@ -1809,7 +1850,7 @@ function assemble(p: Prepared, best: State): BuildResult {
     stats: statLines(wheel, best.alloc, stages, env, vessels),
     offenseScore: norm(got.off, max.off),
     defenseScore: norm(got.def, max.def),
-    wheelEffect: effectOf(v, got),
+    wheelEffect,
     rationale: why.map((x) => x.text),
     rationaleMsgs: why.map((x) => x.msg),
     vessels,
@@ -1817,9 +1858,9 @@ function assemble(p: Prepared, best: State): BuildResult {
     // Fragment Workshop upgrades only once every unlocked vessel holds a gem.
     upgradeRecommendations: vessels.every((vs) => !vs.unlocked || vs.gem) ? upgrades(env, vessels) : [],
     modSwaps: modSwaps(env, vessels),
-    spells: spellUsages(v, wr, wheel),
+    spells: spellUsages({ ...v, model: tableModel }, wr, wheel),
     plannerCode: plannerCodeFor(input.vocation, allocation, vessels, wheel.variant),
-    rotation: rotationUsage(p, wr),
+    rotation: rotationUsage(p, wr, tableModel),
     ...(wheel.variant !== 'current' ? { wheelVariant: wheel.variant } : {}),
     stances: v.model.stances ?? [],
   };

@@ -42,6 +42,9 @@ export function ResultsPanel({ result }: ResultsPanelProps) {
           <EffectTile label={t('results.ehp')} value={result.wheelEffect.ehp} color="text-defense" />
         </div>
       )}
+      {(result.wheelEffect?.other ?? 0) > 0 && (
+        <p className="mt-2 text-xs text-parchment-300">{t('results.otherOffense', { n: result.wheelEffect!.other!.toFixed(1) })}</p>
+      )}
       <p className="mt-2 text-xs text-parchment-400">
         {t('results.vsEmpty')} {t('results.pointsUsed', { used: formatNumber(result.pointsUsed), total: formatNumber(result.pointsTotal) })}
       </p>

@@ -512,6 +512,7 @@ export const en = {
   'results.pointsUsed': '{used} of {total} points used.',
   'results.damage': 'Damage',
   'results.ehp': 'Effective HP',
+  'results.otherOffense': 'Outside the rotation table: about +{n}% damage (mana leech, momentum, unique perks, passive revelations).',
   'results.vsEmpty': 'Compared with an empty wheel, for this rotation and spot.',
   'results.stage': 'Stage {stage} of {total}',
   'results.nextStage': ' · next stage at {points}',

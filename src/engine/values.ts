@@ -114,6 +114,8 @@ export interface ValuationContext {
   gemResist?: Partial<Record<Element, number>>;
   /** Δ% damage of +1 main skill / magic level (skill boost convictions). */
   skillOff: number;
+  /** D130: the model with main skill / magic level + n (skill boost convictions), for the rotation table. */
+  boosted?: (n: number) => SpellModel;
   /** D24: % EHP (× threat) of the active stances beyond shielding (damage taken, dodge, healing). */
   stanceDef?: number;
   /** D45: sustain of the weapon loadout not in the spell model (leech, healing). */
@@ -525,6 +527,31 @@ export function revelationParts(v: ValuationContext, r: EngineRevelation, stage:
   return add(p, flat);
 }
 
+/** D130: offense of a revelation outside the rotation (passive effect; avatar in boss mode). */
+export function revelationOtherOff(v: ValuationContext, r: EngineRevelation, stage: number): number {
+  if (stage < 1 || r.data.spells.some((s) => v.model.excluded?.has(s))) return 0;
+  return r.data.isAvatar ? avatarParts(v, stage).off : passiveRevelation(v, r.data.name, stage).off;
+}
+
+/** D130: spells whose value comes from the rotation damage (the rest is valued outside it). */
+const inRotation = (v: ValuationContext, spell: string) => {
+  const s = v.model.spells.get(spell);
+  return !!s && s.kind === 'damage' && !s.avatar;
+};
+
+/** D130: offense of an augment outside the rotation (support / healing / avatar spells), stage I or I + II. */
+export function augmentOtherOff(v: ValuationContext, t: WheelTile, both: boolean): number {
+  const a = t.conviction.augment;
+  if (!a) return 0;
+  const effects = [...parseEffects(a.stage1), ...(both ? parseEffects(a.stage2) : [])];
+  let off = 0;
+  for (const spell of a.spells) {
+    if (inRotation(v, spell)) continue;
+    off += spellBundleParts(v, spell, v.preCd?.has(spell) ? effects.filter((x) => x.kind !== 'cd') : effects).off;
+  }
+  return off;
+}
+
 /** Effects not covered by the rotation model (defensive / support revelations). */
 function passiveRevelation(v: ValuationContext, name: string, stage: number): Parts {
   const th = v.threat;
@@ -605,6 +632,13 @@ export const supremeCritExtra = (m: WheelSupremeMod, grade: number) => (m.catego
 
 export function revelationIndex(revs: EngineRevelation[], name: string | null): number {
   return name ? revs.findIndex((r) => r.data.name === name) : -1;
+}
+
+/** D130: offense of a placed supreme mod outside the rotation (momentum, mana leech, non-rotation spells; RM counts in the stages). */
+export function supremeOtherOff(v: ValuationContext, revs: EngineRevelation[], facts: BuildFacts, m: WheelSupremeMod, grade: number): number {
+  if (m.category === 'revelationMastery' || supremeCritExtra(m, grade)) return 0;
+  if (m.category === 'effect' || !m.spell || !inRotation(v, m.spell)) return supremeModParts(v, revs, facts, m, grade).off;
+  return m.momentum ? (m.momentum[grade - 1] ?? MOMENTUM_PER_GRADE[grade - 1] ?? 0) * K.MOMENTUM_OFF : 0;
 }
 
 /** Value of a supreme mod at grade 1..4 for the given build. */

@@ -289,6 +289,8 @@ export interface VesselAssignment {
 export interface GainEffect {
   dmg: number;
   ehp: number;
+  /** D130: build effect only: offense outside the rotation damage table (mana leech, momentum, unique perks, passive revelations), % equivalent. */
+  other?: number;
 }
 
 export interface GemRecommendation {

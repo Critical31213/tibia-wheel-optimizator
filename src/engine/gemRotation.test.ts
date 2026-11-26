@@ -34,3 +34,19 @@ describe('D127: gem Critical Extra Damage also on auto attacks', () => {
     expect(withAutoCrit(moved, 10, 10).base).toBeCloseTo(100, 9);
   });
 });
+
+describe('D130: the build damage % is the rotation table gain', () => {
+  it.each([
+    ['knight', 'hunt'],
+    ['paladin', 'hunt'],
+    ['sorcerer', 'boss'],
+  ] as const)('%s %s: dmg = window vs the empty wheel', (vocation, mode) => {
+    // The level is set: by default it follows the points.
+    const inp: OptimizerInput = { vocation, points: 1000, monster: null, priority: 30, context: { mode }, alternatives: 0, character: { level: 1000 } };
+    const r = optimize(inp);
+    // Same rotation and stances on the empty wheel.
+    const empty = optimize({ ...inp, points: 0, rotationId: r.rotation!.presetId, stances: r.stances });
+    const gain = 100 * (r.rotation!.window!.total / empty.rotation!.window!.total - 1);
+    expect(Math.abs(r.wheelEffect!.dmg - gain)).toBeLessThan(0.05);
+  });
+});
