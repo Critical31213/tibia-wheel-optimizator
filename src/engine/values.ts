@@ -600,6 +600,9 @@ export function supremeEffects(m: WheelSupremeMod, grade: number): SpellEffect[]
   }
 }
 
+/** Extra critical damage (%) of a global supreme effect mod (0 for any other mod). */
+export const supremeCritExtra = (m: WheelSupremeMod, grade: number) => (m.category === 'effect' && /critical/i.test(m.name) ? (m.values[grade - 1] ?? 0) : 0);
+
 export function revelationIndex(revs: EngineRevelation[], name: string | null): number {
   return name ? revs.findIndex((r) => r.data.name === name) : -1;
 }
@@ -615,7 +618,8 @@ export function supremeModParts(
   const x = m.values[grade - 1] ?? 0;
   if (m.category === 'effect') {
     if (/dodge/i.test(m.name)) return reductionParts(v, x);
-    if (/critical/i.test(m.name)) return { off: deltaOff(v.model, { stages: facts.stages, critExtra: x }, { stages: facts.stages }), def: 0, util: 0 };
+    const crit = supremeCritExtra(m, grade);
+    if (crit) return { off: deltaOff(v.model, { stages: facts.stages, critExtra: crit }, { stages: facts.stages }), def: 0, util: 0 };
     if (/life leech/i.test(m.name)) return def(v, x * leechPoint(v));
     if (/mana leech/i.test(m.name)) return { off: x * K.MANA_LEECH_OFF, def: x * K.MANA_LEECH_DEF * v.threat, util: 0 };
     return ZERO;

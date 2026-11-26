@@ -124,6 +124,7 @@ import {
   revelationIndex,
   revelationParts,
   type SpellEffect,
+  supremeCritExtra,
   supremeEffects,
   spotMonster,
   sub,
@@ -616,7 +617,6 @@ function statLines(wheel: EngineWheel, alloc: Int32Array, stages: number[], env:
   let manaLeech = 0;
   let skill = 0;
   let skillName = '';
-  let vesselSlices = 0;
   const augments = new Map<string, number>();
   const uniques: string[] = [];
   for (const sl of wheel.slices) {
@@ -635,11 +635,10 @@ function statLines(wheel: EngineWheel, alloc: Int32Array, stages: number[], env:
     else if (sl.kind === 'skill') {
       skill += c.numericValue ?? 1;
       skillName = c.name.replace(/ Boost$/, '');
-    } else if (sl.kind === 'vessel') vesselSlices++;
-    else if (sl.kind === 'augment') augments.set(c.name, (augments.get(c.name) ?? 0) + 1);
+    } else if (sl.kind === 'augment') augments.set(c.name, (augments.get(c.name) ?? 0) + 1);
     else if (sl.kind === 'unique') uniques.push(c.name);
   }
-  const flat = stages.reduce((s, st) => s + REVELATION_FLAT_BONUS[st], 0) + vesselFlat(wheel, vesselSlices, vessels);
+  const flat = wheelFlat(wheel, stages, alloc, vessels);
   const lines: StatLine[] = [];
   const gemLines = gemStatLines(env, vessels);
   // D113: the character's mitigation as in the Cyclopedia (wheel and gem Mitigation Multiplier applied, truncated).
@@ -731,9 +730,11 @@ function namedConvictions(wheel: EngineWheel, alloc: Int32Array, path: number[])
 }
 
 
-function spellUsages(v: ValuationContext, stages: number[], wheel: EngineWheel): SpellUsage[] {
+/** D126: `wr` = the build's rotation input (`wheelRotation`), so shares match the rotation panel. */
+function spellUsages(v: ValuationContext, wr: RotationInput, wheel: EngineWheel): SpellUsage[] {
   const model = v.model;
-  const rot = rotation(model, { stages });
+  const stages = wr.stages;
+  const rot = rotation(model, wr);
   const out: (SpellUsage & { share: number })[] = [];
   const monster = v.monster;
   for (const name of model.wheelSpells) {
@@ -753,7 +754,7 @@ function spellUsages(v: ValuationContext, stages: number[], wheel: EngineWheel):
       r = text(useful ? 'spell.avatarBoss' : 'spell.avatarHunt');
     } else if (s.kind === 'damage') {
       const x = rot.rates.get(name);
-      share = x ? (100 * x.rate * x.perCast) / rot.total : 0;
+      share = x ? (100 * x.rate * x.perCast) / hitTotal(rot) : 0;
       const element = s.element ?? 'physical';
       const modifier = Math.round(s.elem * 100);
       if (model.context.mode === 'hunt' && s.singleTarget) {
@@ -791,6 +792,9 @@ function spellUsages(v: ValuationContext, stages: number[], wheel: EngineWheel):
   return out.map(({ share, ...u }) => (share > 0 && u.useful ? { ...u, share: round1(share) } : u));
 }
 
+/** D124 / D126: rotation damage without charm procs and Carnage (the shown totals and shares). */
+const hitTotal = (r: { total: number; charms?: number }) => r.total - (r.charms ?? 0);
+
 /** Casts per minute (30 combat turns). */
 const PER_MINUTE = 60 / TURN_SECONDS;
 
@@ -806,26 +810,30 @@ function gemRotationEffects(wheel: EngineWheel, vessels: readonly VesselAssignme
     const { modId, grade } = vs.gem.supreme;
     const m = wheel.supremeMods.find((x) => x.id === modId);
     if (!m) continue;
-    if (m.category === 'effect') {
-      if (/critical/i.test(m.name)) critExtra += m.values[grade - 1] ?? 0;
-    } else if (m.spell) spells.set(m.spell, [...(spells.get(m.spell) ?? []), ...supremeEffects(m, grade)]);
+    critExtra += supremeCritExtra(m, grade);
+    if (m.spell) spells.set(m.spell, [...(spells.get(m.spell) ?? []), ...supremeEffects(m, grade)]);
   }
   return { spells, critExtra };
 }
 
-/** Rotation bonuses of a built wheel (revelation stages, full augments, flat damage, D125: gem supreme mods). */
+/** Flat damage & healing of a built wheel: revelation stages plus vessels. */
+const wheelFlat = (wheel: EngineWheel, stages: readonly number[], alloc: ArrayLike<number>, vessels: readonly VesselAssignment[]) =>
+  stages.reduce((a, st) => a + REVELATION_FLAT_BONUS[st], 0) + vesselFlat(wheel, wheel.vesselTiles.filter((i) => isFull(wheel, alloc, i)).length, vessels);
+
+/**
+ * Rotation bonuses of a built wheel (revelation stages, full augments, flat damage, D125: gem supreme mods). D126: the
+ * one source for the rotation panel, the spell list, the charm reassignment and the weapon choice.
+ */
 function wheelRotation(p: Prepared, stages: number[], alloc: ArrayLike<number>, vessels: readonly VesselAssignment[]) {
   const { v, wheel } = p;
   const augments = wheel.slices.filter((s) => s.kind === 'augment' && isFull(wheel, alloc, s.idx)).map((s) => s.tile);
-  const vesselSlices = wheel.vesselTiles.filter((i) => isFull(wheel, alloc, i)).length;
-  const flat = stages.reduce((a, st) => a + REVELATION_FLAT_BONUS[st], 0) + vesselFlat(wheel, vesselSlices, vessels);
   const gems = gemRotationEffects(wheel, vessels);
-  return { stages, mods: augmentMods(v, augments, gems.spells), flat, ...(gems.critExtra ? { critExtra: gems.critExtra } : {}) };
+  return { stages, mods: augmentMods(v, augments, gems.spells), flat: wheelFlat(wheel, stages, alloc, vessels), ...(gems.critExtra ? { critExtra: gems.critExtra } : {}) };
 }
 
-function rotationUsage(p: Prepared, stages: number[], alloc: ArrayLike<number>, vessels: readonly VesselAssignment[]): RotationUsage {
+function rotationUsage(p: Prepared, wr: ReturnType<typeof wheelRotation>): RotationUsage {
   const { v, wheel } = p;
-  const wr = wheelRotation(p, stages, alloc, vessels);
+  const stages = wr.stages;
   const mods = wr.mods;
   const rot = rotation(v.model, wr);
   const turns = DAMAGE_WINDOW / TURN_SECONDS;
@@ -839,7 +847,7 @@ function rotationUsage(p: Prepared, stages: number[], alloc: ArrayLike<number>, 
     spells.push({
       name,
       ratio: round1(x.rate * PER_MINUTE),
-      share: round1((100 * x.rate * x.perCast) / rot.total),
+      share: round1((100 * x.rate * x.perCast) / hitTotal(rot)),
       ...(s && s.revelation >= 0 ? { fromRevelation: true } : {}),
       damage: {
         casts: round1(x.rate * turns),
@@ -860,9 +868,8 @@ function rotationUsage(p: Prepared, stages: number[], alloc: ArrayLike<number>, 
     });
   }
   spells.sort((a, b) => b.share - a.share || a.name.localeCompare(b.name));
-  const autoAttack = round1((100 * v.model.base) / rot.total);
-  // D124: the table leaves out charm procs (crit charms stay in the spell and auto-attack hits).
-  const window = { seconds: DAMAGE_WINDOW, autoAttack: Math.round(v.model.base * turns), total: Math.round((rot.total - (rot.charms ?? 0)) * turns) };
+  const autoAttack = round1((100 * v.model.base) / hitTotal(rot));
+  const window = { seconds: DAMAGE_WINDOW, autoAttack: Math.round(v.model.base * turns), total: Math.round(hitTotal(rot) * turns) };
   return { presetId: v.model.plan.id, auto: p.auto, spells, ...(autoAttack > 0 ? { autoAttack } : {}), window };
 }
 
@@ -1751,13 +1758,13 @@ function searchGated(p: Prepared, opts: SearchOpts): State {
 
 type BuildResult = Omit<OptimizerResult, 'alternatives'>;
 
-function assemble(p: Prepared, best: State): BuildResult {
-  const { input, wheel, v, blend, gems } = p;
-  const vesselSlices = wheel.vesselTiles.filter((i) => isFull(wheel, best.alloc, i)).length;
-  const spots = vesselSpots(wheel, vesselKeyOf(wheel, best.alloc));
-  const gridRev = DOMAIN_ORDER.map((_, d) => best.domainPts[d] + RM_SLICE_POINTS * best.rmFull[d]);
-  const wheelEffects = wheelEffectsFor(wheel, best.alloc);
-  let env: GemEnv = { v, wheel, blend, facts: factsFor(gridRev, wheelEffects), grades: modGrades(p.gems) };
+/** D126: the owned gems placed in a state's vessels and the final revelation points (grid + placed Revelation Mastery). */
+function placedBuild(p: Prepared, st: State) {
+  const { wheel, v, blend, gems } = p;
+  const spots = vesselSpots(wheel, vesselKeyOf(wheel, st.alloc));
+  const gridRev = DOMAIN_ORDER.map((_, d) => st.domainPts[d] + RM_SLICE_POINTS * st.rmFull[d]);
+  const wheelEffects = wheelEffectsFor(wheel, st.alloc);
+  let env: GemEnv = { v, wheel, blend, facts: factsFor(gridRev, wheelEffects), grades: modGrades(gems) };
   const placed = placeGems(env, gems, spots);
   env = withGemResist(env, placedResist(env, spots, placed));
   let vessels = vesselAssignments(env, spots, placed);
@@ -1767,7 +1774,14 @@ function assemble(p: Prepared, best: State): BuildResult {
     env = { ...env, facts: factsFor(finalRev, wheelEffects) };
     vessels = vesselAssignments(env, spots, placed);
   }
-  const stages = env.facts.stages;
+  return { env, vessels, finalRev, stages: env.facts.stages };
+}
+
+function assemble(p: Prepared, best: State): BuildResult {
+  const { input, wheel, v } = p;
+  const vesselSlices = wheel.vesselTiles.filter((i) => isFull(wheel, best.alloc, i)).length;
+  const { env, vessels, finalRev, stages } = placedBuild(p, best);
+  const wr = wheelRotation(p, stages, best.alloc, vessels);
 
   const allocation: Record<string, number> = {};
   wheel.slices.forEach((s, i) => {
@@ -1801,9 +1815,9 @@ function assemble(p: Prepared, best: State): BuildResult {
     // Fragment Workshop upgrades only once every unlocked vessel holds a gem.
     upgradeRecommendations: vessels.every((vs) => !vs.unlocked || vs.gem) ? upgrades(env, vessels) : [],
     modSwaps: modSwaps(env, vessels),
-    spells: spellUsages(v, stages, wheel),
+    spells: spellUsages(v, wr, wheel),
     plannerCode: plannerCodeFor(input.vocation, allocation, vessels, wheel.variant),
-    rotation: rotationUsage(p, stages, best.alloc, vessels),
+    rotation: rotationUsage(p, wr),
     ...(wheel.variant !== 'current' ? { wheelVariant: wheel.variant } : {}),
     stances: v.model.stances ?? [],
   };
@@ -2491,10 +2505,10 @@ function rankWeapons(cands: Candidate[], score: (lo: Loadout) => number, level: 
     .sort((a, b) => b.score - a.score || a.weapon.id.localeCompare(b.weapon.id));
 }
 
-/** The build's rotation input: revelation stages and the augments of its full slices. */
+/** The build's rotation input (D126: as the rotation panel shows it, gems placed). */
 function buildRotation(p: Prepared, st: State): RotationInput {
-  const augments = p.wheel.slices.filter((s) => s.kind === 'augment' && isFull(p.wheel, st.alloc, s.idx)).map((s) => s.tile);
-  return { stages: gridStages(p, st), mods: augmentMods(p.v, augments) };
+  const b = placedBuild(p, st);
+  return wheelRotation(p, b.stages, st.alloc, b.vessels);
 }
 
 const weaponValuer = (p: Prepared, st: State) => loadoutValuer(p.input, p.spec!, p.v, buildRotation(p, st));
