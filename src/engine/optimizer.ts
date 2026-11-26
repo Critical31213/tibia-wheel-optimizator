@@ -77,6 +77,7 @@ import {
 } from './gems';
 import { type EngineMessageKey, text } from './messages';
 import {
+  autoBase,
   buildSpellModel,
   elementMultiplier,
   damageShare,
@@ -868,8 +869,9 @@ function rotationUsage(p: Prepared, wr: ReturnType<typeof wheelRotation>): Rotat
     });
   }
   spells.sort((a, b) => b.share - a.share || a.name.localeCompare(b.name));
-  const autoAttack = round1((100 * v.model.base) / hitTotal(rot));
-  const window = { seconds: DAMAGE_WINDOW, autoAttack: Math.round(v.model.base * turns), total: Math.round(hitTotal(rot) * turns) };
+  const auto = autoBase(v.model, wr.critExtra);
+  const autoAttack = round1((100 * auto) / hitTotal(rot));
+  const window = { seconds: DAMAGE_WINDOW, autoAttack: Math.round(auto * turns), total: Math.round(hitTotal(rot) * turns) };
   return { presetId: v.model.plan.id, auto: p.auto, spells, ...(autoAttack > 0 ? { autoAttack } : {}), window };
 }
 
@@ -2192,8 +2194,9 @@ function compareWheel(p: Prepared, best: BuildResult, own: Readonly<Record<strin
   const { wheel, parts, blend, v } = p;
   const b = stateOf(wheel, best.allocation).st;
   const { st: o, invalid } = stateOf(wheel, own);
-  const stB = gridStages(p, b);
-  const stO = gridStages(p, o);
+  // D129: stages with the placed Revelation Mastery gems, as the main result shows them.
+  const stB = best.revelations.map((r) => r.stage);
+  const stO = placedBuild(p, o).stages;
   const wB = rawTotals(wheel, parts, b.alloc, stB, false);
   const wO = rawTotals(wheel, parts, o.alloc, stO, false);
   const diff = sub(wB, wO);

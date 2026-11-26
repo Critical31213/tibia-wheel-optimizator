@@ -4,7 +4,7 @@
  */
 import type { CharmAssign, OwnedCharm } from '../types';
 import { CHARM_IDS } from '../data/charms';
-import { charmModel, critEV, NO_BONUS, rotationTotal, type RotationInput, type SpellModel } from './spells';
+import { charmModel, withAutoCrit, NO_BONUS, rotationTotal, type RotationInput, type SpellModel } from './spells';
 
 /** Known charms, unique (the highest stage kept), stages 1..3. */
 export function ownedCharms(raw: readonly OwnedCharm[] | undefined): OwnedCharm[] {
@@ -19,11 +19,12 @@ export function ownedCharms(raw: readonly OwnedCharm[] | undefined): OwnedCharm[
 /** The model with charms (crit shift on auto attacks, procs and Carnage in the rotation). */
 export function withCharmPicks(model: SpellModel, picks: readonly CharmAssign[]): SpellModel {
   const charms = charmModel(model.vocation, model.character.level, model.context, model.monsters, picks);
-  const g = model.gear;
   const before = model.charms;
-  const crit = (c: SpellModel['charms']) => critEV((g?.critChance ?? 0) + (c?.critChance ?? 0), (g?.critExtra ?? 0) + (c?.critExtra ?? 0));
+  const c = model.autoCrit ?? { chance: 0, extra: 0, share: 1 };
   const { charms: _old, ...rest } = model;
-  return { ...rest, base: (model.base * crit(charms)) / crit(before), ...(charms ? { charms } : {}) };
+  // D127: the charm crit replaces the previous one on the auto-attack hits only.
+  const moved = withAutoCrit(rest, c.chance - (before?.critChance ?? 0) + (charms?.critChance ?? 0), c.extra - (before?.critExtra ?? 0) + (charms?.critExtra ?? 0));
+  return { ...moved, ...(charms ? { charms } : {}) };
 }
 
 export interface CharmAssignment {

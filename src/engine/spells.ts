@@ -225,6 +225,29 @@ export interface SpellModel {
   excluded?: ReadonlySet<string>;
   /** D93: assigned charms, averaged over the spot. */
   charms?: CharmModel;
+  /** D127: crit of the auto-attack hits in `base` and their share of it (the rest, e.g. Homing Missile, does not crit). */
+  autoCrit?: AutoCrit;
+}
+
+export interface AutoCrit {
+  chance: number;
+  extra: number;
+  share: number;
+}
+
+/** D127: auto-attack damage per turn with extra critical damage `critExtra` (gem supreme mod) on its hits. */
+export function autoBase(model: Pick<SpellModel, 'base' | 'autoCrit'>, critExtra = 0): number {
+  const c = model.autoCrit;
+  if (!critExtra || !c) return model.base;
+  return model.base * (1 + c.share * (critEV(c.chance, c.extra + critExtra) / critEV(c.chance, c.extra) - 1));
+}
+
+/** D127: the model with its auto-attack crit moved to `chance` / `extra` (base rescaled, share kept consistent). */
+export function withAutoCrit<M extends Pick<SpellModel, 'base' | 'autoCrit'>>(model: M, chance: number, extra: number): M {
+  const c = model.autoCrit ?? { chance: 0, extra: 0, share: 1 };
+  const k = critEV(chance, extra) / critEV(c.chance, c.extra);
+  const scaled = 1 - c.share + c.share * k;
+  return { ...model, base: model.base * scaled, autoCrit: { chance, extra, share: scaled > 0 ? (c.share * k) / scaled : c.share } };
 }
 
 /** D93: charm effects weighted over the spot's creatures. */
@@ -503,7 +526,8 @@ export function buildSpellModel(
   const mage = vocation === 'sorcerer' || vocation === 'druid';
   const autoElem = mage ? spotElementMultiplier(spot, 'physical') : convertedPhysical(spot, gear?.conversion);
   const autoShare = autoAttackShare(vocation, extras.autoAttackPct);
-  const base = autoShare * autoHit * autoTargets * autoElem * critEV((gear?.critChance ?? 0) + (charms?.critChance ?? 0), (gear?.critExtra ?? 0) + (charms?.critExtra ?? 0)) * (gear?.mult ?? 1);
+  const autoCrit: AutoCrit = { chance: (gear?.critChance ?? 0) + (charms?.critChance ?? 0), extra: (gear?.critExtra ?? 0) + (charms?.critExtra ?? 0), share: 1 };
+  const base = autoShare * autoHit * autoTargets * autoElem * critEV(autoCrit.chance, autoCrit.extra) * (gear?.mult ?? 1);
 
   const model: SpellModel = {
     vocation,
@@ -517,6 +541,7 @@ export function buildSpellModel(
     passives,
     base,
     autoShare,
+    autoCrit,
     total: 1,
     flatOffPerPoint: 0,
     flatHealPerPoint: 0,
@@ -706,7 +731,7 @@ function dropSharedCooldowns(cands: Cand[]) {
  */
 function presetRotation(model: SpellModel, r: RotationInput): RotationResult {
   const rates = new Map<string, { rate: number; perCast: number }>();
-  let total = model.base;
+  let total = autoBase(model, r.critExtra);
   let left = 1;
   const rev: Cand[] = [];
   const inSlot = new Set(model.plan.entries.flatMap((e) => e.slot ?? []));
@@ -804,7 +829,7 @@ function greedyRotation(model: SpellModel, r: RotationInput): RotationResult {
   dropSharedCooldowns(cands);
   cands.sort((a, b) => b.perCast - a.perCast || a.s.name.localeCompare(b.s.name));
   let left = 1;
-  let total = model.base;
+  let total = autoBase(model, r.critExtra);
   const rates = new Map<string, { rate: number; perCast: number }>();
   for (const c of cands) {
     const rate = Math.min(c.cap, left);

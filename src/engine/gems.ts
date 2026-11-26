@@ -288,8 +288,10 @@ function rankBasic(env: GemEnv, slotNo: 1 | 2, grade: number): ModPick[] {
     .sort((a, b) => b.score - a.score || a.id - b.id);
 }
 
+/** D128: cooldown mods are never suggested (players do not use them); owned ones are still valued. */
 function rankSupreme(env: GemEnv, grade: number): ModPick[] {
   return env.wheel.supremeMods
+    .filter((m) => m.category !== 'augCooldown')
     .map((m) => {
       const g = Math.max(grade, env.grades?.get(modKey('supreme', m.id)) ?? 0);
       const parts = supremeModParts(env.v, env.wheel.revelations, env.facts, m, g);
@@ -550,7 +552,8 @@ export function upgrades(env: GemEnv, vessels: VesselAssignment[]): UpgradeRecom
   }
   const out: UpgradeRecommendation[] = [];
   for (const [key, m] of byMod) {
-    if (m.grade >= 4) continue;
+    // D128: no upgrades of cooldown mods.
+    if (m.grade >= 4 || (m.slot === 'supreme' && findSupreme(env.wheel, m.modId)?.category === 'augCooldown')) continue;
     const to = (m.grade + 1) as ModGrade;
     const mine = uses.filter((u) => u.key === key);
     // D114: valued on top of the other gems' resistance (this mod's own current share removed).

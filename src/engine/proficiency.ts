@@ -220,6 +220,7 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
   }
 
   let base = model.base;
+  let autoCrit = model.autoCrit;
   let targets: number | undefined;
   if (!isMage(model.vocation)) {
     // Elemental ammunition turns the whole shot into its element.
@@ -237,18 +238,19 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
     const hunt = model.vocation !== 'paladin' ? AUTO_ATTACK_TARGETS[model.vocation] : w.type === 'bow' ? (lo.ammo?.targets ?? AUTO_ATTACK_TARGETS.paladin) : (lo.ammo?.targets ?? 1);
     targets = mode === 'boss' ? 1 : hunt;
     const [pc, pd] = elemCrit(autoElement);
-    const crit = critEV(
-      // D95: Low Blow / Savage Blow count on auto attacks too.
-      critChance + pc + pp((p) => p.kind === 'autoCritChance') + (gear?.critChance ?? 0) + (model.charms?.critChance ?? 0),
-      critExtra + pd + pp((p) => p.kind === 'autoCritDamage') + (gear?.critExtra ?? 0) + (model.charms?.critExtra ?? 0),
-    );
-    base = (model.autoShare ?? 1) * hit * targets * autoMix * crit * (model.damageMult ?? 1) * mult * (gear?.mult ?? 1);
+    // D95: Low Blow / Savage Blow count on auto attacks too.
+    const chance = critChance + pc + pp((p) => p.kind === 'autoCritChance') + (gear?.critChance ?? 0) + (model.charms?.critChance ?? 0);
+    const extra = critExtra + pd + pp((p) => p.kind === 'autoCritDamage') + (gear?.critExtra ?? 0) + (model.charms?.critExtra ?? 0);
+    base = (model.autoShare ?? 1) * hit * targets * autoMix * critEV(chance, extra) * (model.damageMult ?? 1) * mult * (gear?.mult ?? 1);
+    autoCrit = { chance, extra, share: 1 };
   }
+  const hits = base;
   for (const p of perks) {
     if (p.kind !== 'homingMissile' || !p.element) continue;
     base += PROF.CASTS_PER_TURN * p.value * (p.levelMultiplier ?? 0) * c.level * spotElementMultiplier(model.monsters, p.element) * mult;
   }
-  return { ...model, spells, base, flat: (model.flat ?? 0) + flat, weaponId: w.id, ...(targets !== undefined ? { autoTargets: targets } : {}) };
+  if (autoCrit && base > 0) autoCrit = { ...autoCrit, share: (autoCrit.share * hits) / base };
+  return { ...model, spells, base, ...(autoCrit ? { autoCrit } : {}), flat: (model.flat ?? 0) + flat, weaponId: w.id, ...(targets !== undefined ? { autoTargets: targets } : {}) };
 }
 
 /** Spot multiplier of an element with extra pierce (on top of the stances' pierce). */
