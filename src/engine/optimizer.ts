@@ -124,6 +124,7 @@ import {
   revelationIndex,
   revelationParts,
   type SpellEffect,
+  supremeEffects,
   spotMonster,
   sub,
   threatOf,
@@ -796,13 +797,30 @@ const PER_MINUTE = 60 / TURN_SECONDS;
 /** D67: damage window shown under the rotation (s). */
 const DAMAGE_WINDOW = 30;
 
-/** Rotation bonuses of a built wheel (revelation stages, full augments, flat damage). */
+/** D125: spell effects and extra critical damage of the placed owned gems' supreme mods. */
+function gemRotationEffects(wheel: EngineWheel, vessels: readonly VesselAssignment[]) {
+  const spells = new Map<string, SpellEffect[]>();
+  let critExtra = 0;
+  for (const vs of vessels) {
+    if (vs.source !== 'owned' || !vs.gem?.supreme || !activeSlots(vs.gem.quality, vs.quality, wheel.gemSystem === 'resonance').includes('supreme')) continue;
+    const { modId, grade } = vs.gem.supreme;
+    const m = wheel.supremeMods.find((x) => x.id === modId);
+    if (!m) continue;
+    if (m.category === 'effect') {
+      if (/critical/i.test(m.name)) critExtra += m.values[grade - 1] ?? 0;
+    } else if (m.spell) spells.set(m.spell, [...(spells.get(m.spell) ?? []), ...supremeEffects(m, grade)]);
+  }
+  return { spells, critExtra };
+}
+
+/** Rotation bonuses of a built wheel (revelation stages, full augments, flat damage, D125: gem supreme mods). */
 function wheelRotation(p: Prepared, stages: number[], alloc: ArrayLike<number>, vessels: readonly VesselAssignment[]) {
   const { v, wheel } = p;
   const augments = wheel.slices.filter((s) => s.kind === 'augment' && isFull(wheel, alloc, s.idx)).map((s) => s.tile);
   const vesselSlices = wheel.vesselTiles.filter((i) => isFull(wheel, alloc, i)).length;
   const flat = stages.reduce((a, st) => a + REVELATION_FLAT_BONUS[st], 0) + vesselFlat(wheel, vesselSlices, vessels);
-  return { stages, mods: augmentMods(v, augments), flat };
+  const gems = gemRotationEffects(wheel, vessels);
+  return { stages, mods: augmentMods(v, augments, gems.spells), flat, ...(gems.critExtra ? { critExtra: gems.critExtra } : {}) };
 }
 
 function rotationUsage(p: Prepared, stages: number[], alloc: ArrayLike<number>, vessels: readonly VesselAssignment[]): RotationUsage {

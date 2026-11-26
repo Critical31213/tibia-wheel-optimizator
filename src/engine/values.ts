@@ -480,8 +480,11 @@ export function augmentParts(v: ValuationContext, t: WheelTile): [Parts, Parts] 
   return [one, sub(both, one)];
 }
 
-/** Spell mods of the filled augment slices (stage II when both copies are full), for the rotation display. */
-export function augmentMods(v: ValuationContext, tiles: WheelTile[]): Map<string, SpellMods> {
+/**
+ * Spell mods of the filled augment slices (stage II when both copies are full), for the rotation display.
+ * D125: `extra` = the placed gems' supreme spell effects.
+ */
+export function augmentMods(v: ValuationContext, tiles: WheelTile[], extra?: ReadonlyMap<string, SpellEffect[]>): Map<string, SpellMods> {
   const copies = new Map<string, { tile: WheelTile; n: number }>();
   for (const t of tiles) {
     if (!t.conviction.augment) continue;
@@ -489,16 +492,16 @@ export function augmentMods(v: ValuationContext, tiles: WheelTile[]): Map<string
     if (c) c.n++;
     else copies.set(t.conviction.name, { tile: t, n: 1 });
   }
-  const out = new Map<string, SpellMods>();
+  const bySpell = new Map<string, SpellEffect[]>();
+  const push = (spell: string, effects: SpellEffect[]) => bySpell.set(spell, [...(bySpell.get(spell) ?? []), ...effects]);
   for (const { tile, n } of copies.values()) {
     const a = tile.conviction.augment!;
     const effects = [...parseEffects(a.stage1), ...(n > 1 ? parseEffects(a.stage2) : [])];
-    for (const spell of a.spells) {
-      const prev = out.get(spell);
-      const m = toMods(v.preCd?.has(spell) ? effects.filter((x) => x.kind !== 'cd') : effects, v.context.mode === 'hunt');
-      out.set(spell, prev ? { pct: prev.pct + m.pct, critChance: prev.critChance + m.critChance, critExtra: prev.critExtra + m.critExtra, cd: prev.cd + m.cd, extraTargets: prev.extraTargets + m.extraTargets } : m);
-    }
+    for (const spell of a.spells) push(spell, effects);
   }
+  for (const [spell, effects] of extra ?? []) push(spell, effects);
+  const out = new Map<string, SpellMods>();
+  for (const [spell, effects] of bySpell) out.set(spell, toMods(v.preCd?.has(spell) ? effects.filter((x) => x.kind !== 'cd') : effects, v.context.mode === 'hunt'));
   return out;
 }
 
