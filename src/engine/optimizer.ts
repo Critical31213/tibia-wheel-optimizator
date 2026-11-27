@@ -873,7 +873,7 @@ function rotationUsage(p: Prepared, wr: ReturnType<typeof wheelRotation>, model:
     });
   }
   spells.sort((a, b) => b.share - a.share || a.name.localeCompare(b.name));
-  const auto = autoBase(v.model, wr.critExtra);
+  const auto = autoBase(v.model, wr);
   const autoAttack = round1((100 * auto) / hitTotal(rot));
   const window = { seconds: DAMAGE_WINDOW, autoAttack: Math.round(auto * turns), total: Math.round(hitTotal(rot) * turns) };
   return { presetId: v.model.plan.id, auto: p.auto, spells, ...(autoAttack > 0 ? { autoAttack } : {}), window };
@@ -2019,19 +2019,60 @@ function alternatives(p: Prepared, plans: Prepared[], main: State, count: number
  * domain damped lets other revelation mixes compete. Kept only if the exact objective improves
  * and the rotation stays valid.
  */
+/**
+ * D131: objective of a finished state with the exact rotation damage of the built wheel (placed gems, skill boost)
+ * instead of the additive parts; the other offense and the defense stay as the parts value them.
+ */
+function exactObjective(p: Prepared, st: State): number {
+  const parts = objectiveParts(p, st);
+  const { env, vessels, stages } = placedBuild(p, st);
+  const wr = wheelRotation(p, stages, st.alloc, vessels);
+  const boost = skillBoost(p.wheel, st.alloc);
+  const model = boost && p.v.boosted ? p.v.boosted(boost) : p.v.model;
+  const gain = (100 * (hitTotal(rotation(model, wr)) - hitTotal(rotation(p.v.model, NO_BONUS)))) / Math.max(1, p.v.model.total);
+  return p.blend({ ...parts, off: p.parts.baseP.off + gain + otherOff(p, st.alloc, env, vessels) });
+}
+
 function refine(p: Prepared, best: State): State {
   if (p.budget >= p.wheel.definition.totalCapacity) return best;
-  let bestObj = objective(p, best);
+  // D131: candidates compared by the exact rotation damage (the search ranks with additive parts).
+  let bestObj = exactObjective(p, best);
   const stages = gridStages(p, best);
   for (let d = 0; d < 4; d++) {
     if (stages[d] < 1 || stages[d] > 2) continue;
     const st = runSearch(p, forceTables(blendTables(p.parts, p.blend, [0, 1, 2, 3].map((x) => (x === d ? 0.2 : 1))), p.minStages, p.minVessels), LIGHT_SEARCH);
-    const obj = objective(p, st);
+    const obj = exactObjective(p, st);
     if (obj > bestObj + 1e-9 && (!p.auto || planValid(p, gridStages(p, st)))) {
       best = st;
       bestObj = obj;
     }
   }
+  return best;
+}
+
+/**
+ * D131: the additive parts value a revelation spell by itself and miss the turns it takes from the other (augmented)
+ * spells. For each reached, not forced revelation spell, a build searched without that spell is compared with the
+ * exact objective.
+ */
+function withoutRevelationSpells(p: Prepared, best: State): State {
+  if (!p.spec || p.budget >= p.wheel.definition.totalCapacity) return best;
+  const stages = gridStages(p, best);
+  const required = revelationIndex(p.wheel.revelations, p.v.model.plan.requires);
+  let bestObj = exactObjective(p, best);
+  p.wheel.revelations.forEach((r, d) => {
+    if (stages[d] < 1 || p.minStages[d] > 0 || d === required) return;
+    const spells = r.data.spells.filter((n) => p.v.model.spells.get(n)?.usable);
+    if (!spells.length) return;
+    const input = { ...p.input, excludedSpells: [...(p.input.excludedSpells ?? []), ...spells] };
+    const q = prepare(input, input.priority, undefined, { ...p.spec!, v: undefined });
+    const st = searchPlan(q);
+    const obj = exactObjective(p, st);
+    if (obj > bestObj + 1e-9 && planValid(p, gridStages(p, st))) {
+      best = st;
+      bestObj = obj;
+    }
+  });
   return best;
 }
 
@@ -2440,7 +2481,7 @@ function bestBuild(input: OptimizerInput): { p: Prepared; plans: Prepared[]; mai
     finalists = screened.filter((x, i) => i === 0 || (i === 1 && x.rank === top.rank && x.obj >= top.obj - 0.02 * Math.abs(top.obj))).map((x) => x.q);
   }
   for (const q of finalists) consider(q, searchPlan(q));
-  let main = refine(p, best ?? runSearch(p));
+  let main = withoutRevelationSpells(p, refine(p, best ?? runSearch(p)));
   // D45: perks and weapon re-chosen with the build's rotation (stages, augments); kept when the re-searched build is better.
   const again = rechooseWeapon(p, main, plans.length > 1);
   if (again) ({ p, main } = again);
@@ -2567,7 +2608,7 @@ function rechooseWeapon(p: Prepared, main: State, checkPlan: boolean): { p: Prep
   const q = prepare(p.input, p.input.priority, undefined, { ...p.spec, v: undefined, weapon: top });
   const st = refine(q, searchPlan(q));
   if (checkPlan && !planValid(q, gridStages(q, st))) return null;
-  return objective(q, st) > objective(p, main) + 1e-9 ? { p: q, main: st } : null;
+  return exactObjective(q, st) > exactObjective(p, main) + 1e-9 ? { p: q, main: st } : null;
 }
 
 /** Loadout value vs the chosen weapon as a D55 effect. */

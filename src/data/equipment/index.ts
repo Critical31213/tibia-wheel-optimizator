@@ -97,6 +97,9 @@ export const IMBUEMENTS: readonly ImbueDef[] = [
 /** D97: item augments (TibiaWiki), by item / weapon id. */
 const AUGMENTS = (augmentData as { augments: Record<string, ItemAugment[]> }).augments;
 export const itemAugments = (id: string): readonly ItemAugment[] => AUGMENTS[id] ?? [];
+const MANTRA = (augmentData as { mantra?: Record<string, number> }).mantra ?? {};
+/** D131: mantra of a monk item (TibiaWiki infobox), 0 without. */
+export const itemMantra = (id: string): number => MANTRA[id] ?? 0;
 
 const IMBUE_BY_ID = new Map(IMBUEMENTS.map((x) => [x.id, x]));
 export const getImbuement = (id: string): ImbueDef | undefined => IMBUE_BY_ID.get(id);

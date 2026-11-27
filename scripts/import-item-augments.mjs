@@ -7,6 +7,8 @@
  * infoboxes, read through the MediaWiki API, for every item in equipment.json and every weapon in proficiency.json.
  * Only the facts (spell, effect, value) are kept.
  *
+ * D131: also the `mantra` field (monk equipment), kept per item id in the same file.
+ *
  * Output: src/data/equipment/augments.json. Unparsed augments are printed and listed in `meta.issues`.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -98,6 +100,7 @@ for (let i = 0; i < items.length; i += BATCH) {
 }
 
 const augments = {};
+const mantra = {};
 let missing = 0;
 for (const x of items) {
   const text = byTitle.get(x.title);
@@ -106,6 +109,8 @@ for (const x of items) {
     continue;
   }
   // Multi-line or one-line infoboxes: the value ends at a newline, the next `|` or the closing `}}`.
+  const mt = text.match(/\|\s*mantra\s*=\s*(\d+)/);
+  if (mt && Number(mt[1]) > 0) mantra[x.id] = Number(mt[1]);
   const m = text.match(/\|\s*augments\s*=\s*([^|\n}]*)/);
   const raw = m?.[1]?.trim();
   if (!raw || raw === '--') continue;
@@ -114,5 +119,5 @@ for (const x of items) {
 }
 if (missing) issue(`${missing} items without a wiki page`);
 
-writeFileSync(OUT, JSON.stringify({ meta: { source: 'https://tibia.fandom.com', items: Object.keys(augments).length, issues }, augments }, null, 0) + '\n');
+writeFileSync(OUT, JSON.stringify({ meta: { source: 'https://tibia.fandom.com', items: Object.keys(augments).length, issues }, augments, mantra }, null, 0) + '\n');
 console.log(`${Object.keys(augments).length} items with augments → ${OUT}`);

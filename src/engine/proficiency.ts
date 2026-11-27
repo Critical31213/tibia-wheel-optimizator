@@ -222,6 +222,7 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
   let base = model.base;
   let autoCrit = model.autoCrit;
   let targets: number | undefined;
+  let rawHit = 0;
   if (!isMage(model.vocation)) {
     // Elemental ammunition turns the whole shot into its element.
     const ammoElement = lo.ammo && lo.ammo.element !== 'physical' ? lo.ammo.element : null;
@@ -237,6 +238,7 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
     // Paladins: bows without known ammunition assume diamond arrows; crossbows (spectral bolts) hit one target.
     const hunt = model.vocation !== 'paladin' ? AUTO_ATTACK_TARGETS[model.vocation] : w.type === 'bow' ? (lo.ammo?.targets ?? AUTO_ATTACK_TARGETS.paladin) : (lo.ammo?.targets ?? 1);
     targets = mode === 'boss' ? 1 : hunt;
+    rawHit = hit;
     const [pc, pd] = elemCrit(autoElement);
     // D95: Low Blow / Savage Blow count on auto attacks too.
     const chance = critChance + pc + pp((p) => p.kind === 'autoCritChance') + (gear?.critChance ?? 0) + (model.charms?.critChance ?? 0);
@@ -250,7 +252,10 @@ export function applyLoadout(model: SpellModel, lo: Loadout): SpellModel {
     base += PROF.CASTS_PER_TURN * p.value * (p.levelMultiplier ?? 0) * c.level * spotElementMultiplier(model.monsters, p.element) * mult;
   }
   if (autoCrit && base > 0) autoCrit = { ...autoCrit, share: (autoCrit.share * hits) / base };
-  return { ...model, spells, base, ...(autoCrit ? { autoCrit } : {}), flat: (model.flat ?? 0) + flat, weaponId: w.id, ...(targets !== undefined ? { autoTargets: targets } : {}) };
+  // D131: mantra per hit relative to the new base (Homing Missile does not get it).
+  const mantra = model.gear?.mantra ?? 0;
+  const mantraShare = mantra && rawHit > 0 && base > 0 ? ((mantra / rawHit) * hits) / base : model.mantraShare;
+  return { ...model, spells, base, ...(mantraShare ? { mantraShare } : {}), ...(autoCrit ? { autoCrit } : {}), flat: (model.flat ?? 0) + flat, weaponId: w.id, ...(targets !== undefined ? { autoTargets: targets } : {}) };
 }
 
 /** Spot multiplier of an element with extra pierce (on top of the stances' pierce). */

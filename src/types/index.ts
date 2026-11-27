@@ -541,6 +541,8 @@ export interface GearEffects {
   ruse: number;
   /** D97: augments of the worn items (not the weapon: its augments come with the proficiency loadout). */
   augments?: ItemAugment[];
+  /** D131: total mantra of the worn items (monk; Ascetic adds 100/200/300 % of it to each auto-attack hit). */
+  mantra?: number;
 }
 
 /** D45: an owned weapon and its proficiency progress. Character skills are entered without weapon bonuses. */

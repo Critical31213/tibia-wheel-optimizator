@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { optimize } from '.';
 import type { OptimizerInput, OwnedGem } from '../types';
-import { autoBase, critEV, withAutoCrit } from './spells';
+import { autoBase, critEV, NO_STAGES, withAutoCrit } from './spells';
 
 const base: OptimizerInput = { vocation: 'paladin', points: 1000, monster: null, priority: 0, context: { mode: 'hunt' }, alternatives: 0, rotationId: 'rp-caldera-ethereal' };
 const gem = (supreme: number | null): OwnedGem[] => [{ id: 'g', quality: 'greater' as const, basic1: { modId: 30, grade: 1 as const }, basic2: { modId: 12, grade: 1 as const }, supreme: supreme ? { modId: supreme, grade: 1 as const } : null }];
@@ -26,11 +26,11 @@ describe('D127: gem Critical Extra Damage also on auto attacks', () => {
   });
 
   it('autoBase scales only the critting share; withAutoCrit keeps it consistent', () => {
-    const m = { base: 100, autoCrit: { chance: 10, extra: 10, share: 0.5 } };
+    const m = { base: 100, autoCrit: { chance: 10, extra: 10, share: 0.5 }, passives: new Map<string, number>() };
     const k = critEV(10, 30) / critEV(10, 10);
-    expect(autoBase(m, 20)).toBeCloseTo(100 * (0.5 + 0.5 * k), 9);
+    expect(autoBase(m, { stages: NO_STAGES, critExtra: 20 })).toBeCloseTo(100 * (0.5 + 0.5 * k), 9);
     const moved = withAutoCrit(m, 10, 30);
-    expect(moved.base).toBeCloseTo(autoBase(m, 20), 9);
+    expect(moved.base).toBeCloseTo(autoBase(m, { stages: NO_STAGES, critExtra: 20 }), 9);
     expect(withAutoCrit(moved, 10, 10).base).toBeCloseTo(100, 9);
   });
 });

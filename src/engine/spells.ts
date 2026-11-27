@@ -227,6 +227,10 @@ export interface SpellModel {
   charms?: CharmModel;
   /** D127: crit of the auto-attack hits in `base` and their share of it (the rest, e.g. Homing Missile, does not crit). */
   autoCrit?: AutoCrit;
+  /** D131: gear mantra per auto-attack hit as a share of `base` (Ascetic adds stage × this × `base`). */
+  mantraShare?: number;
+  /** D131: spender multiplier of the stance's Harmony base bonus (Ascetic adds its points to the same base). */
+  harmonyMult?: number;
 }
 
 export interface AutoCrit {
@@ -236,18 +240,27 @@ export interface AutoCrit {
 }
 
 /** D127: auto-attack damage per turn with extra critical damage `critExtra` (gem supreme mod) on its hits. */
-export function autoBase(model: Pick<SpellModel, 'base' | 'autoCrit'>, critExtra = 0): number {
+export function autoBase(model: Pick<SpellModel, 'base' | 'autoCrit' | 'passives' | 'mantraShare'>, r: Pick<RotationInput, 'critExtra' | 'stages'> = NO_BONUS): number {
+  // D131: Ascetic: each auto-attack hit deals 100/200/300 % of the gear mantra extra (crits like the hit).
+  const d = model.mantraShare ? model.passives.get('Ascetic') : undefined;
+  const mantra = d === undefined ? 0 : (model.mantraShare ?? 0) * (r.stages[d] ?? 0);
   const c = model.autoCrit;
-  if (!critExtra || !c) return model.base;
-  return model.base * (1 + c.share * (critEV(c.chance, c.extra + critExtra) / critEV(c.chance, c.extra) - 1));
+  const critExtra = r.critExtra ?? 0;
+  if (!critExtra || !c) return model.base * (1 + mantra);
+  return model.base * (1 + mantra + (c.share + mantra) * (critEV(c.chance, c.extra + critExtra) / critEV(c.chance, c.extra) - 1));
 }
 
 /** D127: the model with its auto-attack crit moved to `chance` / `extra` (base rescaled, share kept consistent). */
-export function withAutoCrit<M extends Pick<SpellModel, 'base' | 'autoCrit'>>(model: M, chance: number, extra: number): M {
+export function withAutoCrit<M extends Pick<SpellModel, 'base' | 'autoCrit' | 'mantraShare'>>(model: M, chance: number, extra: number): M {
   const c = model.autoCrit ?? { chance: 0, extra: 0, share: 1 };
   const k = critEV(chance, extra) / critEV(c.chance, c.extra);
   const scaled = 1 - c.share + c.share * k;
-  return { ...model, base: model.base * scaled, autoCrit: { chance, extra, share: scaled > 0 ? (c.share * k) / scaled : c.share } };
+  return {
+    ...model,
+    base: model.base * scaled,
+    autoCrit: { chance, extra, share: scaled > 0 ? (c.share * k) / scaled : c.share },
+    ...(model.mantraShare && scaled > 0 ? { mantraShare: (model.mantraShare * k) / scaled } : {}),
+  };
 }
 
 /** D93: charm effects weighted over the spot's creatures. */
@@ -328,6 +341,8 @@ export interface GearModel {
   weaponImbues?: GearEffects['weaponImbues'];
   /** D97: item augments. */
   augments?: GearEffects['augments'];
+  /** D131: total gear mantra. */
+  mantra?: number;
 }
 
 /** D97: item augments on the spell model: base damage, crit chance / extra damage (fractions), cooldown (s). */
@@ -362,6 +377,7 @@ export function gearModel(g: GearEffects | undefined): GearModel | undefined {
     ...(g.lifeLeech !== undefined ? { lifeLeech: g.lifeLeech } : {}),
     ...(g.weaponImbues ? { weaponImbues: g.weaponImbues } : {}),
     ...(g.augments?.length ? { augments: g.augments } : {}),
+    ...(g.mantra ? { mantra: g.mantra } : {}),
   };
 }
 
@@ -542,6 +558,7 @@ export function buildSpellModel(
     base,
     autoShare,
     autoCrit,
+    ...(gear?.mantra && autoHit > 0 ? { mantraShare: gear.mantra / autoHit } : {}),
     total: 1,
     flatOffPerPoint: 0,
     flatHealPerPoint: 0,
@@ -694,7 +711,10 @@ function castEval(model: SpellModel, s: SpellEval, r: RotationInput, m: SpellMod
       continue;
     }
     const p = PASSIVE_MULT[name];
-    if (p.applies(s)) mult *= p.mult[st - 1];
+    if (!p.applies(s)) continue;
+    // D131: Ascetic and the Harmony stance raise the same base bonus, so their points add up.
+    const h = name === 'Ascetic' ? (model.harmonyMult ?? 1) - 1 : 0;
+    mult *= (p.mult[st - 1] + h) / (1 + h);
   }
   return { damage: Math.max(0, dmg * mult * critEV(critChance, critExtra)), hit: Math.max(0, val(h.main) * mult) };
 }
@@ -731,7 +751,7 @@ function dropSharedCooldowns(cands: Cand[]) {
  */
 function presetRotation(model: SpellModel, r: RotationInput): RotationResult {
   const rates = new Map<string, { rate: number; perCast: number }>();
-  let total = autoBase(model, r.critExtra);
+  let total = autoBase(model, r);
   let left = 1;
   const rev: Cand[] = [];
   const inSlot = new Set(model.plan.entries.flatMap((e) => e.slot ?? []));
@@ -829,7 +849,7 @@ function greedyRotation(model: SpellModel, r: RotationInput): RotationResult {
   dropSharedCooldowns(cands);
   cands.sort((a, b) => b.perCast - a.perCast || a.s.name.localeCompare(b.s.name));
   let left = 1;
-  let total = autoBase(model, r.critExtra);
+  let total = autoBase(model, r);
   const rates = new Map<string, { rate: number; perCast: number }>();
   for (const c of cands) {
     const rate = Math.min(c.cap, left);

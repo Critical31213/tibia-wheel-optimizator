@@ -80,7 +80,7 @@ Every source yields `Parts = { off, def, util }`. They are blended as `score = w
     - Bursts: average of main and extra.
     - Spiritual Outburst: the extra is added.
     - Beams: side hits land on the outer targets, and the central hit gets +10/12/14 % per target, capped at 30/36/42 %.
-  - **Passives.** Combat Mastery and Ascetic (harmony spenders) multiply the spells they affect; Lord of Destruction boosts the damage type of the elemental stance (D24, `LORD_OF_DESTRUCTION`).
+  - **Passives.** Combat Mastery and Ascetic (harmony spenders) multiply the spells they affect (D131: Ascetic's points add to the stance's Harmony base bonus, `SpellModel.harmonyMult`, not on top of it; Ascetic also adds 100/200/300 % of the gear mantra to each auto-attack hit, `mantraShare` in `autoBase`, crit like the hit, not doubled by Serene); Lord of Destruction boosts the damage type of the elemental stance (D24, `LORD_OF_DESTRUCTION`).
 - **Rotation (D20):** one attack slot per 2 s turn. A *plan* is a preset from `getRotationPresets(vocation)` or the greedy plan (`GREEDY_PLAN_ID = 'boss'`).
   - Plan selection: `input.rotationId` (manual), else auto = every preset (plus the greedy plan in boss mode), each searched jointly with the build; the best valid plan wins. `requires.revelation` is valid only when the build reaches that revelation; `requires.shield` switches the knight to a shield (base mitigation).
   - `planFor` resolves `or` alternatives by per-cast damage vs the spot at stage 3, drops revelation-granted spells and merges duplicates.
@@ -181,7 +181,9 @@ Optional `input.gear` (owned items per slot, D75): `wearBest` picks the set for 
    - Candidates are ranked without allocating (`rankOf` with a precomputed delta). Only the top 24 are materialised, and only the top 8 are greedily completed per level. A completion is remembered for every full state its greedy chain passed: a beam state equal to one of them (key, score, fill order) reuses it (D64).
    - Rank = score + revelation-stage look-ahead + greedy-completion estimate. A partial last slice uses the remainder.
    - A budget ≥ total capacity has only one allocation, so the search returns the full wheel and no alternatives.
-3. **Refine.** For each domain at stage 1–2, damp it (×0.2) and re-run the search. The result replaces the main build only if its exact objective under the main valuation is higher (and, in auto mode, the plan stays valid).
+3. **Refine.** For each domain at stage 1–2, damp it (×0.2) and re-run the search. The result replaces the main build only if its objective under the main valuation is higher (and, in auto mode, the plan stays valid).
+   - D131: `exactObjective` compares these candidates: the rotation damage of the built wheel (`placedBuild`, `wheelRotation`, skill boost model) instead of the additive offense parts; other offense (`otherOff`) and defense stay as parts. The weapon re-choice (D45) uses it too.
+   - D131: `withoutRevelationSpells`: for each reached revelation spell (not forced, not required by the plan), the plan is re-prepared with that spell excluded and searched; its build wins if its exact objective under the main valuation is higher. The additive parts value a revelation spell by itself and miss the turns it takes from the other, augmented spells.
 4. **Final pass.** Recompute stages, RM, vessels, stats, recommendations, spells and `plannerCode`.
 5. **Alternatives.** The count is `input.alternatives ?? 2`, clamped to 0..5; none are produced below 100 points. Candidates, in order:
    - Avatar focus (boss mode; avatar revelation ×8);
