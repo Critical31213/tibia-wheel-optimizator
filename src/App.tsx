@@ -126,11 +126,12 @@ function Optimizer({ onReset }: { onReset: () => void }) {
             suggestWeapons: deferredWeapons.weapons.length && deferredWeapons.suggest ? true : undefined,
             gear: gearRequest,
             charms: deferredGear.charms.length ? deferredGear.charms : undefined,
+            consumables: deferredGear.consumables,
             wheelVariant: deferred.wheel === 'current' ? undefined : deferred.wheel,
             compareWith: deferredCompare,
           }
         : null,
-    [deferredCompare, deferred.wheel, deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, meleeSkill, rotationId, customRotation, forcedSpells, forcedStage2, forcedRevelations, minVessels, autoAttack, wheel, excludedSpells, spellTargets, stance, deferredWeapons, gearRequest, deferredGear.charms],
+    [deferredCompare, deferred.wheel, deferred.vocation, points, deferredSpot, deferred.priority, mode, deferredGems, character, meleeSkill, rotationId, customRotation, forcedSpells, forcedStage2, forcedRevelations, minVessels, autoAttack, wheel, excludedSpells, spellTargets, stance, deferredWeapons, gearRequest, deferredGear.charms, deferredGear.consumables],
   );
   const optimized = useOptimizer(request);
   // The shown build may lag the inputs while the worker computes; everything below follows its own vocation.

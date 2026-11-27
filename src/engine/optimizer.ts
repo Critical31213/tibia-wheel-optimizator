@@ -47,6 +47,7 @@ import { resolveCharacterStats } from '../data/character';
 import { GEAR_SLOTS, getItem } from '../data/equipment';
 import { gearEffects, type WornGear } from './gear';
 import { assignCharms, ownedCharms, type CharmAssignment } from './charms';
+import { consumableBonus } from '../data/consumables';
 import { getCharm } from '../data/charms';
 import { BALLISTIC_MASTERY, healingAverage, pierceDamageMod, POSITIONAL_TACTICS, TURN_SECONDS } from '../data/damage';
 import { autoPresets, customPreset, getRotationPresets } from '../data/damage/rotations';
@@ -1047,7 +1048,7 @@ function rationale(p: Prepared, best: State, stages: number[], revPoints: number
 const pointsOf = (input: Pick<OptimizerInput, 'points'>) =>
   Math.max(0, Math.floor(Number.isFinite(input.points) ? input.points : 0));
 
-type ValuationInput = Pick<OptimizerInput, 'vocation' | 'points' | 'monster' | 'context' | 'character' | 'monsters' | 'equipment' | 'equipmentTwoHanded' | 'wornPieces' | 'weapons' | 'gear'> &
+type ValuationInput = Pick<OptimizerInput, 'vocation' | 'points' | 'monster' | 'context' | 'character' | 'monsters' | 'equipment' | 'equipmentTwoHanded' | 'wornPieces' | 'weapons' | 'gear' | 'consumables' | 'meleeSkill'> &
   Partial<Pick<OptimizerInput, 'rotationId' | 'forcedSpells' | 'customRotation' | 'excludedSpells' | 'charmPicks' | 'spellTargets'>>;
 
 const extrasOf = (input: Pick<OptimizerInput, 'excludedSpells' | 'charmPicks' | 'spellTargets' | 'autoAttackPct'>): ModelExtras => ({ excluded: input.excludedSpells, charms: input.charmPicks, targets: input.spellTargets, autoAttackPct: input.autoAttackPct });
@@ -1079,12 +1080,20 @@ function modelInputs(input: ValuationInput) {
   // D74: equipment skills are added to the entered (base) skills; empty fields keep the typical values (with gear).
   const gear = input.equipment?.skills;
   const plus = (x: number | undefined, bonus = 0) => (x === undefined ? undefined : x + bonus);
-  const character = resolveCharacterStats(input.vocation, {
+  const resolved = resolveCharacterStats(input.vocation, {
     level,
     mainSkill: plus(clean(input.character?.mainSkill), gear?.main),
     magicLevel: plus(clean(input.character?.magicLevel), gear?.magic),
     shielding: plus(clean(input.character?.shielding), gear?.shielding),
   });
+  // D136: food and potions on top (also on estimated skills).
+  const food = consumableBonus(input.consumables, input.vocation, input.meleeSkill);
+  const character = {
+    ...resolved,
+    mainSkill: resolved.mainSkill + food.main,
+    magicLevel: resolved.magicLevel + food.magic,
+    shielding: Math.max(0, resolved.shielding + food.shielding),
+  };
   const monsters = normaliseMonsters(input.monsters, input.monster ?? null);
   const model = buildSpellModel(input.vocation, context, monsters, character, {}, undefined, input.equipment, extrasOf(input));
   return { context, level, character, monsters, model };

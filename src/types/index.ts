@@ -444,6 +444,8 @@ export interface OptimizerInput {
   suggestWeapons?: boolean;
   /** D74: equipment the player owns (several items per slot); the engine wears the best set for the spot. */
   gear?: GearInput;
+  /** D136: chosen skill food and potion ids (added to the resolved skills). */
+  consumables?: string[];
   /** D74: effects of the worn equipment (set by the engine from `gear`); undefined = the previous assumptions. */
   equipment?: GearEffects;
   /** D78: `equipment` without the shield / spellbook, used with a two-handed weapon. */

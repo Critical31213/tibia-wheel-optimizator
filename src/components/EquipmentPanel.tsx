@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { CharmResult, GearEffects, GearResult, MeleeSkill, OwnedWeapon, Vocation } from '../types';
 import { CharmIcon, CharmsEditor } from './CharmsEditor';
+import { ConsumablesEditor, FlaskIcon } from './ConsumablesEditor';
 import { useT, type TFunction } from '../i18n';
 import {
   getImbuement,
@@ -24,7 +25,7 @@ import {
   type ImbueLevel,
   type ImbueSlot,
 } from '../data/equipment';
-import { addPiece, isGearSet, MAX_PIECES, removePiece, updatePiece, type GearPrefs, type ImbueChoice } from '../lib/gear';
+import { addPiece, isGearSet, MAX_PIECES, removePiece, setConsumable, updatePiece, type GearPrefs, type ImbueChoice } from '../lib/gear';
 import { weaponImbueSlots, weaponMaxTier, type WeaponPrefs } from '../lib/weapons';
 import type { Weapon } from '../lib/api';
 import { cx } from '../lib/labels';
@@ -41,6 +42,8 @@ const NOT_MODELLED = new Set(['momentum', 'transcendence']);
 
 /** D93: paper-doll cell of the charms button (bottom left). */
 const CHARM_CELL = 9;
+/** D136: cell of the food / potion button (bottom right). */
+const FOOD_CELL = 11;
 
 // ---------------------------------------------------------------------------
 // Labels
@@ -462,7 +465,7 @@ export interface EquipmentPanelProps {
 /** D74: equipment as a Tibia paper doll; a slot opens its editor in a window (the weapon slot: owned weapons with proficiency). */
 export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, worn, weaponName, weapons, onWeapons, charmPicks }: EquipmentPanelProps) {
   const t = useT();
-  const [editing, setEditing] = useState<Slot | 'charms' | null>(null);
+  const [editing, setEditing] = useState<Slot | 'charms' | 'food' | null>(null);
   const close = () => setEditing(null);
   // The shown build may lag behind edits: a worn index past the list falls back to the first item.
   const wornIndex = (s: Slot) => {
@@ -493,8 +496,25 @@ export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, worn, weapo
                 <span className="text-[10px] uppercase tracking-wide text-parchment-400">{t('charm.title')}</span>
                 {gear.charms.length > 0 && <span className="absolute left-1 top-1 rounded bg-ink-700 px-1 text-[10px] text-parchment-200">{gear.charms.length}</span>}
               </button>
+            ) : k === FOOD_CELL ? (
+              <button
+                key="food"
+                type="button"
+                onClick={() => setEditing(editing === 'food' ? null : 'food')}
+                aria-expanded={editing === 'food'}
+                aria-label={t('food.button', { n: gear.consumables?.length ?? 0 })}
+                title={t('food.title')}
+                className={cx(
+                  'relative flex aspect-square min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg border p-1',
+                  editing === 'food' ? 'border-gold-400 bg-gold-700/25' : gear.consumables?.length ? 'border-gold-700/70 bg-ink-950/70 hover:border-gold-500' : 'border-dashed border-ink-500 bg-ink-950/40 hover:border-gold-600',
+                )}
+              >
+                <FlaskIcon className={cx('size-6', gear.consumables?.length ? 'text-gold-300' : 'text-parchment-500')} />
+                <span className="text-center text-[10px] uppercase leading-tight tracking-wide text-parchment-400">{t('food.title')}</span>
+                {!!gear.consumables?.length && <span className="absolute left-1 top-1 rounded bg-ink-700 px-1 text-[10px] text-parchment-200">{gear.consumables.length}</span>}
+              </button>
             ) : (
-              <span key={k} aria-hidden="true" className={cx('aspect-square rounded-lg', k !== 11 && 'border border-ink-700/60 bg-ink-950/20')} />
+              <span key={k} aria-hidden="true" className="aspect-square rounded-lg border border-ink-700/60 bg-ink-950/20" />
             ),
           )}
         </div>
@@ -503,7 +523,12 @@ export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, worn, weapo
             <CharmsEditor value={gear.charms} onChange={(charms) => onGear((g) => ({ ...g, charms }))} picks={charmPicks} />
           </Modal>
         )}
-        {editing && editing !== 'charms' && (
+        {editing === 'food' && (
+          <Modal title={t('food.title')} onClose={close}>
+            <ConsumablesEditor vocation={vocation} meleeSkill={meleeSkill} value={gear.consumables ?? []} onChange={(kind, id) => onGear((g) => setConsumable(g, kind, id))} />
+          </Modal>
+        )}
+        {editing && editing !== 'charms' && editing !== 'food' && (
           <Modal title={slotName(t, editing)} wide={editing === 'weapon'} onClose={close}>
             <SlotEditor
               key={editing}

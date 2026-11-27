@@ -7,6 +7,7 @@
  */
 import type { GearImbue, GearInput, GearPiece, GearSlot, OwnedCharm, Vocation, WeaponGear } from '../types';
 import { CHARM_IDS } from '../data/charms';
+import { consumablesFor, getConsumable } from '../data/consumables';
 import {
   GEAR_SLOTS,
   getItem,
@@ -29,6 +30,8 @@ export interface GearPrefs {
   weapon: WeaponGear | null;
   /** D93: unlocked offensive charms. */
   charms: OwnedCharm[];
+  /** D136: chosen skill food and potion (at most one of each). */
+  consumables?: string[];
 }
 
 /** Owned items kept per slot. */
@@ -45,6 +48,25 @@ export function sanitizeCharms(raw: unknown): OwnedCharm[] {
     if (CHARM_IDS.includes(id) && stage && !out.some((x) => x.id === id)) out.push({ id, stage });
   }
   return out;
+}
+
+/** D136: known food / potion of the vocation, one of each kind. */
+export function sanitizeConsumables(raw: unknown, vocation: Vocation): string[] {
+  const allowed = new Set(consumablesFor(vocation).map((c) => c.id));
+  const out: string[] = [];
+  for (const id of Array.isArray(raw) ? raw : []) {
+    const c = typeof id === 'string' && allowed.has(id) ? getConsumable(id) : undefined;
+    if (c && !out.some((x) => getConsumable(x)?.kind === c.kind)) out.push(c.id);
+  }
+  return out;
+}
+
+/** D136: picks `id` (null = none) as the food or potion. */
+export function setConsumable(g: GearPrefs, kind: 'food' | 'potion', id: string | null): GearPrefs {
+  const rest = (g.consumables ?? []).filter((x) => getConsumable(x)?.kind !== kind);
+  const consumables = id ? [...rest, id] : rest;
+  const { consumables: _, ...base } = g;
+  return consumables.length ? { ...base, consumables } : base;
 }
 
 export const gearStorageKey = (vocation: Vocation): string => `wheel-optimizer:gear:v1:${vocation}`;
@@ -80,7 +102,7 @@ function sanitizePiece(raw: unknown, slot: GearSlot, vocation: Vocation): GearPi
 }
 
 export function sanitizeGear(raw: unknown, vocation: Vocation): GearPrefs {
-  const r = (raw && typeof raw === 'object' ? raw : {}) as { pieces?: Record<string, unknown>; weapon?: Partial<WeaponGear> | null; charms?: unknown };
+  const r = (raw && typeof raw === 'object' ? raw : {}) as { pieces?: Record<string, unknown>; weapon?: Partial<WeaponGear> | null; charms?: unknown; consumables?: unknown };
   const pieces: GearPrefs['pieces'] = {};
   for (const s of GEAR_SLOTS) {
     const v = r.pieces?.[s];
@@ -92,7 +114,8 @@ export function sanitizeGear(raw: unknown, vocation: Vocation): GearPrefs {
   const weapon = w && typeof w === 'object'
     ? { tier: int(w.tier, 0, MAX_TIER) ?? 0, imbues: sanitizeImbues(w.imbues, 'weapon', vocation, WEAPON_IMBUE_SLOTS) }
     : null;
-  return { pieces, weapon, charms: sanitizeCharms(r.charms) };
+  const consumables = sanitizeConsumables(r.consumables, vocation);
+  return { pieces, weapon, charms: sanitizeCharms(r.charms), ...(consumables.length ? { consumables } : {}) };
 }
 
 export function parseGear(json: string | null, vocation: Vocation): GearPrefs {

@@ -69,7 +69,7 @@ license for its data; on request of its owners the data will be removed or repla
 ## TibiaWiki
 
 Some spell cooldowns, stance values, a few wand damage values, imbuement protection values, the stacking of
-protections, the offensive charm values (chances, damage, caps), the character's own critical hit and the Strike
+protections, the offensive charm values (chances, damage, caps), the skill food and potion bonuses, the character's own critical hit and the Strike
 imbuement values were checked against TibiaWiki, and the item augments (spell, effect, value) and the monk items'
 mantra are read from its item infoboxes through the MediaWiki API (`scripts/import-item-augments.mjs`), and the creatures of each hunting place are
 read from its `CreatureList` (`scripts/import-hunting-spots.mjs`)

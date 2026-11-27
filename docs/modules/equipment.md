@@ -85,3 +85,12 @@ item and the number of owned items. A slot opens its editor in a modal window (`
 imbuements per the item's slots, remove) and "add item" (search for the slot). The
 weapon slot (wider window) shows the engine's pick, sets its tier and up to 3 imbuements ("back to default" clears
 them) and holds the owned weapons with their proficiency (`OwnedWeapons.tsx`). Below the doll: the bonus totals.
+
+## Food and potions (D136)
+
+`src/data/consumables.ts`: skill food (Hireling and Jean Pierre dishes, Lemon Cupcake) and potions (Bullseye, Berserk,
+Mastermind, Transcendence), values from TibiaWiki. Stored in `GearPrefs.consumables` (one food, one potion; omitted when
+empty), sent as `OptimizerInput.consumables`. `consumableBonus` gives `{ main, magic, shielding }`; `modelInputs` adds it
+to the resolved character (also to estimated skills). A food and a potion boosting the same skill do not stack: the
+stronger item counts and the other is dropped. Delicatessen Salad ("all melee skills") is taken to include fist.
+UI: `ConsumablesEditor.tsx` in the bottom-right paper-doll cell.
