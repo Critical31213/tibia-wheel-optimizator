@@ -29,11 +29,14 @@ interface Props {
   vocation: Vocation;
   meleeSkill: MeleeSkill | null;
   value: readonly string[];
+  /** Potion pick, or null = clear the kind. */
   onChange: (kind: 'food' | 'potion', id: string | null) => void;
+  /** D141: add / remove one food. */
+  onToggleFood: (id: string) => void;
 }
 
-/** D136: one skill food and one potion; their skills are added to the character's. */
-export function ConsumablesEditor({ vocation, meleeSkill, value, onChange }: Props) {
+/** D136 / D141: skill foods (one per skill) and one potion; their skills are added to the character's. */
+export function ConsumablesEditor({ vocation, meleeSkill, value, onChange, onToggleFood }: Props) {
   const t = useT();
   const list = consumablesFor(vocation);
   const b = consumableBonus(value, vocation, meleeSkill);
@@ -46,20 +49,21 @@ export function ConsumablesEditor({ vocation, meleeSkill, value, onChange }: Pro
     <div className="flex flex-col gap-3 text-sm">
       <p className="text-xs text-parchment-300">{t('food.hint')}</p>
       {(['food', 'potion'] as const).map((kind) => {
-        const cur = value.find((id) => getConsumable(id)?.kind === kind) ?? null;
+        const chosen = value.filter((id) => getConsumable(id)?.kind === kind);
         const opts = list.filter((c) => c.kind === kind);
         if (!opts.length) return null;
         return (
           <fieldset key={kind} className="flex flex-col gap-1.5">
             <legend className="mb-1 text-xs uppercase tracking-wide text-parchment-400">{t(`food.${kind}`)}</legend>
+            {kind === 'food' && <p className="-mt-1 text-[11px] text-parchment-500">{t('food.foodHint')}</p>}
             {[null, ...opts].map((c) => {
-              const on = (c?.id ?? null) === cur;
+              const on = c ? chosen.includes(c.id) : !chosen.length;
               return (
                 <button
                   key={c?.id ?? 'none'}
                   type="button"
                   aria-pressed={on}
-                  onClick={() => onChange(kind, c?.id ?? null)}
+                  onClick={() => (c && kind === 'food' ? onToggleFood(c.id) : onChange(kind, c?.id ?? null))}
                   className={cx('flex items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-left', on ? 'border-gold-500 bg-gold-700/25' : 'border-ink-700 hover:border-gold-700')}
                 >
                   <span className={cx('text-xs', on ? 'text-parchment-50' : 'text-parchment-300')}>{c ? c.name : t('food.none')}</span>

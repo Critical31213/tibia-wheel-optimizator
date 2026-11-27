@@ -96,8 +96,9 @@ index still holds the same item (with several owned items and no current pick, n
 ## Food and potions (D136)
 
 `src/data/consumables.ts`: skill food (Hireling and Jean Pierre dishes, Lemon Cupcake) and potions (Bullseye, Berserk,
-Mastermind, Transcendence), values from TibiaWiki. Stored in `GearPrefs.consumables` (one food, one potion; omitted when
-empty), sent as `OptimizerInput.consumables`. `consumableBonus` gives `{ main, magic, shielding }`; `modelInputs` adds it
+Mastermind, Transcendence), values from TibiaWiki. Stored in `GearPrefs.consumables` (D141: several foods boosting different
+skills, e.g. magic level + distance, a food of the same skill replaces the previous one (`toggleFood`); one potion;
+omitted when empty), sent as `OptimizerInput.consumables`. `consumableBonus` gives `{ main, magic, shielding }`; `modelInputs` adds it
 to the resolved character (also to estimated skills). A food and a potion boosting the same skill do not stack: the
 stronger item counts and the other is dropped. Delicatessen Salad ("all melee skills") is taken to include fist.
 UI: `ConsumablesEditor.tsx` in the bottom-right paper-doll cell.

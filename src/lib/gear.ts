@@ -7,7 +7,7 @@
  */
 import type { GearImbue, GearInput, GearPiece, GearSlot, OwnedCharm, Vocation, WeaponGear } from '../types';
 import { CHARM_IDS } from '../data/charms';
-import { consumablesFor, getConsumable } from '../data/consumables';
+import { consumablesFor, getConsumable, sameBuff } from '../data/consumables';
 import {
   GEAR_SLOTS,
   getItem,
@@ -50,23 +50,38 @@ export function sanitizeCharms(raw: unknown): OwnedCharm[] {
   return out;
 }
 
-/** D136: known food / potion of the vocation, one of each kind. */
+/** D136 / D141: known foods (different skills) and one potion of the vocation. */
 export function sanitizeConsumables(raw: unknown, vocation: Vocation): string[] {
   const allowed = new Set(consumablesFor(vocation).map((c) => c.id));
   const out: string[] = [];
   for (const id of Array.isArray(raw) ? raw : []) {
     const c = typeof id === 'string' && allowed.has(id) ? getConsumable(id) : undefined;
-    if (c && !out.some((x) => getConsumable(x)?.kind === c.kind)) out.push(c.id);
+    const clash = (x: string) => {
+      const o = getConsumable(x);
+      return !!o && o.kind === c!.kind && (c!.kind === 'potion' || sameBuff(o, c!));
+    };
+    if (c && !out.some(clash)) out.push(c.id);
   }
   return out;
 }
 
-/** D136: picks `id` (null = none) as the food or potion. */
-export function setConsumable(g: GearPrefs, kind: 'food' | 'potion', id: string | null): GearPrefs {
-  const rest = (g.consumables ?? []).filter((x) => getConsumable(x)?.kind !== kind);
-  const consumables = id ? [...rest, id] : rest;
+function withConsumables(g: GearPrefs, consumables: string[]): GearPrefs {
   const { consumables: _, ...base } = g;
   return consumables.length ? { ...base, consumables } : base;
+}
+
+/** D136: picks `id` as the potion, or clears every item of the kind (null). */
+export function setConsumable(g: GearPrefs, kind: 'food' | 'potion', id: string | null): GearPrefs {
+  const rest = (g.consumables ?? []).filter((x) => getConsumable(x)?.kind !== kind);
+  return withConsumables(g, id ? [...rest, id] : rest);
+}
+
+/** D141: adds a food (replacing a food of the same skill) or removes it when chosen. */
+export function toggleFood(g: GearPrefs, id: string): GearPrefs {
+  const cur = g.consumables ?? [];
+  const c = getConsumable(id);
+  if (!c || cur.includes(id)) return withConsumables(g, cur.filter((x) => x !== id));
+  return withConsumables(g, [...cur.filter((x) => { const o = getConsumable(x); return !(o?.kind === 'food' && sameBuff(o, c)); }), id]);
 }
 
 export const gearStorageKey = (vocation: Vocation): string => `wheel-optimizer:gear:v1:${vocation}`;

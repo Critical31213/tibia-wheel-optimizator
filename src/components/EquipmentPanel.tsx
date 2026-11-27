@@ -25,7 +25,7 @@ import {
   type ImbueLevel,
   type ImbueSlot,
 } from '../data/equipment';
-import { addPiece, isGearSet, MAX_PIECES, removePiece, setConsumable, updatePiece, type GearPrefs, type ImbueChoice } from '../lib/gear';
+import { addPiece, isGearSet, MAX_PIECES, removePiece, setConsumable, toggleFood, updatePiece, type GearPrefs, type ImbueChoice } from '../lib/gear';
 import { weaponImbueSlots, weaponMaxTier, type WeaponPrefs } from '../lib/weapons';
 import type { Weapon } from '../lib/api';
 import { cx } from '../lib/labels';
@@ -534,7 +534,7 @@ export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, worn, weapo
         )}
         {editing === 'food' && (
           <Modal title={t('food.title')} onClose={close}>
-            <ConsumablesEditor vocation={vocation} meleeSkill={meleeSkill} value={gear.consumables ?? []} onChange={(kind, id) => onGear((g) => setConsumable(g, kind, id))} />
+            <ConsumablesEditor vocation={vocation} meleeSkill={meleeSkill} value={gear.consumables ?? []} onChange={(kind, id) => onGear((g) => setConsumable(g, kind, id))} onToggleFood={(id) => onGear((g) => toggleFood(g, id))} />
           </Modal>
         )}
         {editing && editing !== 'charms' && editing !== 'food' && (

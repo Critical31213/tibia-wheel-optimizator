@@ -1,7 +1,8 @@
 /**
- * D136: skill-boosting food and potions (TibiaWiki, checked 2026-11-27). One food and one potion at a time; a potion
- * replaces a food buff of the same skill (and the other way round), so when both boost one skill only the stronger
- * item counts. Delicatessen Salad boosts "all melee skills", taken as fist too (Veggie Casserole lists fist).
+ * D136: skill-boosting food and potions (TibiaWiki, checked 2026-11-27). D141: several foods at once when they boost
+ * different skills (dishes share a cooldown, their buffs last an hour); one potion. A potion replaces a food buff of
+ * the same skill (and the other way round), so when both boost one skill only the stronger item counts. Delicatessen
+ * Salad boosts "all melee skills", taken as fist too (Veggie Casserole lists fist).
  */
 import type { MeleeSkill, Vocation } from '../types';
 import type { ItemSkill } from './equipment/types';
@@ -49,6 +50,10 @@ export const consumablesFor = (vocation: Vocation): ConsumableDef[] =>
     (c) => (!c.vocations || c.vocations.includes(vocation)) && Object.entries(c.skills).some(([s, v]) => v > 0 && (s === 'magic' || s === 'shielding' || MAIN[vocation].includes(s as ItemSkill))),
   );
 
+/** D141: two items boost a common skill (their buffs replace each other). */
+export const sameBuff = (a: ConsumableDef, b: ConsumableDef): boolean =>
+  (Object.keys(a.skills) as ItemSkill[]).some((s) => (a.skills[s] ?? 0) > 0 && (b.skills[s] ?? 0) > 0);
+
 export interface ConsumableBonus {
   main: number;
   magic: number;
@@ -58,12 +63,16 @@ export interface ConsumableBonus {
 /** Skill changes of the chosen food and potion (knights: the trained melee skill, else the best one). */
 export function consumableBonus(ids: readonly string[] | undefined, vocation: Vocation, meleeSkill?: MeleeSkill | null): ConsumableBonus {
   const items = (ids ?? []).map(getConsumable).filter((c): c is ConsumableDef => !!c && (!c.vocations || c.vocations.includes(vocation)));
-  const food = items.find((c) => c.kind === 'food');
+  // One buff per skill: a later food boosting a skill of an earlier one is ignored.
+  const foods: ConsumableDef[] = [];
+  for (const c of items) if (c.kind === 'food' && !foods.some((f) => sameBuff(f, c))) foods.push(c);
   const potion = items.find((c) => c.kind === 'potion');
-  let used = [food, potion].filter((c): c is ConsumableDef => !!c);
-  if (food && potion) {
-    const clash = (Object.keys(potion.skills) as ItemSkill[]).find((s) => (potion.skills[s] ?? 0) > 0 && (food.skills[s] ?? 0) > 0);
-    if (clash) used = [(potion.skills[clash] ?? 0) > (food.skills[clash] ?? 0) ? potion : food];
+  let used = [...foods];
+  if (potion) {
+    const clash = foods.filter((f) => sameBuff(f, potion));
+    const top = (c: ConsumableDef) => Math.max(...(Object.keys(potion.skills) as ItemSkill[]).filter((s) => (potion.skills[s] ?? 0) > 0).map((s) => c.skills[s] ?? 0));
+    if (!clash.length) used.push(potion);
+    else if (top(potion) > Math.max(...clash.map(top))) used = [...foods.filter((f) => !clash.includes(f)), potion];
   }
   const sum = (s: ItemSkill) => used.reduce((a, c) => a + (c.skills[s] ?? 0), 0);
   const mains = vocation === 'knight' && meleeSkill ? [meleeSkill] : MAIN[vocation];
