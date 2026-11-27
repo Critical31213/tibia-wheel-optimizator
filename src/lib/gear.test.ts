@@ -258,3 +258,16 @@ describe('engine with equipment', () => {
     expect(sanitizeGear({ pieces: { helmet: [{ itemId: hood.id, imbues: [{ id: 'epiphany', level: 3 }] }] } }, 'paladin').pieces.helmet![0].imbues).toEqual([{ id: 'epiphany', level: 2 }]);
   });
 });
+
+describe('D142 trinket only when it adds value', () => {
+  it('no trinket against physical damage only; Moon Mirror against death', () => {
+    const phys: Monster = { id: 'p', name: 'p', elementModifiers: {}, damageTypes: ['physical'], maxDamage: 1000 };
+    const death: Monster = { ...phys, id: 'd', name: 'd', damageTypes: ['death'] };
+    const input = (monster: Monster): OptimizerInput => ({
+      vocation: 'paladin', points: 400, monster: null, monsters: [{ monster, weight: 1 }], priority: 50, character: { level: 400 },
+      gear: { pieces: { trinket: [{ itemId: 'bone-fiddle' }, { itemId: 'moon-mirror' }] }, weapon: null },
+    });
+    expect(wearBest(input(phys))!.gear.worn).toEqual({});
+    expect(wearBest(input(death))!.gear.wornIds).toEqual({ trinket: 'moon-mirror' });
+  });
+});

@@ -175,7 +175,8 @@ Gems and weapons are deliberately **not** in the URL (too long); a shared link c
   grade's `gradeValues` entry is shown next to the slot label.
 - "Add gem" uses a quality select labelled with the vocation-specific gem name (`gemName`, read from the planner's
   `VesselInfos.GemNames` in the wheel data, e.g. "Greater Sage Gem" for sorcerers and "Greater Mystic Gem" for druids); each gem card has a quality select and a Remove button. The panel is collapsible
-  (`aria-expanded` / `aria-controls`); it starts collapsed when the vocation already has gems (D104), open otherwise.
+  (`aria-expanded` / `aria-controls`); it starts collapsed when the vocation already has gems (D104), open otherwise. D142: each quality section with gems also starts collapsed
+  (adding a gem opens it; a section holding gems flagged by an import stays open).
 
 ## Results: vessels & gems
 

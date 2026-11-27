@@ -136,9 +136,10 @@ export function GemsPanel({ vocation, gems, mods, emptyVessels, onChange }: Gems
   const bodyId = useId();
   // D104: collapsed on load when the vocation already has gems (open to add the first ones).
   const [open, setOpen] = useState(() => gems.length === 0);
-  const [closed, setClosed] = useState<ReadonlySet<GemQuality>>(new Set());
+  // D142: quality sections with gems start collapsed; opened ones are kept here.
+  const [opened, setOpened] = useState<ReadonlySet<GemQuality>>(new Set());
   const toggle = (q: GemQuality) =>
-    setClosed((s) => {
+    setOpened((s) => {
       const n = new Set(s);
       if (!n.delete(q)) n.add(q);
       return n;
@@ -175,9 +176,9 @@ export function GemsPanel({ vocation, gems, mods, emptyVessels, onChange }: Gems
             const empty = emptyVessels?.[q] ?? 0;
             const name = gemName(vocation, q);
             const list = gems.flatMap((gem, index) => (gem.quality === q ? [{ gem, index }] : []));
-            // Collapsing only pays off with several gems.
-            const collapsible = list.length > 1;
-            const hidden = collapsible && closed.has(q);
+            const collapsible = list.length > 0;
+            // Sections with gems flagged by an import stay open.
+            const hidden = collapsible && !opened.has(q) && !list.some(({ gem }) => flagged.has(gem.id));
             return (
               <section
                 key={q}
@@ -239,7 +240,10 @@ export function GemsPanel({ vocation, gems, mods, emptyVessels, onChange }: Gems
                 )}
                 {!hidden && <button
                   type="button"
-                  onClick={() => onChange((all) => [...all, createGem(q)])}
+                  onClick={() => {
+                    setOpened((s) => new Set(s).add(q));
+                    onChange((all) => [...all, createGem(q)]);
+                  }}
                   aria-label={t('gems.addOf', { name })}
                   className="rounded-lg border border-gold-600 bg-gold-700/30 px-3 py-1 text-sm font-medium text-gold-300 hover:bg-gold-700/50"
                 >

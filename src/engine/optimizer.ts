@@ -1206,8 +1206,10 @@ export function wearBest(input: OptimizerInput): { gear: GearResult; wornPieces:
     });
     return gearEffects({ pieces, weapon: g.weapon }, input.vocation, input.meleeSkill);
   };
-  let worn: (number | undefined)[] = options.map((o) => o[0]);
-  if (options.some((o) => o.length > 1)) {
+  // D142: a trinket is worn only when it adds value (no trinket by default; ties keep none).
+  const optional = GEAR_SLOTS.map((s) => s === 'trinket');
+  let worn: (number | undefined)[] = options.map((o, k) => (optional[k] ? undefined : o[0]));
+  if (options.some((o, k) => o.length > 1 || (optional[k] && o.length))) {
     const score = gearScorer(input);
     let top = score(effectsOf(worn));
     for (let pass = 0; pass < GEAR_PASSES; pass++) {
