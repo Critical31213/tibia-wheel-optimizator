@@ -36,8 +36,8 @@ export interface StanceDef {
   partyOnly?: boolean;
 }
 
-/** Share of time a monk is serene (user, D24). */
-export const SERENE_UPTIME = 0.8;
+/** Share of time a monk is serene (D24; D134: always, solo monks are always serene). */
+export const SERENE_UPTIME = 1;
 /** Share of incoming damage from non-adjacent enemies (user, D24). */
 export const NON_ADJACENT_SHARE = 0.3;
 

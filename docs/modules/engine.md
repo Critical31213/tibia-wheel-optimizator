@@ -154,9 +154,9 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 
 ### Stances (`stances.ts`, D24)
 
-- Data: `src/data/damage/stances.ts` (`STANCES`, `stanceCombos`, `SERENE_UPTIME` 0.8, `NON_ADJACENT_SHARE` 0.3).
+- Data: `src/data/damage/stances.ts` (`STANCES`, `stanceCombos`, `SERENE_UPTIME` 1 (D134), `NON_ADJACENT_SHARE` 0.3).
 - Character: skill +% (Blood Rage 25, Sharpshooter 32, Virtue of Justice 8 × serene), shielding +30 % (Protector, via mitigation; EHP reference keeps the unstanced shielding).
-- Spell model: element magic level (Divine Defiance 6 % distance → holy/healing, Elemental Synthesis 10 % ML → ice/earth), elemental stance bonus on natural spells (+4 % base fire, +4 % crit chance energy, +30 % crit extra death) and conversion (other spells take the element's sensitivity for min(1, element casts / other casts)), Exposed Weakness 8 % pierce, Harmony spenders ×(1 + 0.0478 × base pp), Protector damage ×0.85.
+- Spell model: element magic level (Divine Defiance 6 % distance → holy/healing, Elemental Synthesis 10 % ML → ice/earth), elemental stance bonus on natural spells (+4 % base fire, +4 % crit chance energy, +30 % crit extra death) and conversion (other spells take the element's sensitivity for min(1, element casts / other casts)), Exposed Weakness 8 % pierce, Harmony spenders ×(1 + 0.0478 × base pp) (D134: per pp of the Harmony base bonus at 5 Harmony, official calculator probe; Virtue of Harmony serene +6 pp, Ascetic +1/2/3 pp, summed), Protector damage ×0.85.
 - Defense (`stanceDefense`, × threat, in `baseParts`): damage taken (Blood Rage +15 %, Protector −15 %, Sapped Strength −10 %), dodge 12 % × 30 %, healing (+10 % self / Sustain +35 % all × serene, healing ML) × heal share × K.HEAL_EHP.
 - Pick (`pickStances`): per plan, the stance set with the highest blended `baseParts`; a preset's `stance` is fixed.
 

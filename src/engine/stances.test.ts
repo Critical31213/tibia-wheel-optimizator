@@ -23,7 +23,7 @@ describe('D24 stances', () => {
     expect(stancedCharacter(c, [st('Blood Rage')]).mainSkill).toBe(150);
     expect(stancedCharacter(c, [st('Protector')]).shielding).toBe(143);
     const m = resolveCharacterStats('monk', { level: 500, mainSkill: 125 });
-    expect(stancedCharacter(m, [st('Virtue of Justice')]).mainSkill).toBe(143); // 125 × 1.144
+    expect(stancedCharacter(m, [st('Virtue of Justice')]).mainSkill).toBe(145); // 125 × 1.16 (serene)
     const p = resolveCharacterStats('paladin', { level: 500, mainSkill: 120 });
     expect(stanceElementMl(p, [st('Divine Defiance')])).toEqual({ holy: 7, healing: 7 });
   });
