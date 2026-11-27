@@ -89,7 +89,9 @@ Paper doll (Tibia layout; backpack and ammunition are not modelled), all slots e
 item and the number of owned items. A slot opens its editor in a modal window (`<dialog>`): owned items (worn one marked; tier with its effect,
 imbuements per the item's slots, remove) and "add item" (search for the slot). The
 weapon slot (wider window) shows the engine's pick, sets its tier and up to 3 imbuements ("back to default" clears
-them) and holds the owned weapons with their proficiency (`OwnedWeapons.tsx`). Below the doll: the bonus totals.
+them) and holds the owned weapons with their proficiency (`OwnedWeapons.tsx`). Below the doll: the bonus totals. D139: the item picker hides owned items that cannot differ (no forge tier, no
+imbuement slots, e.g. trinkets); the engine returns `GearResult.wornIds` and a slot names its worn item only while that
+index still holds the same item (with several owned items and no current pick, no item is named).
 
 ## Food and potions (D136)
 

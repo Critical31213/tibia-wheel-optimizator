@@ -83,12 +83,15 @@ const slotName = (t: TFunction, s: Slot) => t(`gear.slot.${s}`);
 // ---------------------------------------------------------------------------
 // Editors
 
-function ItemPicker({ slot, vocation, onPick }: { slot: GearSlot; vocation: Vocation; onPick: (i: EquipmentItem) => void }) {
+/** D139: an owned item without forge tiers or imbuement slots cannot differ from a second copy. */
+const fixedItem = (i: EquipmentItem) => maxTier(i.class) === 0 && !i.imbuementSlots;
+
+function ItemPicker({ slot, vocation, owned, onPick }: { slot: GearSlot; vocation: Vocation; owned: readonly string[]; onPick: (i: EquipmentItem) => void }) {
   const t = useT();
   const id = useId();
   const [query, setQuery] = useState('');
   const q = useDebouncedValue(query, 100).trim().toLowerCase();
-  const all = useMemo(() => itemsFor(SLOT_ITEMS[slot], vocation), [slot, vocation]);
+  const all = useMemo(() => itemsFor(SLOT_ITEMS[slot], vocation).filter((i) => !(fixedItem(i) && owned.includes(i.id))), [slot, vocation, owned]);
   const list = useMemo(() => (q ? all.filter((i) => i.name.toLowerCase().includes(q)) : all).slice(0, 60), [all, q]);
   return (
     <div className="flex flex-col gap-2">
@@ -303,6 +306,7 @@ function OwnedPieces({ slot, vocation, gear, wornIndex, onGear }: { slot: GearSl
         <ItemPicker
           slot={slot}
           vocation={vocation}
+          owned={list.map((p) => p.itemId)}
           onPick={(item) => {
             onGear((g) => addPiece(g, slot, item));
             setAdding(false);
@@ -369,7 +373,8 @@ interface SlotButtonProps {
 function SlotButton({ slot, gear, weaponName, wornIndex, weaponCount, off, active, onClick }: SlotButtonProps) {
   const t = useT();
   const list = slot === 'weapon' ? [] : (gear.pieces[slot] ?? []);
-  const piece = slot === 'weapon' ? gear.weapon : list[wornIndex ?? 0];
+  // D139: with several owned items and no current pick, no item is named.
+  const piece = slot === 'weapon' ? gear.weapon : list[wornIndex ?? (list.length === 1 ? 0 : -1)];
   const name = slot === 'weapon' ? weaponName : piece && 'itemId' in piece ? (getItem(piece.itemId)?.name ?? null) : null;
   const set = slot === 'weapon' ? gear.weapon !== null || weaponCount > 0 : list.length > 0;
   const count = slot === 'weapon' ? weaponCount : list.length;
@@ -469,10 +474,12 @@ export function EquipmentPanel({ vocation, meleeSkill, gear, onGear, worn, weapo
   const t = useT();
   const [editing, setEditing] = useState<Slot | 'charms' | 'food' | null>(null);
   const close = () => setEditing(null);
-  // The shown build may lag behind edits: a worn index past the list falls back to the first item.
+  // D139: the shown build may lag behind edits: its worn item counts only while it is still at that index.
   const wornIndex = (s: Slot) => {
-    const i = s === 'weapon' ? undefined : worn?.worn[s];
-    return i !== undefined && s !== 'weapon' && i < (gear.pieces[s]?.length ?? 0) ? i : undefined;
+    if (s === 'weapon') return undefined;
+    const i = worn?.worn[s];
+    const id = worn?.wornIds?.[s];
+    return i !== undefined && gear.pieces[s]?.[i] && (!id || gear.pieces[s]![i].itemId === id) ? i : undefined;
   };
   return (
     <Panel title={t('gear.title')} step={6} headingId="gear-heading">

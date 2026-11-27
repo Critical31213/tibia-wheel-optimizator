@@ -121,6 +121,7 @@ describe('wearing the best owned items', () => {
     expect(t(fire).gear.worn).toEqual({ trinket: 1 });
     expect(t(death).gear.worn).toEqual({ trinket: 0 });
     expect(t(fire).gear.effects.resist.fire).toBe(5);
+    expect(t(fire).gear.wornIds).toEqual({ trinket: 'sun-catcher' });
   });
 
   it('D138: Cursed Coin crit counts; picked for pure damage', () => {

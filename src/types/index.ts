@@ -505,6 +505,8 @@ export interface GearInput {
 /** D74: the worn set: index into `gear.pieces[slot]` per slot, and its effects. */
 export interface GearResult {
   worn: Partial<Record<GearSlot, number>>;
+  /** D139: item id at each worn index (the UI checks the index still points at it). */
+  wornIds?: Partial<Record<GearSlot, string>>;
   effects: GearEffects;
   /** D78: the chosen weapon is two-handed, so the shield / spellbook is taken off (not in `effects`). */
   offhandOff?: boolean;

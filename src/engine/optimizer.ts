@@ -1224,8 +1224,9 @@ export function wearBest(input: OptimizerInput): { gear: GearResult; wornPieces:
     }
   }
   const out: Partial<Record<GearSlot, number>> = {};
+  const wornIds: Partial<Record<GearSlot, string>> = {};
   GEAR_SLOTS.forEach((s, k) => {
-    if (worn[k] !== undefined) out[s] = worn[k];
+    if (worn[k] !== undefined) [out[s], wornIds[s]] = [worn[k], g.pieces[s]![worn[k]!].itemId];
   });
   const oh = GEAR_SLOTS.indexOf('offhand');
   const ohItem = worn[oh] !== undefined ? getItem(g.pieces.offhand![worn[oh]!].itemId) : undefined;
@@ -1234,7 +1235,7 @@ export function wearBest(input: OptimizerInput): { gear: GearResult; wornPieces:
   GEAR_SLOTS.forEach((s, k) => {
     if (worn[k] !== undefined) wornPieces[s] = g.pieces[s]![worn[k]!];
   });
-  return { gear: { worn: out, effects: effectsOf(worn) }, wornPieces, ...(twoHanded ? { twoHanded } : {}) };
+  return { gear: { worn: out, wornIds, effects: effectsOf(worn) }, wornPieces, ...(twoHanded ? { twoHanded } : {}) };
 }
 
 /**
