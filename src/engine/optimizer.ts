@@ -151,6 +151,7 @@ import {
   vesselSliceFlat,
   vesselSpots,
 } from './wheel/build';
+import type { WheelSupremeMod } from '../data/wheel';
 
 export const BEAM_WIDTH = 24;
 /** Beam states greedily completed per level (best-so-far candidates). */
@@ -685,6 +686,8 @@ function gemStatLines(env: GemEnv, vessels: OptimizerResult['vessels']): { lines
   const lines: StatLine[] = [];
   const pooled: Record<string, number> = {};
   const sums = new Map<string, { value: number; unit: string; category: StatLine['category']; cap?: boolean }>();
+  // D133: one line per supreme mod, values of equal mods summed.
+  const supreme = new Map<number, { m: WheelSupremeMod; value: number }>();
   for (const vs of vessels) {
     if (vs.source !== 'owned' || !vs.gem) continue;
     for (const slot of activeSlots(vs.gem.quality, vs.quality, env.wheel.gemSystem === 'resonance')) {
@@ -692,7 +695,7 @@ function gemStatLines(env: GemEnv, vessels: OptimizerResult['vessels']): { lines
       if (!ref) continue;
       if (slot === 'supreme') {
         const m = env.wheel.supremeMods.find((x) => x.id === ref.modId);
-        if (m) lines.push(stat('stat.gemMod', m.gradeValues[ref.grade - 1] ?? '', 'offense', { name: m.name }));
+        if (m) supreme.set(m.id, { m, value: (supreme.get(m.id)?.value ?? 0) + (m.values[ref.grade - 1] ?? 0) });
         continue;
       }
       const m = env.wheel.basicMods.find((x) => x.id === ref.modId);
@@ -709,6 +712,7 @@ function gemStatLines(env: GemEnv, vessels: OptimizerResult['vessels']): { lines
       }
     }
   }
+  for (const { m, value } of supreme.values()) lines.push(stat('stat.gemMod', (m.gradeValues[0] ?? '').replace(/\d+(?:\.\d+)?/, fmt(value, 2)), 'offense', { name: m.name }));
   for (const [name, s] of [...sums].sort((a, b) => a[0].localeCompare(b[0]))) {
     // D114: gem resistance per element is capped.
     const value = s.cap ? Math.min(s.value, GEM_RESIST_CAP) : s.value;

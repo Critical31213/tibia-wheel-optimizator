@@ -50,3 +50,12 @@ describe('D130: the build damage % is the rotation table gain', () => {
     expect(Math.abs(r.wheelEffect!.dmg - gain)).toBeLessThan(0.05);
   });
 });
+
+describe('D133 gem stat lines', () => {
+  it('sums equal supreme mods into one line', () => {
+    const gems = [0, 1].map((i) => ({ id: `g${i}`, quality: 'greater' as const, basic1: { modId: 31, grade: 1 as const }, basic2: null, supreme: { modId: 110, grade: 1 as const } }));
+    const r = optimize({ vocation: 'monk', points: 1950, monsters: [], priority: 0, context: { mode: 'hunt' }, character: { level: 2000, mainSkill: 130 }, alternatives: 0, gems, minVessels: 5 } as unknown as OptimizerInput);
+    const lines = r.stats.filter((s) => s.label.includes('(Base Damage)'));
+    expect(lines.map((s) => s.value)).toEqual(['+10% Base Damage']);
+  });
+});

@@ -71,8 +71,8 @@ export function ResultsPanel({ result }: ResultsPanelProps) {
         <>
           <SubHeading>{t('results.stats')}</SubHeading>
           <dl className="divide-y divide-ink-700 rounded-lg border border-ink-700">
-            {result.stats.map((s) => (
-              <div key={s.label} className="flex items-center justify-between gap-3 px-3 py-1.5 text-sm">
+            {result.stats.map((s, i) => (
+              <div key={`${i}-${s.label}`} className="flex items-center justify-between gap-3 px-3 py-1.5 text-sm">
                 <dt className="text-parchment-200">
                   <span className={cx('mr-2 text-[10px] uppercase', CATEGORY_TEXT[s.category])}>
                     {t(`category.${s.category}`)}
