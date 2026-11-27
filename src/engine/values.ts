@@ -371,6 +371,12 @@ export function spellBundleParts(
   if (!s || v.model.excluded?.has(spell)) return ZERO;
   const stage = s.stageDomain >= 0 ? stages[s.stageDomain] : 3;
   if (s.avatar) return avatarParts(v, stage, effects.filter((e) => e.kind === 'cd').reduce((a, e) => a + e.amount, 0));
+  // D135: a Divine Empowerment cooldown cut raises its field uptime (the revelation part counts the plain spell).
+  if (spell === 'Divine Empowerment') {
+    const cut = effects.reduce((a, e) => a + (e.kind === 'cd' ? e.amount : 0), 0);
+    const items = itemCooldown(v, spell);
+    return { off: divineEmpowermentOff(stage, cut + items) - divineEmpowermentOff(stage, items), def: 0, util: 0 };
+  }
   if (s.revelation >= 0 && stage < 1) return ZERO;
   if (UTILITY_SPELLS.has(spell) && !v.forced.has(spell)) return ZERO;
   if (s.kind === 'damage') {
@@ -552,6 +558,21 @@ export function augmentOtherOff(v: ValuationContext, t: WheelTile, both: boolean
   return off;
 }
 
+/**
+ * D135: Divine Empowerment: +8/10/12 % damage dealt inside a 5 s field = 3 turns of 2 s (6 s of damage); cast at 80 %
+ * of the rate its cooldown (32/28/24 s, minus gem and item cooldown cuts, at least 5 s) allows. Its own support
+ * cooldown group: no attack turn is lost.
+ */
+export function divineEmpowermentOff(stage: number, cdCut = 0): number {
+  if (stage < 1) return 0;
+  const cd = Math.max(DE_FIELD_S, [32, 28, 24][stage - 1] - cdCut);
+  return [8, 10, 12][stage - 1] * Math.min(1, (Math.ceil(DE_FIELD_S / TURN_S) * TURN_S * DE_USAGE) / cd);
+}
+const DE_FIELD_S = 5;
+const TURN_S = 2;
+const DE_USAGE = 0.8;
+const itemCooldown = (v: ValuationContext, spell: string) => (v.model.gear?.augments ?? []).reduce((a, x) => a + (x.kind === 'cooldown' && x.spell === spell ? x.value : 0), 0);
+
 /** Effects not covered by the rotation model (defensive / support revelations). */
 function passiveRevelation(v: ValuationContext, name: string, stage: number): Parts {
   const th = v.threat;
@@ -561,10 +582,8 @@ function passiveRevelation(v: ValuationContext, name: string, stage: number): Pa
       return { off: 0, def: stageVal([3, 4.5, 6], stage) * th * (v.context.mode === 'boss' ? 1.3 : 0.5), util: 0 };
     case 'Combat Mastery':
       return { off: 0, def: stageVal([2, 2.4, 2.8], stage) * th, util: 0 };
-    case 'Divine Empowerment': {
-      const cd = [32, 28, 24][stage - 1];
-      return { off: stageVal([8, 10, 12], stage) * Math.min(1, 5 / cd), def: 0, util: 0 };
-    }
+    case 'Divine Empowerment':
+      return { off: divineEmpowermentOff(stage, itemCooldown(v, 'Divine Empowerment')), def: 0, util: 0 };
     case 'Blessing of the Grove':
       return { off: 0, def: stageVal([3.5, 4.5, 6], stage) * th, util: 0 };
     default:

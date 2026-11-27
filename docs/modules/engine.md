@@ -61,6 +61,7 @@ Every source yields `Parts = { off, def, util }`. They are blended as `score = w
 - `p = priority / 100`;
 - `wOff = max(0.05, 1 − p)`;
 - `wDef = max(0.05, p)`.
+- D135: priority 0 is pure damage: `wOff = 1`, `wDef = wUtil = 0.001` (defense and utility only break ties).
 
 **Character** (`valuationFor`).
 - The engine uses `input.character`. Missing skills are estimated with `defaultCharacterStats` (`src/data/character`).
@@ -144,6 +145,7 @@ The rationale reports the ratio (`rationale.hpOverMitigation` / `rationale.mitig
 **Revelations.** The value of stage s is the sum of:
 - the rotation Δ with only that domain at stage s;
 - passive effects (Gift of Life, Combat Mastery, Divine Empowerment, Blessing of the Grove);
+  - D135: Divine Empowerment = +8/10/12 % × uptime; the 5 s field covers 3 turns of 2 s (6 s), cast at 80 % of the rate its cooldown allows (32/28/24 s minus gem and item cooldown cuts, at least 5 s): `uptime = min(1, 6 / (cooldown / 0.8))`. The Augmented Divine Empowerment gem is valued as the uptime it adds (`divineEmpowermentOff`).
 - the flat Damage & Healing bonus.
 
 **Revelation Mastery** (slice or supreme gem) is valued with look-ahead: `rev(stage(points + x)) − rev(stage(points))`.
@@ -184,6 +186,8 @@ Optional `input.gear` (owned items per slot, D75): `wearBest` picks the set for 
 3. **Refine.** For each domain at stage 1–2, damp it (×0.2) and re-run the search. The result replaces the main build only if its objective under the main valuation is higher (and, in auto mode, the plan stays valid).
    - D131: `exactObjective` compares these candidates: the rotation damage of the built wheel (`placedBuild`, `wheelRotation`, skill boost model) instead of the additive offense parts; other offense (`otherOff`) and defense stay as parts. The weapon re-choice (D45) uses it too.
    - D131: `withoutRevelationSpells`: for each reached revelation spell (not forced, not required by the plan), the plan is re-prepared with that spell excluded and searched; its build wins if its exact objective under the main valuation is higher. The additive parts value a revelation spell by itself and miss the turns it takes from the other, augmented spells.
+   - D135: at priority 0, `pureDamageCheck` also searches with priority 5 and 15 tables and keeps a build with a higher exact objective (the additive tables can rank a build first that deals less in the exact rotation); `withoutRevelationSpells` applies it to its searches too.
+   - D135: `exactSwaps` (last step): 1-for-1 swaps of a full slice for an empty one of the same capacity, ranked by the additive score; the best 24 per round (up to 3 rounds) are compared with the exact objective. Forced seeds, forced revelation stages and forced vessels stay; the plan must stay valid.
 4. **Final pass.** Recompute stages, RM, vessels, stats, recommendations, spells and `plannerCode`.
 5. **Alternatives.** The count is `input.alternatives ?? 2`, clamped to 0..5; none are produced below 100 points. Candidates, in order:
    - Avatar focus (boss mode; avatar revelation ×8);

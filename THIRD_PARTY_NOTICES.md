@@ -27,7 +27,8 @@ TibiaPal's MIT license or by CC BY-SA. On request of CipSoft they will be remove
 Spell damage formulas are fitted on the public damage calculator of TibiaPal (tibiapal.com); community
 averages (hits per spell when hunting), rotation presets and related spell data come from TibiaPal
 (https://github.com/PawelKusnierek/TibiaPal). The weapon proficiency trees, the perk shaping options and the
-client spell ids used to read them come from TibiaPal's proficiency data and calculator; the shaping options were
+client spell ids used to read them come from TibiaPal's proficiency data and calculator; the Divine Empowerment usage assumption (3 turns per field, cast at 80 % of
+the cooldown rate) follows that calculator; the shaping options were
 compiled there from TibiaWiki BR (see below). They are downloaded offline from the repository
 (raw.githubusercontent.com). TibiaPal is licensed as follows:
 

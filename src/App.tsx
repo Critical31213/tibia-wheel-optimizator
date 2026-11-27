@@ -32,6 +32,7 @@ import { characterOf, contextOf } from './lib/inputState';
 import { gearInput } from './lib/gear';
 import { resolveMonsters } from './lib/monsters';
 import { emptyUnlockedByQuality } from './lib/vessels';
+import { SMALL_PULL_SHARE, smallPullTargets, smallPullWins } from './lib/smallPull';
 import { VOCATION_LABELS } from './lib/labels';
 import { resetVocation } from './lib/inputStorage';
 import type { Vocation } from './types';
@@ -55,6 +56,7 @@ function Optimizer({ onReset }: { onReset: () => void }) {
   const deferredGear = useDeferredValue(gear);
   const [compareCode, setCompareCode] = usePersistentCompareCode(inputs.vocation);
   const [showOwn, setShowOwn] = useState(false);
+  const [showSmall, setShowSmall] = useState(false);
   const own = useMemo(() => parseOwnWheel(compareCode), [compareCode]);
   const compareWith = own && own.vocation === inputs.vocation && own.variant === inputs.wheel ? own.points : undefined;
   const deferredCompare = useDeferredValue(compareWith);
@@ -138,6 +140,17 @@ function Optimizer({ onReset }: { onReset: () => void }) {
   const resultWheel = useMemo(() => getWheel(resultVocation, resultVariant), [resultVocation, resultVariant]);
   const shown: BuildResult | null = request ? optimized.result : null;
   const weaponName = (current && shown?.weapon && getWeapon(shown.weapon.best.weaponId)?.name) || null;
+  // D135: the build for a smaller pull, with the shown build valued in the same pull.
+  const smallRequest = useMemo(
+    () =>
+      request && mode === 'hunt' && current && shown && !optimized.busy
+        ? { ...request, spellTargets: smallPullTargets(request.vocation, request.spellTargets), compareWith: shown.allocation }
+        : null,
+    [request, mode, current, shown, optimized.busy],
+  );
+  const smallPull = useOptimizer(smallRequest);
+  const small = smallRequest && smallPull.input?.compareWith === shown?.allocation && smallPullWins(smallPull.result) ? smallPull.result : null;
+  const previewSmall = showSmall && !!small;
   const emptyVessels = useMemo(() => (shown && current ? emptyUnlockedByQuality(shown.vessels) : null), [shown, current]);
 
   return (
@@ -194,14 +207,29 @@ function Optimizer({ onReset }: { onReset: () => void }) {
                 <a href="#gems-heading" className="font-medium text-gold-300 underline hover:text-gold-200">{t('app.noGemsLink')}</a>
               </p>
             )}
+            {small && (
+              <div role="note" className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-sky-500/40 bg-sky-500/10 px-3 py-2 text-xs text-sky-100">
+                <span className="min-w-0 flex-1">
+                  {t('smallPull.note', {
+                    share: Math.round(SMALL_PULL_SHARE * 100),
+                    revelations: small.revelations.filter((r) => r.stage > 0).map((r) => `${r.perk.name} ${['', 'I', 'II', 'III'][r.stage]}`).join(', ') || '-',
+                    dmg: Math.round(small.comparison!.effect.dmg * 10) / 10,
+                  })}
+                </span>
+                <button type="button" onClick={() => setShowSmall(!previewSmall)} className="rounded-md border border-sky-400/50 px-2 py-0.5 font-medium text-sky-100 hover:bg-sky-500/20">
+                  {t(previewSmall ? 'smallPull.back' : 'smallPull.preview')}
+                </button>
+              </div>
+            )}
+            {previewSmall && <p className="mb-2 text-center text-xs font-medium text-sky-200">{t('smallPull.previewTitle')}</p>}
             {showOwn && current && shown?.comparison && (
               <p className="mb-2 text-center text-xs font-medium text-gold-300">{t('compare.ownWheel')}</p>
             )}
             <WheelChart
               wheel={resultWheel}
               variant={resultVariant}
-              result={showOwn && current && shown?.comparison ? shown.comparison : shown}
-              vessels={shown?.vessels}
+              result={previewSmall ? small : showOwn && current && shown?.comparison ? shown.comparison : shown}
+              vessels={previewSmall ? small!.vessels : shown?.vessels}
               mods={resultWheel.mods}
             />
           </Panel>
@@ -236,6 +264,12 @@ function Optimizer({ onReset }: { onReset: () => void }) {
             </Panel>
           )}
           <Panel title={t('app.summaryTitle')} headingId="results-heading">
+            {shown && !gearRequest && (
+              <p role="note" className="mb-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+                {t(inputs.vocation === 'monk' ? 'app.noGearMonk' : 'app.noGear')}{' '}
+                <a href="#gear-heading" className="font-medium text-gold-300 underline hover:text-gold-200">{t('app.noGearLink')}</a>
+              </p>
+            )}
             <div aria-live="polite" aria-busy={optimized.busy} className={optimized.busy ? "opacity-70 transition-opacity" : "transition-opacity"}>
               {shown ? (
                 <ResultsPanel result={shown} />
@@ -261,7 +295,7 @@ function Optimizer({ onReset }: { onReset: () => void }) {
           )}
           {shown && (
             <Panel title={t('export.title')} headingId="export-heading">
-              <ExportPanel key={shown.plannerCode ?? ''} code={shown.plannerCode} />
+              <ExportPanel key={(previewSmall ? small!.plannerCode : shown.plannerCode) ?? ''} code={previewSmall ? small!.plannerCode : shown.plannerCode} />
             </Panel>
           )}
           {shown && (

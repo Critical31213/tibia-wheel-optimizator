@@ -171,6 +171,8 @@ const SCREEN_SEARCH: SearchOpts = { width: 8, complete: 1 };
 const LOOKAHEAD_WEIGHT = 0.6;
 const UTIL_WEIGHT = 0.1;
 const MIN_WEIGHT = 0.05;
+/** D135: at priority 0 defense and utility only break ties (pure damage). */
+const TIE_WEIGHT = 1e-3;
 /** A damage spell counts as useful from this share (%) of total damage. */
 export const USEFUL_SHARE = 3;
 /** Default number of alternative builds. */
@@ -185,6 +187,7 @@ export interface Weights {
 /** `leech` = % EHP per +1 % damage (D29: life leech sustain), added to the offense weight. */
 export function weightsFor(priority: number, leech = 0): Weights {
   const p = clampPriority(priority) / 100;
+  if (p === 0) return { off: 1, def: TIE_WEIGHT, util: TIE_WEIGHT };
   const def = Math.max(MIN_WEIGHT, p);
   return { off: Math.max(MIN_WEIGHT, 1 - p) + def * leech, def, util: UTIL_WEIGHT };
 }
@@ -414,7 +417,7 @@ function improveSwaps(s: Search, start: State, best: State): State {
   return best;
 }
 
-function search(wheel: EngineWheel, t: Tables, budget: number, gemRm: number[][], seed: readonly number[] = [], opts = FULL_SEARCH): State {
+function makeSearch(wheel: EngineWheel, t: Tables, budget: number, gemRm: number[][]): Search {
   const n = wheel.slices.length;
   let density = 0;
   wheel.slices.forEach((sl, i) => {
@@ -430,9 +433,12 @@ function search(wheel: EngineWheel, t: Tables, budget: number, gemRm: number[][]
   });
   density /= n;
   const pairs = wheel.slices.filter((sl) => sl.kind === 'augment' && sl.twin > sl.idx).map((sl): [number, number] => [sl.idx, sl.twin]);
-  const s: Search = { wheel, t, budget, density, gemRm, pairs, completed: new Map() };
+  return { wheel, t, budget, density, gemRm, pairs, completed: new Map() };
+}
+
+function seeded(s: Search, seed: readonly number[]): State {
   let empty: State = {
-    alloc: new Int32Array(n),
+    alloc: new Int32Array(s.wheel.slices.length),
     used: 0,
     domainPts: [0, 0, 0, 0],
     rmFull: [0, 0, 0, 0],
@@ -443,7 +449,14 @@ function search(wheel: EngineWheel, t: Tables, budget: number, gemRm: number[][]
     key: 0,
   };
   // D21: forced augment paths are filled first.
-  for (const i of seed) empty = extend(s, empty, i, wheel.slices[i].capacity);
+  for (const i of seed) empty = extend(s, empty, i, s.wheel.slices[i].capacity);
+  return empty;
+}
+
+function search(wheel: EngineWheel, t: Tables, budget: number, gemRm: number[][], seed: readonly number[] = [], opts = FULL_SEARCH): State {
+  const n = wheel.slices.length;
+  const s = makeSearch(wheel, t, budget, gemRm);
+  const empty = seeded(s, seed);
   let best = complete(s, empty);
   // A full wheel has one allocation; only the fill order differs.
   if (budget >= wheel.definition.totalCapacity) return best;
@@ -2059,6 +2072,68 @@ function refine(p: Prepared, best: State): State {
  * spells. For each reached, not forced revelation spell, a build searched without that spell is compared with the
  * exact objective.
  */
+/** D135: swap candidates per round given to the exact objective (best additive scores first). */
+const EXACT_SWAPS = 24;
+
+/**
+ * D135: final local search. 1-for-1 swaps of a full slice for an empty one of the same capacity, ranked by the
+ * additive tables; the best EXACT_SWAPS per round are compared with the exact objective (rotation of the built wheel,
+ * placed gems), the plan must stay valid.
+ */
+function exactSwaps(p: Prepared, best: State): State {
+  if (p.budget >= p.wheel.definition.totalCapacity) return best;
+  const s = makeSearch(p.wheel, p.tables, p.budget, p.gemRm);
+  const start = seeded(s, p.forced.seed);
+  const n = p.wheel.slices.length;
+  let bestObj = exactObjective(p, best);
+  for (let round = 0; round < 3; round++) {
+    const full = best.path.filter((i) => isFull(p.wheel, best.alloc, i) && start.alloc[i] === 0);
+    const partial = best.path.find((i) => best.alloc[i] > 0 && !isFull(p.wheel, best.alloc, i)) ?? -1;
+    const cands: State[] = [];
+    for (const i of full) {
+      for (let j = 0; j < n; j++) {
+        if (best.alloc[j] > 0 || p.wheel.slices[j].capacity !== p.wheel.slices[i].capacity) continue;
+        const st = replay(s, start, full.filter((x) => x !== i).concat(j), partial, partial >= 0 ? best.alloc[partial] : 0);
+        if (st) cands.push(st);
+      }
+    }
+    let found: State | null = null;
+    const vesselsBefore = p.minVessels?.counts[best.vessels] ?? 0;
+    for (const st of cands.sort((a, b) => b.score - a.score).slice(0, EXACT_SWAPS)) {
+      const stages = gridStages(p, st);
+      // forced revelation stages and vessels stay
+      if (!planValid(p, stages) || stages.some((x, d) => x < p.minStages[d]) || (p.minVessels && p.minVessels.counts[st.vessels] < Math.min(p.minVessels.min, vesselsBefore))) continue;
+      const obj = exactObjective(p, st);
+      if (obj > bestObj + 1e-9) {
+        found = st;
+        bestObj = obj;
+      }
+    }
+    if (!found) return best;
+    best = found;
+  }
+  return best;
+}
+
+/**
+ * D135: at priority 0 the additive tables can rank a build first that deals less in the exact rotation; builds
+ * searched with a little defense weight (priority 5 and 15) compete by the exact objective.
+ */
+function pureDamageCheck(p: Prepared, best: State): State {
+  if (clampPriority(p.input.priority) > 0 || p.budget >= p.wheel.definition.totalCapacity) return best;
+  let bestObj = exactObjective(p, best);
+  for (const prio of [5, 15]) {
+    const q = prepare(p.input, prio, p);
+    const st = runSearch(p, q.tables);
+    const obj = exactObjective(p, st);
+    if (obj > bestObj + 1e-9 && planValid(p, gridStages(p, st))) {
+      best = st;
+      bestObj = obj;
+    }
+  }
+  return best;
+}
+
 function withoutRevelationSpells(p: Prepared, best: State): State {
   if (!p.spec || p.budget >= p.wheel.definition.totalCapacity) return best;
   const stages = gridStages(p, best);
@@ -2070,7 +2145,7 @@ function withoutRevelationSpells(p: Prepared, best: State): State {
     if (!spells.length) return;
     const input = { ...p.input, excludedSpells: [...(p.input.excludedSpells ?? []), ...spells] };
     const q = prepare(input, input.priority, undefined, { ...p.spec!, v: undefined });
-    const st = searchPlan(q);
+    const st = pureDamageCheck(q, searchPlan(q));
     const obj = exactObjective(p, st);
     if (obj > bestObj + 1e-9 && planValid(p, gridStages(p, st))) {
       best = st;
@@ -2485,7 +2560,7 @@ function bestBuild(input: OptimizerInput): { p: Prepared; plans: Prepared[]; mai
     finalists = screened.filter((x, i) => i === 0 || (i === 1 && x.rank === top.rank && x.obj >= top.obj - 0.02 * Math.abs(top.obj))).map((x) => x.q);
   }
   for (const q of finalists) consider(q, searchPlan(q));
-  let main = withoutRevelationSpells(p, refine(p, best ?? runSearch(p)));
+  let main = exactSwaps(p, withoutRevelationSpells(p, pureDamageCheck(p, refine(p, best ?? runSearch(p)))));
   // D45: perks and weapon re-chosen with the build's rotation (stages, augments); kept when the re-searched build is better.
   const again = rechooseWeapon(p, main, plans.length > 1);
   if (again) ({ p, main } = again);

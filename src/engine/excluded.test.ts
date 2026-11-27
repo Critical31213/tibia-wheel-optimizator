@@ -13,8 +13,8 @@ describe('D92: excluded spells', () => {
     const r = optimize({ ...HUNT, excludedSpells: ['Divine Grenade', 'Divine Empowerment'] });
     expect(cast(r)).not.toContain('Divine Grenade');
     expect(augments(r, 'Divine Empowerment')).toBe(0);
-    // The points go elsewhere: the build changes.
-    expect(r.convictions).not.toEqual(base.convictions);
+    // D135: at priority 0 the same wheel can stay best (the revelations keep their flat bonus); the damage drops.
+    expect(r.wheelEffect!.dmg).toBeLessThan(base.wheelEffect!.dmg);
     expect(r.rationaleMsgs?.some((m) => m.key === 'rationale.excluded')).toBe(true);
     expect(r.spells.find((s) => s.name === 'Divine Grenade')).toMatchObject({ useful: false, reasonMsg: { key: 'spell.excluded' } });
   });

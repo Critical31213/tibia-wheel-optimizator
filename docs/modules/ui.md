@@ -154,6 +154,8 @@ Gems and weapons are deliberately **not** in the URL (too long); a shared link c
 - **Release switch (D90)**: with `WHEEL_UPDATE_RELEASED` the toggle is hidden (`wheelVariants()` has one entry), a
   stored or linked `w=live` becomes `current`, and an old-wheel code in the compare panel shows
   `compare.retiredVariant`.
+- **Smaller pull (D135)**: in hunts, after a result `App` runs a second optimizer request (own worker) with the targets of every area spell × 0.6 (`smallPullTargets`, own values else the community averages; `src/lib/smallPull.ts`) and `compareWith` = the shown allocation. When the main build is worse in that pull (verdict close / worse, ≥ 1 % damage) a note above the wheel names the other build's revelations and the gain; "Preview" draws it in `WheelChart` and shows its planner code, "Back to the main build" returns.
+- **No equipment (D135)**: without equipment the summary shows a note that default imbuements and no item bonuses are assumed (monk: also no mantra for Ascetic), with a link to the equipment panel.
 - **Compare with your wheel (D89)**: `ComparePanel` takes a planner code or link (`parseOwnWheel` in
   `src/lib/compare.ts`); a code of the selected vocation and wheel variant is sent as `compareWith` (another
   variant offers a switch). It shows the verdict, the optimal-vs-own gain, the differences where each wheel is
