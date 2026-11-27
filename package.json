@@ -18,7 +18,8 @@
     "import:proficiency": "node scripts/import-proficiency.mjs",
     "import:equipment": "node scripts/import-equipment.mjs",
     "import:augments": "node scripts/import-item-augments.mjs",
-    "import:spots": "node scripts/import-hunting-spots.mjs"
+    "import:spots": "node scripts/import-hunting-spots.mjs",
+    "import:monster-damage": "node scripts/import-monster-damage.mjs"
   },
   "dependencies": {
     "@fontsource/cinzel": "5.2.6",

@@ -140,8 +140,19 @@ The site only lists resistances for the 7 attack elements, so
 npm run scrape:monsters                 # uses scripts/.cache when present
 npm run scrape:monsters -- --refresh    # re-download everything (≈15–35 min)
 npm run scrape:monsters -- --limit 20   # quick debug run on the first 20
+npm run import:monster-damage           # then: attack elements from TibiaWiki (D140)
 npx vitest run src/data                 # validate the new JSON
 ```
+
+## Attack elements from TibiaWiki (D140)
+
+`npm run import:monster-damage` (`scripts/import-monster-damage.mjs`, run after the scraper) reads the `abilities` of
+each creature infobox on TibiaWiki (MediaWiki API, 50 titles per request, cached in `scripts/.cache/monster-wiki/`).
+Melee counts as physical; each `Ability` with a damage element (fields such as fire field, burning, bleeding map to
+their element; conditions like slowed or drunk are skipped) adds its maximum damage to its element (an unknown damage
+counts as the mean of the known ones; a known 0 is skipped). Output per monster: `damageTypes` = union with the scraped
+types, `damageShares` = each element's share of the summed maximum damage. `incomingShares` weights a monster's
+elements by `damageShares` when present, else equally. Creatures not found on the wiki keep the scraped data.
 
 ## Hunting spots (D99)
 

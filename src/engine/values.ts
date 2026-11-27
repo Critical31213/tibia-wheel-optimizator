@@ -167,6 +167,13 @@ export function incomingShares(monsters: { monster: Monster; weight: number }[])
   const total = known.reduce((s, m) => s + m.weight, 0);
   const out: Partial<Record<Element, number>> = {};
   for (const { monster, weight } of known) {
+    // D140: by the element's share of the attacks' maximum damage when known, else equal per type.
+    const shares = Object.entries(monster.damageShares ?? {}).filter(([t, s]) => t !== 'healing' && s > 0) as [Element, number][];
+    const sum = shares.reduce((a, [, s]) => a + s, 0);
+    if (sum > 0) {
+      for (const [t, s] of shares) out[t] = (out[t] ?? 0) + (weight / total) * (s / sum);
+      continue;
+    }
     const types = monster.damageTypes.filter((t) => t !== 'healing');
     for (const t of types) out[t] = (out[t] ?? 0) + weight / total / types.length;
   }

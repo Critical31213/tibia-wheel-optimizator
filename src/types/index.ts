@@ -74,6 +74,8 @@ export interface Monster {
   elementModifiers: Partial<Record<Element, number>>;
   /** Damage types the monster DEALS to the player. */
   damageTypes: Element[];
+  /** D140: share of each element in the summed maximum damage of the monster's attacks (TibiaWiki); undefined = equal. */
+  damageShares?: Partial<Record<Element, number>>;
   /** Estimated max damage per turn, if known. */
   maxDamage?: number;
   /** Bestiary class (weapon proficiency "damage against X" perks); missing for bosses and unclassified creatures. */
