@@ -21,6 +21,7 @@ interface Totals {
   elementMl: Partial<Record<Element, number>>;
   resist: Partial<Record<Element, number>>;
   lifeLeech: number;
+  critChance: number;
 }
 
 function addTo<T extends string>(to: Partial<Record<T, number>>, from: Partial<Record<T, number>> | undefined) {
@@ -49,7 +50,7 @@ const leechOf = (imbues: readonly GearImbue[] | undefined) => (imbues ?? []).red
  * Knights: the trained melee skill (else the best melee bonus).
  */
 export function gearEffects(g: WornGear, vocation: Vocation, meleeSkill: MeleeSkill | null | undefined): GearEffects {
-  const t: Totals = { skills: {}, elementMl: {}, resist: {}, lifeLeech: 0 };
+  const t: Totals = { skills: {}, elementMl: {}, resist: {}, lifeLeech: 0, critChance: 0 };
   for (const s of GEAR_SLOTS) {
     const p = g.pieces[s];
     const item = p && getItem(p.itemId);
@@ -58,6 +59,7 @@ export function gearEffects(g: WornGear, vocation: Vocation, meleeSkill: MeleeSk
     addTo(t.elementMl, item.bonus?.elementMl);
     stackResist(t.resist, item.bonus?.resist);
     t.lifeLeech += item.bonus?.lifeLeech ?? 0;
+    t.critChance += item.bonus?.critChance ?? 0;
     addImbues(t, p.imbues);
   }
   addImbues(t, g.weapon?.imbues);
@@ -98,6 +100,7 @@ export function gearEffects(g: WornGear, vocation: Vocation, meleeSkill: MeleeSk
   const mantra = GEAR_SLOTS.reduce((a, s) => a + (g.pieces[s] ? itemMantra(g.pieces[s]!.itemId) : 0), 0);
   return {
     ...(mantra ? { mantra } : {}),
+    ...(t.critChance ? { itemCritChance: t.critChance } : {}),
     ...(augments.length ? { augments } : {}),
     skills: { main, magic: t.skills.magic ?? 0, shielding: t.skills.shielding ?? 0 },
     elementMl: t.elementMl,

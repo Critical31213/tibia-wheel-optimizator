@@ -370,7 +370,7 @@ export const ONSLAUGHT_DAMAGE = 0.6;
 export function gearModel(g: GearEffects | undefined): GearModel | undefined {
   if (!g) return undefined;
   return {
-    critChance: g.crit ? g.crit.chance - IMBUE_CRIT.chance : 0,
+    critChance: (g.crit ? g.crit.chance - IMBUE_CRIT.chance : 0) + (g.itemCritChance ?? 0),
     critExtra: g.crit ? g.crit.extra - IMBUE_CRIT.extra : 0,
     mult: 1 + (Math.max(0, g.onslaught) / 100) * ONSLAUGHT_DAMAGE,
     ...(g.conversion && g.conversion.pct > 0 ? { conversion: g.conversion } : {}),

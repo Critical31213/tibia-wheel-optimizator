@@ -329,6 +329,7 @@ export const pl: Dictionary = {
   'gear.level.2': "Intricate",
   'gear.level.3': "Powerful",
   'gear.critValue': "{chance}% kryt., +{extra}% obrażeń",
+  'gear.itemCrit': "+{v}% szansy na kryt.",
   'gear.conversionValue': "{v}% na {element}",
   'gear.lifeLeech': "life leech {v}%",
   'gear.augment.critDamage': "{spell}: +{v}% obrażeń krytycznych",

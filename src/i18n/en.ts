@@ -335,6 +335,7 @@ export const en = {
   'gear.level.2': "Intricate",
   'gear.level.3': "Powerful",
   'gear.critValue': "{chance}% crit, +{extra}% damage",
+  'gear.itemCrit': "+{v}% crit chance",
   'gear.conversionValue': "{v}% to {element}",
   'gear.lifeLeech': "life leech {v}%",
   'gear.augment.critDamage': "{spell}: +{v}% critical extra damage",

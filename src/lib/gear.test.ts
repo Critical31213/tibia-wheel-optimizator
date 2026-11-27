@@ -5,7 +5,7 @@ import { optimize } from '../engine';
 import { getWeapon } from '../data/proficiency';
 import { getImbuement, getItem, imbuementsFor, itemsFor, maxTier, SLOT_ITEMS, tierChance } from '../data/equipment';
 import { valuationFor, wearBest } from '../engine/optimizer';
-import { buildSpellModel } from '../engine/spells';
+import { buildSpellModel, gearModel } from '../engine/spells';
 import { resistParts } from '../engine/values';
 import type { GearEffects, Monster, OptimizerInput } from '../types';
 
@@ -121,6 +121,13 @@ describe('wearing the best owned items', () => {
     expect(t(fire).gear.worn).toEqual({ trinket: 1 });
     expect(t(death).gear.worn).toEqual({ trinket: 0 });
     expect(t(fire).gear.effects.resist.fire).toBe(5);
+  });
+
+  it('D138: Cursed Coin crit counts; picked for pure damage', () => {
+    const coin = wearBest({ ...input(death, 0), gear: { pieces: { trinket: [{ itemId: 'moon-mirror' }, { itemId: 'cursed-coin' }] }, weapon: null } })!;
+    expect(coin.gear.worn).toEqual({ trinket: 1 });
+    expect(coin.gear.effects.itemCritChance).toBe(1);
+    expect(gearModel(coin.gear.effects)!.critChance).toBe(1);
   });
 
   it('skips items above the character level', () => {

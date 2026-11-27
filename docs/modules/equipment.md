@@ -23,7 +23,9 @@ Amplification (boots, multiplies the others). Values for tiers 1–6 follow comm
 extrapolated. Highest tier: class 4 → 10, classes 1–3 → their number, no class → 0.
 
 Trinkets (D137): the extra slot (the former ammunition cell of the paper doll) holds one trinket; their resistances
-stack with the other items (D80) and `wearBest` picks the best one for the spot like any other slot.
+stack with the other items (D80) and `wearBest` picks the best one for the spot like any other slot. Item crit chance (Cursed Coin +1 pp, D138) is
+summed into `GearEffects.itemCritChance` and added to the model crit chance on top of the weapon imbuement or the
+default; its −20 % physical resistance counts on the defense side.
 
 ## Storage (`src/lib/gear.ts`)
 

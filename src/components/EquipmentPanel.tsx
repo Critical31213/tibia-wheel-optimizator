@@ -71,6 +71,7 @@ function itemBonusText(t: TFunction, i: EquipmentItem): string {
   for (const [e, v] of Object.entries(b?.elementMl ?? {})) parts.push(`+${v} ML ${t(`element.${e}` as 'element.fire').toLowerCase()}`);
   for (const [e, v] of Object.entries(b?.resist ?? {})) parts.push(`${t(`element.${e}` as 'element.fire').toLowerCase()} ${v > 0 ? '+' : ''}${v}%`);
   if (b?.lifeLeech) parts.push(t('gear.lifeLeech', { v: b.lifeLeech }));
+  if (b?.critChance) parts.push(t('gear.itemCrit', { v: b.critChance }));
   if (i.defense) parts.push(t('gear.defense', { v: i.defense }));
   // D97: augments (bonuses to one spell).
   for (const a of itemAugments(i.id)) parts.push(t(`gear.augment.${a.kind}`, { spell: a.spell, v: a.kind === 'cooldown' ? a.value : Math.round(a.value * 1000) / 10 }));
@@ -430,6 +431,7 @@ function Totals({ fx, set }: { fx: GearEffects | undefined; set: boolean }) {
   if (s.shielding) chips.push(`+${s.shielding} ${t('skill.shielding')}`);
   for (const [e, v] of Object.entries(fx.elementMl)) if (v) chips.push(`+${v} ML ${t(`element.${e}` as 'element.fire').toLowerCase()}`);
   for (const [e, v] of Object.entries(fx.resist)) if (v) chips.push(`${t(`element.${e}` as 'element.fire').toLowerCase()} ${v > 0 ? '+' : ''}${+v.toFixed(1)}%`);
+  if (fx.itemCritChance) chips.push(t('gear.itemCrit', { v: fx.itemCritChance }));
   if (fx.onslaught) chips.push(`${t('gear.effect.onslaught')} ${fx.onslaught.toFixed(2)}%`);
   if (fx.ruse) chips.push(`${t('gear.effect.ruse')} ${fx.ruse.toFixed(2)}%`);
   return (
