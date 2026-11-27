@@ -271,6 +271,7 @@ export const en = {
   'gear.slot.boots': "Boots",
   'gear.slot.ring': "Ring",
   'gear.slot.offhand': "Off-hand",
+  'gear.slot.trinket': "Trinket",
   'gear.slot.weapon': "Weapon",
   'gear.empty': "empty",
   'gear.weaponAuto': "Weapon chosen by the optimizer (add your weapons below; each has its proficiency).",

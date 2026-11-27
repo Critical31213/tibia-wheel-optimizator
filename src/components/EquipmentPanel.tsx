@@ -35,8 +35,8 @@ import { Panel } from './Panel';
 
 type Slot = ImbueSlot;
 
-/** Tibia paper doll; null cells (backpack, ammunition) are not modelled. */
-const DOLL: readonly (Slot | null)[] = ['amulet', 'helmet', null, 'weapon', 'armor', 'offhand', 'ring', 'legs', null, null, 'boots', null];
+/** Tibia paper doll; the backpack is not modelled, the extra slot holds a trinket (D137). */
+const DOLL: readonly (Slot | null)[] = ['amulet', 'helmet', null, 'weapon', 'armor', 'offhand', 'ring', 'legs', 'trinket', null, 'boots', null];
 
 const NOT_MODELLED = new Set(['momentum', 'transcendence']);
 

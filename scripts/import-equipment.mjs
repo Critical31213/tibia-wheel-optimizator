@@ -1,5 +1,5 @@
 /**
- * Offline import of equipment items (helmets, armors, legs, boots, shields, spellbooks, quivers, amulets, rings).
+ * Offline import of equipment items (helmets, armors, legs, boots, shields, spellbooks, quivers, trinkets, amulets, rings).
  *
  * Usage: npm run import:equipment [-- --refresh]
  *
@@ -104,8 +104,8 @@ function vocationsOf(text, name) {
   return out.filter(Boolean);
 }
 
-/** Armory table order on the page: helmets, armors, legs, boots, shields + spellbooks, quivers, (trinkets). */
-const ARMORY = ['helmet', 'armor', 'legs', 'boots', 'shield', 'quiver'];
+/** Armory table order on the page: helmets, armors, legs, boots, shields + spellbooks, quivers, trinkets (D137). */
+const ARMORY = ['helmet', 'armor', 'legs', 'boots', 'shield', 'quiver', 'trinket'];
 /** Equipment page: amulets, rings (other tables are not wearable). */
 const JEWELRY = ['amulet', 'ring'];
 

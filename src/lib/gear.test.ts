@@ -116,6 +116,13 @@ describe('wearing the best owned items', () => {
     expect(wearBest(input(death))!.gear.worn).toEqual({ armor: 0, legs: 1 });
   });
 
+  it('D137: trinket for the spot element', () => {
+    const t = (m: Monster) => wearBest({ ...input(m), gear: { pieces: { trinket: [{ itemId: 'moon-mirror' }, { itemId: 'sun-catcher' }] }, weapon: null } })!;
+    expect(t(fire).gear.worn).toEqual({ trinket: 1 });
+    expect(t(death).gear.worn).toEqual({ trinket: 0 });
+    expect(t(fire).gear.effects.resist.fire).toBe(5);
+  });
+
   it('skips items above the character level', () => {
     const low = { ...input(fire), character: { level: 100, mainSkill: 80 } };
     expect(wearBest(low)!.gear.worn).toEqual({ armor: 1, legs: 0 });

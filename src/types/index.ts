@@ -474,7 +474,7 @@ export interface CharmResult extends CharmAssign {
 }
 
 /** D74: paper-doll slots the player fills (the weapon comes from the owned weapons). */
-export type GearSlot = 'helmet' | 'amulet' | 'armor' | 'legs' | 'boots' | 'ring' | 'offhand';
+export type GearSlot = 'helmet' | 'amulet' | 'armor' | 'legs' | 'boots' | 'ring' | 'offhand' | 'trinket';
 
 export interface GearImbue {
   id: string;

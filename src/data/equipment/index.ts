@@ -27,7 +27,7 @@ export function itemsFor(slots: readonly ItemSlot[], vocation: Vocation): Equipm
 
 /** Equipment slots the user fills (the weapon is the owned-weapons list; only its imbuements and tier are set here). */
 export type { GearSlot };
-export const GEAR_SLOTS: readonly GearSlot[] = ['helmet', 'amulet', 'armor', 'legs', 'boots', 'ring', 'offhand'];
+export const GEAR_SLOTS: readonly GearSlot[] = ['helmet', 'amulet', 'armor', 'legs', 'boots', 'ring', 'offhand', 'trinket'];
 
 export const SLOT_ITEMS: Record<GearSlot, readonly ItemSlot[]> = {
   helmet: ['helmet'],
@@ -37,6 +37,8 @@ export const SLOT_ITEMS: Record<GearSlot, readonly ItemSlot[]> = {
   boots: ['boots'],
   ring: ['ring'],
   offhand: ['shield', 'spellbook', 'quiver'],
+  // D137: extra slot (former ammunition slot).
+  trinket: ['trinket'],
 };
 
 // ---------------------------------------------------------------------------

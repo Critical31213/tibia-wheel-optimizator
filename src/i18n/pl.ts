@@ -265,6 +265,7 @@ export const pl: Dictionary = {
   'gear.slot.boots': "Buty",
   'gear.slot.ring': "Pierścień",
   'gear.slot.offhand': "Druga ręka",
+  'gear.slot.trinket': "Trinket",
   'gear.slot.weapon': "Broń",
   'gear.empty': "pusty",
   'gear.weaponAuto': "Broń wybiera optymalizator (dodaj swoje bronie poniżej, każda ma swoje proficiency).",
